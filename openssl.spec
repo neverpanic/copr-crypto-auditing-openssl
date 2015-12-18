@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2e
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -274,7 +274,7 @@ sslflags=enable-ec_nistp_64_gcc_128
 ./Configure \
 	--prefix=%{_prefix} --openssldir=%{_sysconfdir}/pki/tls ${sslflags} \
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
-	zlib enable-camellia enable-seed enable-tlsext enable-rfc3779 \
+	zlib sctp enable-camellia enable-seed enable-tlsext enable-rfc3779 \
 	enable-cms enable-md2 \
 	no-mdc2 no-rc5 no-ec2m no-gost no-srp \
 	--with-krb5-flavor=MIT --enginesdir=%{_libdir}/openssl/engines \
@@ -490,6 +490,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Dec 18 2015 Tomáš Mráz <tmraz@redhat.com> 1.0.2e-4
+- enable sctp support in DTLS
+
 * Tue Dec  8 2015 Tomáš Mráz <tmraz@redhat.com> 1.0.2e-3
 - remove unimplemented EC method from header (#1289599)
 
