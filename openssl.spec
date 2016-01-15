@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2e
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -83,6 +83,7 @@ Patch92: openssl-1.0.2a-system-cipherlist.patch
 Patch93: openssl-1.0.2a-disable-sslv2v3.patch
 Patch94: openssl-1.0.2d-secp256k1.patch
 Patch95: openssl-1.0.2e-remove-nistp224.patch
+Patch96: openssl-1.0.2e-speed-doc.patch
 # Backported fixes including security fixes
 Patch80: openssl-1.0.2e-wrap-pad.patch
 Patch81: openssl-1.0.2a-padlock64.patch
@@ -205,6 +206,7 @@ cp %{SOURCE12} %{SOURCE13} crypto/ec/
 %patch93 -p1 -b .v2v3
 %patch94 -p1 -b .secp256k1
 %patch95 -p1 -b .nistp224
+%patch96 -p1 -b .speed-doc
 
 %patch80 -p1 -b .wrap
 %patch81 -p1 -b .padlock64
@@ -490,6 +492,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Jan 15 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2e-5
+- document some options of openssl speed command
+
 * Fri Dec 18 2015 Tomáš Mráz <tmraz@redhat.com> 1.0.2e-4
 - enable sctp support in DTLS
 
