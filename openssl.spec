@@ -16,14 +16,14 @@
 
 # Arches on which we need to prevent arch conflicts on opensslconf.h, must
 # also be handled in opensslconf-new.h.
-%define multilib_arches %{ix86} ia64 ppc %{power64} s390 s390x sparcv9 sparc64 x86_64
+%define multilib_arches %{ix86} ia64 %{mips} ppc %{power64} s390 s390x sparcv9 sparc64 x86_64
 
 %global _performance_build 1
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.0.2e
-Release: 5%{?dist}
+Version: 1.0.2f
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -75,7 +75,7 @@ Patch72: openssl-1.0.2a-fips-ctor.patch
 Patch73: openssl-1.0.2c-ecc-suiteb.patch
 Patch74: openssl-1.0.2a-no-md5-verify.patch
 Patch75: openssl-1.0.2a-compat-symbols.patch
-Patch76: openssl-1.0.2a-new-fips-reqs.patch
+Patch76: openssl-1.0.2f-new-fips-reqs.patch
 Patch77: openssl-1.0.2a-weak-ciphers.patch
 Patch78: openssl-1.0.2a-cc-reqs.patch
 Patch90: openssl-1.0.2a-enc-fail.patch
@@ -267,6 +267,15 @@ sslarch=linux-ppc64
 %endif
 %ifarch ppc64le
 sslarch="linux-ppc64le"
+sslflags=enable-ec_nistp_64_gcc_128
+%endif
+%ifarch mips mipsel
+sslarch="linux-mips32 -mips32r2"
+%endif
+%ifarch mips64 mips64el
+sslarch="linux64-mips64 -mips64r2"
+%endif
+%ifarch mips64el
 sslflags=enable-ec_nistp_64_gcc_128
 %endif
 
@@ -493,6 +502,10 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Jan 28 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2f-1
+- minor upstream release 1.0.2f fixing security issues
+- add support for MIPS secondary architecture
+
 * Fri Jan 15 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2e-5
 - document some options of openssl speed command
 
