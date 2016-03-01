@@ -22,8 +22,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.0.2f
-Release: 2%{?dist}
+Version: 1.0.2g
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -56,7 +56,7 @@ Patch33: openssl-1.0.0-beta4-ca-dir.patch
 Patch34: openssl-1.0.2a-x509.patch
 Patch35: openssl-1.0.2a-version-add-engines.patch
 Patch39: openssl-1.0.2a-ipv6-apps.patch
-Patch40: openssl-1.0.2e-fips.patch
+Patch40: openssl-1.0.2g-fips.patch
 Patch45: openssl-1.0.2a-env-zlib.patch
 Patch47: openssl-1.0.2a-readme-warning.patch
 Patch49: openssl-1.0.1i-algo-doc.patch
@@ -70,7 +70,7 @@ Patch65: openssl-1.0.2a-chil-fixes.patch
 Patch66: openssl-1.0.2a-pkgconfig-krb5.patch
 Patch68: openssl-1.0.2a-secure-getenv.patch
 Patch70: openssl-1.0.2a-fips-ec.patch
-Patch71: openssl-1.0.2d-manfix.patch
+Patch71: openssl-1.0.2g-manfix.patch
 Patch72: openssl-1.0.2a-fips-ctor.patch
 Patch73: openssl-1.0.2c-ecc-suiteb.patch
 Patch74: openssl-1.0.2a-no-md5-verify.patch
@@ -80,7 +80,7 @@ Patch77: openssl-1.0.2a-weak-ciphers.patch
 Patch78: openssl-1.0.2a-cc-reqs.patch
 Patch90: openssl-1.0.2a-enc-fail.patch
 Patch92: openssl-1.0.2a-system-cipherlist.patch
-Patch93: openssl-1.0.2a-disable-sslv2v3.patch
+Patch93: openssl-1.0.2g-disable-sslv2v3.patch
 Patch94: openssl-1.0.2d-secp256k1.patch
 Patch95: openssl-1.0.2e-remove-nistp224.patch
 Patch96: openssl-1.0.2e-speed-doc.patch
@@ -502,6 +502,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Mar  1 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2g-1
+- minor upstream release 1.0.2g fixing security issues
+
 * Thu Feb 04 2016 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.0.2f-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_24_Mass_Rebuild
 
