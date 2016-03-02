@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2g
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -287,7 +287,7 @@ sslflags=enable-ec_nistp_64_gcc_128
 	--prefix=%{_prefix} --openssldir=%{_sysconfdir}/pki/tls ${sslflags} \
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib sctp enable-camellia enable-seed enable-tlsext enable-rfc3779 \
-	enable-cms enable-md2 \
+	enable-cms enable-md2 enable-ssl2 \
 	no-mdc2 no-rc5 no-ec2m no-gost no-srp \
 	--with-krb5-flavor=MIT --enginesdir=%{_libdir}/openssl/engines \
 	--with-krb5-dir=/usr shared  ${sslarch} %{?!nofips:fips}
@@ -502,6 +502,10 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Mar  2 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2g-2
+- reenable SSL2 in the build to avoid ABI break (it does not
+  make the openssl vulnerable to DROWN attack)
+
 * Tue Mar  1 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2g-1
 - minor upstream release 1.0.2g fixing security issues
 
