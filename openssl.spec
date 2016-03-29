@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2g
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -88,6 +88,7 @@ Patch96: openssl-1.0.2e-speed-doc.patch
 Patch80: openssl-1.0.2e-wrap-pad.patch
 Patch81: openssl-1.0.2a-padlock64.patch
 Patch82: openssl-1.0.2c-trusted-first-doc.patch
+Patch83: openssl-1.0.2g-remove-ssl2.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -212,6 +213,7 @@ cp %{SOURCE12} %{SOURCE13} crypto/ec/
 %patch80 -p1 -b .wrap
 %patch81 -p1 -b .padlock64
 %patch82 -p1 -b .trusted-first
+%patch83 -p1 -b .remove-ssl2
 
 sed -i 's/SHLIB_VERSION_NUMBER "1.0.0"/SHLIB_VERSION_NUMBER "%{version}"/' crypto/opensslv.h
 
@@ -287,8 +289,8 @@ sslflags=enable-ec_nistp_64_gcc_128
 	--prefix=%{_prefix} --openssldir=%{_sysconfdir}/pki/tls ${sslflags} \
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib sctp enable-camellia enable-seed enable-tlsext enable-rfc3779 \
-	enable-cms enable-md2 enable-ssl2 \
-	no-mdc2 enable-rc5 no-ec2m no-gost no-srp \
+	enable-cms enable-md2 enable-rc5 \
+	no-mdc2 no-ec2m no-gost no-srp \
 	--with-krb5-flavor=MIT --enginesdir=%{_libdir}/openssl/engines \
 	--with-krb5-dir=/usr shared  ${sslarch} %{?!nofips:fips}
 
@@ -502,6 +504,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Mar 29 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2g-4
+- disable SSLv2 support altogether (without ABI break)
+
 * Mon Mar  7 2016 Tom Callaway <spot@fedoraproject.org> - 1.0.2g-3
 - enable RC5
 
