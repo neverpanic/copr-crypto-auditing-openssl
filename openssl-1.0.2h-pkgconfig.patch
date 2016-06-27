@@ -1,7 +1,7 @@
-diff -up openssl-1.0.2a/Makefile.org.krb5 openssl-1.0.2a/Makefile.org
---- openssl-1.0.2a/Makefile.org.krb5	2015-04-21 17:08:41.157464459 +0200
-+++ openssl-1.0.2a/Makefile.org	2015-04-21 17:11:56.887039005 +0200
-@@ -372,7 +372,7 @@ libcrypto.pc: Makefile
+diff -up openssl-1.0.2h/Makefile.org.pkgconfig openssl-1.0.2h/Makefile.org
+--- openssl-1.0.2h/Makefile.org.pkgconfig	2016-05-03 18:06:45.869834730 +0200
++++ openssl-1.0.2h/Makefile.org	2016-06-27 12:04:15.444245018 +0200
+@@ -377,7 +377,7 @@ libcrypto.pc: Makefile
  	    echo 'Requires: '; \
  	    echo 'Libs: -L$${libdir} -lcrypto'; \
  	    echo 'Libs.private: $(EX_LIBS)'; \
@@ -10,9 +10,12 @@ diff -up openssl-1.0.2a/Makefile.org.krb5 openssl-1.0.2a/Makefile.org
  
  libssl.pc: Makefile
  	@ ( echo 'prefix=$(INSTALLTOP)'; \
-@@ -385,7 +385,7 @@ libssl.pc: Makefile
+@@ -388,9 +388,9 @@ libssl.pc: Makefile
+ 	    echo 'Name: OpenSSL-libssl'; \
+ 	    echo 'Description: Secure Sockets Layer and cryptography libraries'; \
  	    echo 'Version: '$(VERSION); \
- 	    echo 'Requires.private: libcrypto'; \
+-	    echo 'Requires.private: libcrypto'; \
++	    echo 'Requires: libcrypto'; \
  	    echo 'Libs: -L$${libdir} -lssl'; \
 -	    echo 'Libs.private: $(EX_LIBS)'; \
 +	    echo 'Libs.private: $(EX_LIBS) $(LIBKRB5)'; \

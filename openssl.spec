@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2h
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -67,7 +67,7 @@ Patch58: openssl-1.0.2a-fips-md5-allow.patch
 Patch60: openssl-1.0.2a-apps-dgst.patch
 Patch63: openssl-1.0.2a-xmpp-starttls.patch
 Patch65: openssl-1.0.2a-chil-fixes.patch
-Patch66: openssl-1.0.2a-pkgconfig-krb5.patch
+Patch66: openssl-1.0.2h-pkgconfig.patch
 Patch68: openssl-1.0.2a-secure-getenv.patch
 Patch70: openssl-1.0.2a-fips-ec.patch
 Patch71: openssl-1.0.2g-manfix.patch
@@ -190,7 +190,7 @@ cp %{SOURCE12} %{SOURCE13} crypto/ec/
 %patch60 -p1 -b .dgst
 %patch63 -p1 -b .starttls
 %patch65 -p1 -b .chil
-%patch66 -p1 -b .krb5
+%patch66 -p1 -b .pkgconfig
 %patch68 -p1 -b .secure-getenv
 %patch70 -p1 -b .fips-ec
 %patch71 -p1 -b .manfix
@@ -500,6 +500,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Jun 27 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2h-2
+- require libcrypto in libssl.pc (#1301301)
+
 * Tue May  3 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2h-1
 - minor upstream release 1.0.2h fixing security issues
 
