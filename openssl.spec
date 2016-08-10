@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2h
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -87,6 +87,7 @@ Patch96: openssl-1.0.2e-speed-doc.patch
 Patch80: openssl-1.0.2e-wrap-pad.patch
 Patch81: openssl-1.0.2a-padlock64.patch
 Patch82: openssl-1.0.2h-trusted-first-doc.patch
+Patch83: openssl-1.0.2h-dtls-bad-ver.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -210,6 +211,7 @@ cp %{SOURCE12} %{SOURCE13} crypto/ec/
 %patch80 -p1 -b .wrap
 %patch81 -p1 -b .padlock64
 %patch82 -p1 -b .trusted-first
+%patch83 -p1 -b .dtls-bad-ver
 
 sed -i 's/SHLIB_VERSION_NUMBER "1.0.0"/SHLIB_VERSION_NUMBER "%{version}"/' crypto/opensslv.h
 
@@ -500,6 +502,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Aug 10 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2h-3
+- fix regression in Cisco AnyConnect VPN support (#1354588)
+
 * Mon Jun 27 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2h-2
 - require libcrypto in libssl.pc (#1301301)
 
