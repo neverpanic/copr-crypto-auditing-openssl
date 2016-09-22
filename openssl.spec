@@ -22,8 +22,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.0.2h
-Release: 3%{?dist}
+Version: 1.0.2i
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -56,7 +56,7 @@ Patch33: openssl-1.0.0-beta4-ca-dir.patch
 Patch34: openssl-1.0.2a-x509.patch
 Patch35: openssl-1.0.2a-version-add-engines.patch
 Patch39: openssl-1.0.2a-ipv6-apps.patch
-Patch40: openssl-1.0.2h-fips.patch
+Patch40: openssl-1.0.2i-fips.patch
 Patch45: openssl-1.0.2a-env-zlib.patch
 Patch47: openssl-1.0.2a-readme-warning.patch
 Patch49: openssl-1.0.1i-algo-doc.patch
@@ -66,18 +66,18 @@ Patch56: openssl-1.0.2a-rsa-x931.patch
 Patch58: openssl-1.0.2a-fips-md5-allow.patch
 Patch60: openssl-1.0.2a-apps-dgst.patch
 Patch63: openssl-1.0.2a-xmpp-starttls.patch
-Patch65: openssl-1.0.2a-chil-fixes.patch
+Patch65: openssl-1.0.2i-chil-fixes.patch
 Patch66: openssl-1.0.2h-pkgconfig.patch
-Patch68: openssl-1.0.2a-secure-getenv.patch
+Patch68: openssl-1.0.2i-secure-getenv.patch
 Patch70: openssl-1.0.2a-fips-ec.patch
 Patch71: openssl-1.0.2g-manfix.patch
 Patch72: openssl-1.0.2a-fips-ctor.patch
 Patch73: openssl-1.0.2c-ecc-suiteb.patch
 Patch74: openssl-1.0.2a-no-md5-verify.patch
 Patch75: openssl-1.0.2a-compat-symbols.patch
-Patch76: openssl-1.0.2f-new-fips-reqs.patch
+Patch76: openssl-1.0.2i-new-fips-reqs.patch
 Patch78: openssl-1.0.2a-cc-reqs.patch
-Patch90: openssl-1.0.2a-enc-fail.patch
+Patch90: openssl-1.0.2i-enc-fail.patch
 Patch92: openssl-1.0.2a-system-cipherlist.patch
 Patch93: openssl-1.0.2g-disable-sslv2v3.patch
 Patch94: openssl-1.0.2d-secp256k1.patch
@@ -86,8 +86,7 @@ Patch96: openssl-1.0.2e-speed-doc.patch
 # Backported fixes including security fixes
 Patch80: openssl-1.0.2e-wrap-pad.patch
 Patch81: openssl-1.0.2a-padlock64.patch
-Patch82: openssl-1.0.2h-trusted-first-doc.patch
-Patch83: openssl-1.0.2h-dtls-bad-ver.patch
+Patch82: openssl-1.0.2i-trusted-first-doc.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -211,7 +210,6 @@ cp %{SOURCE12} %{SOURCE13} crypto/ec/
 %patch80 -p1 -b .wrap
 %patch81 -p1 -b .padlock64
 %patch82 -p1 -b .trusted-first
-%patch83 -p1 -b .dtls-bad-ver
 
 sed -i 's/SHLIB_VERSION_NUMBER "1.0.0"/SHLIB_VERSION_NUMBER "%{version}"/' crypto/opensslv.h
 
@@ -457,7 +455,10 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %dir %{_sysconfdir}/pki/CA/newcerts
 %{_sysconfdir}/pki/tls/misc/c_*
 %attr(0755,root,root) %{_bindir}/openssl
-%attr(0644,root,root) %{_mandir}/man1*/[ABD-Zabcd-z]*
+%attr(0644,root,root) %{_mandir}/man1*/*
+%exclude %{_mandir}/man1*/*.pl*
+%exclude %{_mandir}/man1*/c_rehash*
+%exclude %{_mandir}/man1*/tsget*
 %attr(0644,root,root) %{_mandir}/man5*/*
 %attr(0644,root,root) %{_mandir}/man7*/*
 
@@ -494,6 +495,8 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %defattr(-,root,root)
 %attr(0755,root,root) %{_bindir}/c_rehash
 %attr(0644,root,root) %{_mandir}/man1*/*.pl*
+%attr(0644,root,root) %{_mandir}/man1*/c_rehash*
+%attr(0644,root,root) %{_mandir}/man1*/tsget*
 %{_sysconfdir}/pki/tls/misc/*.pl
 %{_sysconfdir}/pki/tls/misc/tsget
 
@@ -502,6 +505,10 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Sep 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2i-1
+- minor upstream release 1.0.2i fixing security issues
+- move man pages for perl based scripts to perl subpackage (#1377617)
+
 * Wed Aug 10 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2h-3
 - fix regression in Cisco AnyConnect VPN support (#1354588)
 
