@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2i
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -42,7 +42,7 @@ Source13: ectest.c
 # Build changes
 Patch1: openssl-1.0.2e-rpmbuild.patch
 Patch2: openssl-1.0.2a-defaults.patch
-Patch4: openssl-1.0.2a-enginesdir.patch
+Patch4: openssl-1.0.2i-enginesdir.patch
 Patch5: openssl-1.0.2a-no-rpath.patch
 Patch6: openssl-1.0.2a-test-use-localhost.patch
 Patch7: openssl-1.0.0-timezone.patch
@@ -505,6 +505,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Sat Sep 24 2016 David Woodhouse <dwmw2@infradead.org> 1.0.2i-2
+- Fix enginesdir in libcrypto.c (#1375361)
+
 * Thu Sep 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2i-1
 - minor upstream release 1.0.2i fixing security issues
 - move man pages for perl based scripts to perl subpackage (#1377617)

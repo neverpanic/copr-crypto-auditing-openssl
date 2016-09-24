@@ -47,10 +47,10 @@ diff -up openssl-1.0.2a/Configure.system openssl-1.0.2a/Configure
  
  foreach (sort (keys %disabled))
  	{
-@@ -1667,6 +1676,7 @@ while (<IN>)
- 	s/^INSTALLTOP=.*$/INSTALLTOP=$prefix/;
+@@ -1668,6 +1677,7 @@ while (<IN>)
  	s/^MULTILIB=.*$/MULTILIB=$multilib/;
  	s/^OPENSSLDIR=.*$/OPENSSLDIR=$openssldir/;
+ 	s/^ENGINESDIR=.*$/ENGINESDIR=$enginesdir/;
 +	s/^SYSTEM_CIPHERS_FILE=.*$/SYSTEM_CIPHERS_FILE=$system_ciphers_file/;
  	s/^LIBDIR=.*$/LIBDIR=$libdir/;
  	s/^INSTALL_PREFIX=.*$/INSTALL_PREFIX=$install_prefix/;
