@@ -22,8 +22,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.0.2i
-Release: 2%{?dist}
+Version: 1.0.2j
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -505,6 +505,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Sep 26 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2j-1
+- minor upstream release 1.0.2j fixing regression from previous release
+
 * Sat Sep 24 2016 David Woodhouse <dwmw2@infradead.org> 1.0.2i-2
 - Fix enginesdir in libcrypto.c (#1375361)
 
