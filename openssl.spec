@@ -23,7 +23,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.0.2j
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -276,6 +276,9 @@ sslarch="linux64-mips64 -mips64r2"
 %ifarch mips64el
 sslflags=enable-ec_nistp_64_gcc_128
 %endif
+%ifarch riscv64
+sslarch=linux-generic64
+%endif
 
 # ia64, x86_64, ppc are OK by default
 # Configure the build tree.  Override OpenSSL defaults with known-good defaults
@@ -505,6 +508,9 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/fipscanister.*
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Oct 07 2016 Richard W.M. Jones <rjones@redhat.com> - 1:1.0.2j-2
+- Add flags for riscv64.
+
 * Mon Sep 26 2016 Tomáš Mráz <tmraz@redhat.com> 1.0.2j-1
 - minor upstream release 1.0.2j fixing regression from previous release
 
