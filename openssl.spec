@@ -59,6 +59,7 @@ Patch39: openssl-1.1.0-cc-reqs.patch
 Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
+Patch43: openssl-1.1.0-afalg-eventfd2.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -158,6 +159,7 @@ cp %{SOURCE13} test/
 %patch40 -p1 -b .disable-ssl3
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
+%patch43 -p1 -b .eventfd2
 
 %build
 # Figure out which flags we want to use.
