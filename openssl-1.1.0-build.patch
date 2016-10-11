@@ -21,13 +21,10 @@ diff -up openssl-1.1.0b/Configurations/10-main.conf.build openssl-1.1.0b/Configu
      },
  
      "linux-armv4" => {
-@@ -680,7 +681,10 @@ sub vms_info {
-     },
+@@ -681,6 +682,7 @@ sub vms_info {
      "linux-aarch64" => {
          inherit_from     => [ "linux-generic64", asm("aarch64_asm") ],
-+        cflags           => add("-m64 -DL_ENDIAN"),
          perlasm_scheme   => "linux64",
-+        shared_ldflag    => "-m64",
 +        multilib         => "64",
      },
      "linux-arm64ilp32" => {  # https://wiki.linaro.org/Platform/arm64-ilp32
