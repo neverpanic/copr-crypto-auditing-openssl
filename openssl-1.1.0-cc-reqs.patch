@@ -1,8 +1,8 @@
-diff -up openssl-1.0.2a/crypto/rsa/rsa_gen.c.cc-reqs openssl-1.0.2a/crypto/rsa/rsa_gen.c
---- openssl-1.0.2a/crypto/rsa/rsa_gen.c.cc-reqs	2015-04-09 18:22:58.638448432 +0200
-+++ openssl-1.0.2a/crypto/rsa/rsa_gen.c	2015-04-09 18:22:57.264416692 +0200
-@@ -474,6 +474,12 @@ static int rsa_builtin_keygen(RSA *rsa,
-     if (!rsa->iqmp && ((rsa->iqmp = BN_new()) == NULL))
+diff -up openssl-1.1.0-pre5/crypto/rsa/rsa_gen.c.cc-reqs openssl-1.1.0-pre5/crypto/rsa/rsa_gen.c
+--- openssl-1.1.0-pre5/crypto/rsa/rsa_gen.c.cc-reqs	2016-04-19 16:57:54.000000000 +0200
++++ openssl-1.1.0-pre5/crypto/rsa/rsa_gen.c	2016-07-20 17:01:49.929695542 +0200
+@@ -123,6 +123,12 @@ static int rsa_builtin_keygen(RSA *rsa,
+     if (!rsa->iqmp && ((rsa->iqmp = BN_secure_new()) == NULL))
          goto err;
  
 +    /* prepare minimum p and q difference */
@@ -14,7 +14,7 @@ diff -up openssl-1.0.2a/crypto/rsa/rsa_gen.c.cc-reqs openssl-1.0.2a/crypto/rsa/r
      BN_copy(rsa->e, e_value);
  
      /* generate p and q */
-@@ -501,7 +507,9 @@ static int rsa_builtin_keygen(RSA *rsa,
+@@ -150,7 +156,9 @@ static int rsa_builtin_keygen(RSA *rsa,
          do {
              if (!BN_generate_prime_ex(rsa->q, bitsq, 0, NULL, NULL, cb))
                  goto err;

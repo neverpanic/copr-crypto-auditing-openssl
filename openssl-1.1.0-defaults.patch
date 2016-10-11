@@ -1,6 +1,6 @@
-diff -up openssl-1.0.2a/apps/openssl.cnf.defaults openssl-1.0.2a/apps/openssl.cnf
---- openssl-1.0.2a/apps/openssl.cnf.defaults	2015-03-19 14:30:36.000000000 +0100
-+++ openssl-1.0.2a/apps/openssl.cnf	2015-04-20 14:37:10.112271850 +0200
+diff -up openssl-1.1.0-pre5/apps/openssl.cnf.defaults openssl-1.1.0-pre5/apps/openssl.cnf
+--- openssl-1.1.0-pre5/apps/openssl.cnf.defaults	2016-04-19 16:57:52.000000000 +0200
++++ openssl-1.1.0-pre5/apps/openssl.cnf	2016-07-18 14:22:08.252691017 +0200
 @@ -72,7 +72,7 @@ cert_opt 	= ca_default		# Certificate fi
  
  default_days	= 365			# how long to certify for
@@ -49,12 +49,3 @@ diff -up openssl-1.0.2a/apps/openssl.cnf.defaults openssl-1.0.2a/apps/openssl.cn
  commonName_max			= 64
  
  emailAddress			= Email Address
-@@ -339,7 +341,7 @@ signer_key	= $dir/private/tsakey.pem # T
- default_policy	= tsa_policy1		# Policy if request did not specify it
- 					# (optional)
- other_policies	= tsa_policy2, tsa_policy3	# acceptable policies (optional)
--digests		= md5, sha1		# Acceptable message digests (mandatory)
-+digests		= sha1, sha256, sha384, sha512	# Acceptable message digests (mandatory)
- accuracy	= secs:1, millisecs:500, microsecs:100	# (optional)
- clock_precision_digits  = 0	# number of digits after dot. (optional)
- ordering		= yes	# Is ordering defined for timestamps?
