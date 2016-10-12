@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0b
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -60,6 +60,7 @@ Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
+Patch44: openssl-1.1.0-afalg-endian.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -160,6 +161,7 @@ cp %{SOURCE13} test/
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
+%patch44 -p1 -b .endian
 
 %build
 # Figure out which flags we want to use.
@@ -423,6 +425,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Oct 12 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-2
+- fix afalg failure on big endian
+
 * Tue Oct 11 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-1
 - update to upstream version 1.1.0b
 
