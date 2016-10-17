@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0b
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -425,6 +425,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Oct 12 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-3
+- do not break contract on return value when using dsa_builtin_paramgen2()
+
 * Wed Oct 12 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-2
 - fix afalg failure on big endian
 

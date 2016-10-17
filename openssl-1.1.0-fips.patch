@@ -388,7 +388,16 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
  
  int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
                           const EVP_MD *evpmd, const unsigned char *seed_in,
-@@ -315,6 +344,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -301,7 +330,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+                           int *counter_ret, unsigned long *h_ret,
+                           BN_GENCB *cb)
+ {
+-    int ok = -1;
++    int ok = 0;
+     unsigned char *seed = NULL, *seed_tmp = NULL;
+     unsigned char md[EVP_MAX_MD_SIZE];
+     int mdsize;
+@@ -318,6 +347,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
      if (mctx == NULL)
          goto err;
  
@@ -409,6 +418,15 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
      if (evpmd == NULL) {
          if (N == 160)
              evpmd = EVP_sha1();
+@@ -579,7 +622,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+         BN_free(ret->g);
+         ret->g = BN_dup(g);
+         if (ret->p == NULL || ret->q == NULL || ret->g == NULL) {
+-            ok = -1;
++            ok = 0;
+             goto err;
+         }
+         if (counter_ret != NULL)
 diff -up openssl-1.1.0/crypto/dsa/dsa_key.c.fips openssl-1.1.0/crypto/dsa/dsa_key.c
 --- openssl-1.1.0/crypto/dsa/dsa_key.c.fips	2016-08-25 17:29:20.000000000 +0200
 +++ openssl-1.1.0/crypto/dsa/dsa_key.c	2016-09-08 11:37:38.735459940 +0200
