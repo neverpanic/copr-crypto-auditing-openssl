@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0b
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -425,6 +425,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Nov  4 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-4
+- use a random seed if the supplied one did not generate valid
+  parameters in dsa_builtin_paramgen2()
+
 * Wed Oct 12 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-3
 - do not break contract on return value when using dsa_builtin_paramgen2()
 

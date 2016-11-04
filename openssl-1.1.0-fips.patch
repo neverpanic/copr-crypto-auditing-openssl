@@ -331,9 +331,9 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_err.c.fips openssl-1.1.0/crypto/dsa/dsa_er
      {ERR_REASON(DSA_R_PARAMETER_ENCODING_ERROR), "parameter encoding error"},
      {ERR_REASON(DSA_R_Q_NOT_PRIME), "q not prime"},
      {0, NULL}
-diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_gen.c
---- openssl-1.1.0/crypto/dsa/dsa_gen.c.fips	2016-08-25 17:29:20.000000000 +0200
-+++ openssl-1.1.0/crypto/dsa/dsa_gen.c	2016-09-08 11:37:38.734459917 +0200
+diff -up openssl-1.1.0b/crypto/dsa/dsa_gen.c.fips openssl-1.1.0b/crypto/dsa/dsa_gen.c
+--- openssl-1.1.0b/crypto/dsa/dsa_gen.c.fips	2016-09-26 11:46:05.000000000 +0200
++++ openssl-1.1.0b/crypto/dsa/dsa_gen.c	2016-11-04 11:47:40.258493737 +0100
 @@ -22,12 +22,22 @@
  #include <openssl/rand.h>
  #include <openssl/sha.h>
@@ -357,7 +357,7 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
      if (ret->meth->dsa_paramgen)
          return ret->meth->dsa_paramgen(ret, bits, seed_in, seed_len,
                                         counter_ret, h_ret, cb);
-@@ -35,11 +45,30 @@ int DSA_generate_parameters_ex(DSA *ret,
+@@ -35,9 +45,15 @@ int DSA_generate_parameters_ex(DSA *ret,
          const EVP_MD *evpmd = bits >= 2048 ? EVP_sha256() : EVP_sha1();
          size_t qbits = EVP_MD_size(evpmd) * 8;
  
@@ -372,23 +372,8 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
 +# endif
      }
  }
-+# ifdef OPENSSL_FIPS
-+int FIPS_dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
-+                              const EVP_MD *evpmd,
-+                              const unsigned char *seed_in, size_t seed_len,
-+                              int *counter_ret, unsigned long *h_ret,
-+                              BN_GENCB *cb)
-+{
-+    return dsa_builtin_paramgen2(ret, bits, qbits,
-+                                 evpmd, seed_in, seed_len,
-+                                 -1, NULL, counter_ret, h_ret, cb);
-+}
-+# endif
-+
  
- int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
-                          const EVP_MD *evpmd, const unsigned char *seed_in,
-@@ -301,7 +330,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -301,7 +317,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
                            int *counter_ret, unsigned long *h_ret,
                            BN_GENCB *cb)
  {
@@ -397,7 +382,7 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
      unsigned char *seed = NULL, *seed_tmp = NULL;
      unsigned char md[EVP_MAX_MD_SIZE];
      int mdsize;
-@@ -318,6 +347,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -318,6 +334,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
      if (mctx == NULL)
          goto err;
  
@@ -418,7 +403,36 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
      if (evpmd == NULL) {
          if (N == 160)
              evpmd = EVP_sha1();
-@@ -579,7 +622,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -416,9 +446,10 @@ int dsa_builtin_paramgen2(DSA *ret, size
+                 goto err;
+             /* Provided seed didn't produce a prime: error */
+             if (seed_in) {
+-                ok = 0;
+-                DSAerr(DSA_F_DSA_BUILTIN_PARAMGEN2, DSA_R_Q_NOT_PRIME);
+-                goto err;
++                /* Different seed_out will indicate that seed_in
++                 * did not generate primes.
++                 */
++                seed_in = NULL;
+             }
+ 
+             /* do a callback call */
+@@ -504,11 +535,14 @@ int dsa_builtin_paramgen2(DSA *ret, size
+             if (counter >= (int)(4 * L))
+                 break;
+         }
++#if 0
++        /* Cannot happen */
+         if (seed_in) {
+             ok = 0;
+             DSAerr(DSA_F_DSA_BUILTIN_PARAMGEN2, DSA_R_INVALID_PARAMETERS);
+             goto err;
+         }
++#endif
+     }
+  end:
+     if (!BN_GENCB_call(cb, 2, 1))
+@@ -579,7 +613,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
          BN_free(ret->g);
          ret->g = BN_dup(g);
          if (ret->p == NULL || ret->q == NULL || ret->g == NULL) {
@@ -427,6 +441,60 @@ diff -up openssl-1.1.0/crypto/dsa/dsa_gen.c.fips openssl-1.1.0/crypto/dsa/dsa_ge
              goto err;
          }
          if (counter_ret != NULL)
+@@ -597,3 +631,53 @@ int dsa_builtin_paramgen2(DSA *ret, size
+     EVP_MD_CTX_free(mctx);
+     return ok;
+ }
++
++#ifdef OPENSSL_FIPS
++
++int FIPS_dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
++                               const EVP_MD *evpmd, const unsigned char *seed_in,
++                               size_t seed_len, int idx, unsigned char *seed_out,
++                               int *counter_ret, unsigned long *h_ret,
++                               BN_GENCB *cb)
++{
++    return dsa_builtin_paramgen2(ret, L, N, evpmd, seed_in, seed_len,
++        idx, seed_out, counter_ret, h_ret, cb);
++}
++
++int FIPS_dsa_paramgen_check_g(DSA *dsa)
++{
++    BN_CTX *ctx;
++    BIGNUM *tmp;
++    BN_MONT_CTX *mont = NULL;
++    int rv = -1;
++
++    ctx = BN_CTX_new();
++    if (ctx == NULL)
++        return -1;
++    BN_CTX_start(ctx);
++    if (BN_cmp(dsa->g, BN_value_one()) <= 0)
++        return 0;
++    if (BN_cmp(dsa->g, dsa->p) >= 0)
++        return 0;
++    tmp = BN_CTX_get(ctx);
++    if (tmp == NULL)
++        goto err;
++    if ((mont=BN_MONT_CTX_new()) == NULL)
++        goto err;
++    if (!BN_MONT_CTX_set(mont,dsa->p,ctx))
++        goto err;
++    /* Work out g^q mod p */
++    if (!BN_mod_exp_mont(tmp,dsa->g,dsa->q, dsa->p, ctx, mont))
++        goto err;
++    if (!BN_cmp(tmp, BN_value_one()))
++        rv = 1;
++    else
++        rv = 0;
++ err:
++    BN_CTX_end(ctx);
++    BN_MONT_CTX_free(mont);
++    BN_CTX_free(ctx);
++    return rv;
++}
++
++#endif
 diff -up openssl-1.1.0/crypto/dsa/dsa_key.c.fips openssl-1.1.0/crypto/dsa/dsa_key.c
 --- openssl-1.1.0/crypto/dsa/dsa_key.c.fips	2016-08-25 17:29:20.000000000 +0200
 +++ openssl-1.1.0/crypto/dsa/dsa_key.c	2016-09-08 11:37:38.735459940 +0200
@@ -11397,6 +11465,22 @@ diff -up openssl-1.1.0/crypto/sha/sha512.c.fips openssl-1.1.0/crypto/sha/sha512.
      c->h[0] = U64(0x6a09e667f3bcc908);
      c->h[1] = U64(0xbb67ae8584caa73b);
      c->h[2] = U64(0x3c6ef372fe94f82b);
+diff -up openssl-1.1.0b/doc/crypto/DSA_generate_parameters.pod.fips openssl-1.1.0b/doc/crypto/DSA_generate_parameters.pod
+--- openssl-1.1.0b/doc/crypto/DSA_generate_parameters.pod.fips	2016-09-26 11:46:06.000000000 +0200
++++ openssl-1.1.0b/doc/crypto/DSA_generate_parameters.pod	2016-11-04 12:03:51.544906058 +0100
+@@ -29,8 +29,10 @@ B<bits> is the length of the prime p to
+ For lengths under 2048 bits, the length of q is 160 bits; for lengths
+ greater than or equal to 2048 bits, the length of q is set to 256 bits.
+ 
+-If B<seed> is NULL, the primes will be generated at random.
+-If B<seed_len> is less than the length of q, an error is returned.
++If B<seed> is NULL, or it does not generate primes, the primes will be
++generated at random.
++If B<seed_len> is less than the length of q, an error is returned
++if old DSA parameter generation method is used as a backend.
+ 
+ DSA_generate_parameters_ex() places the iteration count in
+ *B<counter_ret> and a counter used for finding a generator in
 diff -up openssl-1.1.0/include/openssl/crypto.h.fips openssl-1.1.0/include/openssl/crypto.h
 --- openssl-1.1.0/include/openssl/crypto.h.fips	2016-08-25 17:29:22.000000000 +0200
 +++ openssl-1.1.0/include/openssl/crypto.h	2016-09-08 11:37:38.746460186 +0200
@@ -11536,10 +11620,10 @@ diff -up openssl-1.1.0/include/openssl/evp.h.fips openssl-1.1.0/include/openssl/
  # define EVP_R_UNKNOWN_CIPHER                             160
  # define EVP_R_UNKNOWN_DIGEST                             161
  # define EVP_R_UNKNOWN_OPTION                             169
-diff -up openssl-1.1.0/include/openssl/fips.h.fips openssl-1.1.0/include/openssl/fips.h
---- openssl-1.1.0/include/openssl/fips.h.fips	2016-09-08 11:37:38.746460186 +0200
-+++ openssl-1.1.0/include/openssl/fips.h	2016-09-08 11:37:38.746460186 +0200
-@@ -0,0 +1,176 @@
+diff -up openssl-1.1.0b/include/openssl/fips.h.fips openssl-1.1.0b/include/openssl/fips.h
+--- openssl-1.1.0b/include/openssl/fips.h.fips	2016-10-11 10:19:52.091719206 +0200
++++ openssl-1.1.0b/include/openssl/fips.h	2016-11-04 11:22:26.548391059 +0100
+@@ -0,0 +1,186 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -11590,6 +11674,9 @@ diff -up openssl-1.1.0/include/openssl/fips.h.fips openssl-1.1.0/include/openssl
 + */
 +
 +#include <openssl/opensslconf.h>
++#include <openssl/dsa.h>
++#include <openssl/evp.h>
++#include <openssl/bn.h>
 +
 +#ifndef OPENSSL_FIPS
 +# error FIPS is disabled.
@@ -11604,6 +11691,13 @@ diff -up openssl-1.1.0/include/openssl/fips.h.fips openssl-1.1.0/include/openssl
 +    int FIPS_selftest(void);
 +    int FIPS_selftest_failed(void);
 +    int FIPS_selftest_drbg_all(void);
++
++    int FIPS_dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
++                               const EVP_MD *evpmd, const unsigned char *seed_in,
++                               size_t seed_len, int idx, unsigned char *seed_out,
++                               int *counter_ret, unsigned long *h_ret,
++                               BN_GENCB *cb);
++    int FIPS_dsa_paramgen_check_g(DSA *dsa);
 +
 +/* BEGIN ERROR CODES */
 +/* The following lines are auto generated by the script mkerr.pl. Any changes
