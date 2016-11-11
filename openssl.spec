@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0b
-Release: 4%{?dist}
+Version: 1.1.0c
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -41,7 +41,6 @@ Source13: ectest.c
 Patch1: openssl-1.1.0-build.patch
 Patch2: openssl-1.1.0-defaults.patch
 Patch3: openssl-1.1.0-no-html.patch
-Patch5: openssl-1.1.0-no-rpath.patch
 # Bug fixes
 Patch21: openssl-1.1.0-issuer-hash.patch
 Patch22: openssl-1.1.0-algo-doc.patch
@@ -60,7 +59,6 @@ Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
-Patch44: openssl-1.1.0-afalg-endian.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -142,7 +140,6 @@ cp %{SOURCE13} test/
 %patch1 -p1 -b .build   %{?_rawbuild}
 %patch2 -p1 -b .defaults
 %patch3 -p1 -b .no-html  %{?_rawbuild}
-%patch5 -p1 -b .no-rpath
 
 %patch21 -p1 -b .issuer-hash
 %patch22 -p1 -b .algo-doc
@@ -161,7 +158,6 @@ cp %{SOURCE13} test/
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
-%patch44 -p1 -b .endian
 
 %build
 # Figure out which flags we want to use.
@@ -261,6 +257,10 @@ patch -p1 -R < %{PATCH31}
 
 LD_LIBRARY_PATH=`pwd`${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 export LD_LIBRARY_PATH
+crypto/fips/fips_standalone_hmac libcrypto.so.%{soversion} >.libcrypto.so.%{soversion}.hmac
+ln -s .libcrypto.so.%{soversion}.hmac .libcrypto.so.hmac
+crypto/fips/fips_standalone_hmac libssl.so.%{soversion} >.libssl.so.%{soversion}.hmac
+ln -s .libssl.so.%{soversion}.hmac .libssl.so.hmac
 OPENSSL_ENABLE_MD5_VERIFY=
 export OPENSSL_ENABLE_MD5_VERIFY
 make test
@@ -425,6 +425,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Nov 11 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-1
+- update to upstream version 1.1.0c
+
 * Fri Nov  4 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0b-4
 - use a random seed if the supplied one did not generate valid
   parameters in dsa_builtin_paramgen2()
