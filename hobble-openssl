@@ -26,7 +26,7 @@ for c in `find crypto/bn -name "*gf2m.c"`; do
 	> $c
 done
 
-for c in `find crypto/ec -name "ec2*.c" -o -name "ec_curve.c" -o -name "ecp_nistp22?.c"`; do
+for c in `find crypto/ec -name "ec2*.c" -o -name "ec_curve.c"`; do
 	echo Destroying $c
 	> $c
 done

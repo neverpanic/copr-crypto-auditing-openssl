@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0c
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -425,6 +425,11 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Nov 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-2
+- revert SSL_read() behavior change - patch from upstream (#1394677)
+- EC curve NIST P-224 is now allowed, still kept disabled in TLS due
+  to less than optimal security
+
 * Fri Nov 11 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-1
 - update to upstream version 1.1.0c
 

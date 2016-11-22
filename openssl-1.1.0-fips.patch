@@ -786,21 +786,6 @@ diff -up openssl-1.1.0c/crypto/ec/ec_key.c.fips openssl-1.1.0c/crypto/ec/ec_key.
      ECerr(EC_F_EC_KEY_GENERATE_KEY, EC_R_OPERATION_NOT_SUPPORTED);
      return 0;
  }
-diff -up openssl-1.1.0c/crypto/ec/ecp_smpl.c.fips openssl-1.1.0c/crypto/ec/ecp_smpl.c
---- openssl-1.1.0c/crypto/ec/ecp_smpl.c.fips	2016-11-10 15:03:44.000000000 +0100
-+++ openssl-1.1.0c/crypto/ec/ecp_smpl.c	2016-11-11 13:31:51.329603626 +0100
-@@ -144,6 +144,11 @@ int ec_GFp_simple_group_set_curve(EC_GRO
-         return 0;
-     }
- 
-+    if (BN_num_bits(p) < 256) {
-+        ECerr(EC_F_EC_GFP_SIMPLE_GROUP_SET_CURVE, EC_R_UNSUPPORTED_FIELD);
-+        return 0;
-+    }
-+
-     if (ctx == NULL) {
-         ctx = new_ctx = BN_CTX_new();
-         if (ctx == NULL)
 diff -up openssl-1.1.0c/crypto/err/err_all.c.fips openssl-1.1.0c/crypto/err/err_all.c
 --- openssl-1.1.0c/crypto/err/err_all.c.fips	2016-11-10 15:03:44.000000000 +0100
 +++ openssl-1.1.0c/crypto/err/err_all.c	2016-11-11 13:31:51.329603626 +0100

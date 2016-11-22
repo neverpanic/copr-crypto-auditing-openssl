@@ -236,6 +236,70 @@ static void prime_field_tests(void)
     if (x == NULL || y == NULL || z == NULL || yplusone == NULL)
         ABORT;
 
+    /* Curve P-224 (FIPS PUB 186-2, App. 6) */
+
+    if (!BN_hex2bn
+        (&p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000000000000000000001"))
+        ABORT;
+    if (1 != BN_is_prime_ex(p, BN_prime_checks, ctx, NULL))
+        ABORT;
+    if (!BN_hex2bn
+        (&a, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFE"))
+        ABORT;
+    if (!BN_hex2bn
+        (&b, "B4050A850C04B3ABF54132565044B0B7D7BFD8BA270B39432355FFB4"))
+        ABORT;
+    if (!EC_GROUP_set_curve_GFp(group, p, a, b, ctx))
+        ABORT;
+
+    if (!BN_hex2bn
+        (&x, "B70E0CBD6BB4BF7F321390B94A03C1D356C21122343280D6115C1D21"))
+        ABORT;
+    if (!EC_POINT_set_compressed_coordinates_GFp(group, P, x, 0, ctx))
+        ABORT;
+    if (EC_POINT_is_on_curve(group, P, ctx) <= 0)
+        ABORT;
+    if (!BN_hex2bn
+        (&z, "FFFFFFFFFFFFFFFFFFFFFFFFFFFF16A2E0B8F03E13DD29455C5C2A3D"))
+        ABORT;
+    if (!EC_GROUP_set_generator(group, P, z, BN_value_one()))
+        ABORT;
+
+    if (!EC_POINT_get_affine_coordinates_GFp(group, P, x, y, ctx))
+        ABORT;
+    fprintf(stdout, "\nNIST curve P-224 -- Generator:\n     x = 0x");
+    BN_print_fp(stdout, x);
+    fprintf(stdout, "\n     y = 0x");
+    BN_print_fp(stdout, y);
+    fprintf(stdout, "\n");
+    /* G_y value taken from the standard: */
+    if (!BN_hex2bn
+        (&z, "BD376388B5F723FB4C22DFE6CD4375A05A07476444D5819985007E34"))
+        ABORT;
+    if (0 != BN_cmp(y, z))
+        ABORT;
+
+    if (!BN_add(yplusone, y, BN_value_one()))
+        ABORT;
+    /*
+     * When (x, y) is on the curve, (x, y + 1) is, as it happens, not,
+     * and therefore setting the coordinates should fail.
+     */
+    if (EC_POINT_set_affine_coordinates_GFp(group, P, x, yplusone, ctx))
+        ABORT;
+
+    fprintf(stdout, "verify degree ...");
+    if (EC_GROUP_get_degree(group) != 224)
+        ABORT;
+    fprintf(stdout, " ok\n");
+
+    group_order_tests(group);
+
+    if ((P_224 = EC_GROUP_new(EC_GROUP_method_of(group))) == NULL)
+        ABORT;
+    if (!EC_GROUP_copy(P_224, group))
+        ABORT;
+
     /* Curve P-256 (FIPS PUB 186-2, App. 6) */
 
     if (!BN_hex2bn
@@ -556,6 +620,7 @@ static void prime_field_tests(void)
     BN_free(z);
     BN_free(yplusone);
 
+    EC_GROUP_free(P_224);
     EC_GROUP_free(P_256);
     EC_GROUP_free(P_384);
     EC_GROUP_free(P_521);

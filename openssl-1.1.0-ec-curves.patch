@@ -1,13 +1,13 @@
 diff -up openssl-1.1.0/apps/speed.c.curves openssl-1.1.0/apps/speed.c
 --- openssl-1.1.0/apps/speed.c.curves	2016-09-08 11:03:15.550585422 +0200
 +++ openssl-1.1.0/apps/speed.c	2016-09-08 11:05:17.287315488 +0200
-@@ -536,42 +536,16 @@ static OPT_PAIR rsa_choices[] = {
+@@ -536,42 +536,18 @@ static OPT_PAIR rsa_choices[] = {
  #define R_EC_X25519  16
  #ifndef OPENSSL_NO_EC
  static OPT_PAIR ecdsa_choices[] = {
 -    {"ecdsap160", R_EC_P160},
 -    {"ecdsap192", R_EC_P192},
--    {"ecdsap224", R_EC_P224},
+     {"ecdsap224", R_EC_P224},
      {"ecdsap256", R_EC_P256},
      {"ecdsap384", R_EC_P384},
      {"ecdsap521", R_EC_P521},
@@ -27,7 +27,7 @@ diff -up openssl-1.1.0/apps/speed.c.curves openssl-1.1.0/apps/speed.c
  static OPT_PAIR ecdh_choices[] = {
 -    {"ecdhp160", R_EC_P160},
 -    {"ecdhp192", R_EC_P192},
--    {"ecdhp224", R_EC_P224},
+     {"ecdhp224", R_EC_P224},
      {"ecdhp256", R_EC_P256},
      {"ecdhp384", R_EC_P384},
      {"ecdhp521", R_EC_P521},
@@ -44,21 +44,21 @@ diff -up openssl-1.1.0/apps/speed.c.curves openssl-1.1.0/apps/speed.c
      {"ecdhx25519", R_EC_X25519},
      {NULL}
  };
-diff -up openssl-1.1.0/include/openssl/ec.h.curves openssl-1.1.0/include/openssl/ec.h
---- openssl-1.1.0/include/openssl/ec.h.curves	2016-08-25 17:29:22.000000000 +0200
-+++ openssl-1.1.0/include/openssl/ec.h	2016-09-08 11:03:15.550585422 +0200
-@@ -80,11 +80,6 @@ const EC_METHOD *EC_GFp_mont_method(void
- const EC_METHOD *EC_GFp_nist_method(void);
+diff -up openssl-1.1.0c/crypto/ec/ecp_smpl.c.curves openssl-1.1.0c/crypto/ec/ecp_smpl.c
+--- openssl-1.1.0c/crypto/ec/ecp_smpl.c.curves	2016-11-10 15:03:44.000000000 +0100
++++ openssl-1.1.0c/crypto/ec/ecp_smpl.c	2016-11-11 13:31:51.329603626 +0100
+@@ -144,6 +144,11 @@ int ec_GFp_simple_group_set_curve(EC_GRO
+         return 0;
+     }
  
- # ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
--/** Returns 64-bit optimized methods for nistp224
-- *  \return  EC_METHOD object
-- */
--const EC_METHOD *EC_GFp_nistp224_method(void);
--
- /** Returns 64-bit optimized methods for nistp256
-  *  \return  EC_METHOD object
-  */
++    if (BN_num_bits(p) < 224) {
++        ECerr(EC_F_EC_GFP_SIMPLE_GROUP_SET_CURVE, EC_R_UNSUPPORTED_FIELD);
++        return 0;
++    }
++
+     if (ctx == NULL) {
+         ctx = new_ctx = BN_CTX_new();
+         if (ctx == NULL)
 diff -up openssl-1.1.0/ssl/t1_lib.c.curves openssl-1.1.0/ssl/t1_lib.c
 --- openssl-1.1.0/ssl/t1_lib.c.curves	2016-09-08 11:03:15.551585445 +0200
 +++ openssl-1.1.0/ssl/t1_lib.c	2016-09-08 11:06:58.072575697 +0200
