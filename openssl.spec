@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0c
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -60,6 +60,8 @@ Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
 # Backported fixes including security fixes
+Patch60: openssl-1.1.0-sslread-revert.patch
+Patch61: openssl-1.1.0-cert-req.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -158,6 +160,9 @@ cp %{SOURCE13} test/
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
+
+%patch60 -p1 -b .sslread-revert
+%patch61 -p1 -b .cert-req
 
 %build
 # Figure out which flags we want to use.
@@ -425,8 +430,11 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
-* Tue Nov 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-2
+* Wed Nov 30 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-3
 - revert SSL_read() behavior change - patch from upstream (#1394677)
+- fix behavior on client certificate request in renegotiation (#1393579)
+
+* Tue Nov 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-2
 - EC curve NIST P-224 is now allowed, still kept disabled in TLS due
   to less than optimal security
 
