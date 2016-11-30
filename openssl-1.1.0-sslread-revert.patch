@@ -190,6 +190,24 @@ diff --git a/test/asynciotest.c b/test/asynciotest.c
 index 0d382d7..133e3d5 100644
 --- a/test/asynciotest.c
 +++ b/test/asynciotest.c
+@@ -85,7 +85,7 @@ static int async_free(BIO *bio)
+ static int async_read(BIO *bio, char *out, int outl)
+ {
+     struct async_ctrs *ctrs;
+-    int ret = 0;
++    int ret = -1;
+     BIO *next = BIO_next(bio);
+ 
+     if (outl <= 0)
+@@ -120,7 +120,7 @@ static int async_read(BIO *bio, char *ou
+ static int async_write(BIO *bio, const char *in, int inl)
+ {
+     struct async_ctrs *ctrs;
+-    int ret = 0;
++    int ret = -1;
+     size_t written = 0;
+     BIO *next = BIO_next(bio);
+ 
 @@ -297,32 +297,59 @@ int main(int argc, char *argv[])
           * we hit at least one async event in both reading and writing
           */
