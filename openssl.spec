@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0c
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -430,6 +430,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Dec  2 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-4
+- FIPS mode fixes for TLS
+
 * Wed Nov 30 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-3
 - revert SSL_read() behavior change - patch from upstream (#1394677)
 - fix behavior on client certificate request in renegotiation (#1393579)
