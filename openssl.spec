@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0c
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -59,6 +59,7 @@ Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
+Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 # Backported fixes including security fixes
 Patch60: openssl-1.1.0-sslread-revert.patch
 Patch61: openssl-1.1.0-cert-req.patch
@@ -160,6 +161,7 @@ cp %{SOURCE13} test/
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
+%patch44 -p1 -b .preserve-nl
 
 %patch60 -p1 -b .sslread-revert
 %patch61 -p1 -b .cert-req
@@ -430,6 +432,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Dec 22 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-5
+- preserve new line in fd BIO BIO_gets() as other BIOs do
+
 * Fri Dec  2 2016 Tomáš Mráz <tmraz@redhat.com> 1.1.0c-4
 - FIPS mode fixes for TLS
 
