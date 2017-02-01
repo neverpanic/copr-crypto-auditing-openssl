@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0d
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -61,6 +61,7 @@ Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 # Backported fixes including security fixes
+Patch60: openssl-1.1.0-backports.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -161,6 +162,7 @@ cp %{SOURCE13} test/
 %patch43 -p1 -b .eventfd2
 %patch44 -p1 -b .preserve-nl
 
+%patch60 -p1 -b .backports
 
 %build
 # Figure out which flags we want to use.
@@ -428,6 +430,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Feb  1 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0d-2
+- applied upstream fixes (fix regression in X509_CRL_digest)
+
 * Thu Jan 26 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0d-1
 - update to upstream version 1.1.0d
 
