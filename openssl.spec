@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0d
-Release: 3%{?dist}
+Version: 1.1.0e
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -61,7 +61,6 @@ Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 # Backported fixes including security fixes
-Patch60: openssl-1.1.0-backports.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -161,8 +160,6 @@ cp %{SOURCE13} test/
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
 %patch44 -p1 -b .preserve-nl
-
-%patch60 -p1 -b .backports
 
 %build
 # Figure out which flags we want to use.
@@ -430,6 +427,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Feb 16 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0e-1
+- update to upstream version 1.1.0e
+- add documentation of the PROFILE=SYSTEM special cipher string (#1420232)
+
 * Sat Feb 11 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0d-3
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_26_Mass_Rebuild
 
