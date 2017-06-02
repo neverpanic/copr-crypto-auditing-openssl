@@ -1,19 +1,28 @@
-diff -up openssl-1.1.0c/Configurations/unix-Makefile.tmpl.build openssl-1.1.0c/Configurations/unix-Makefile.tmpl
---- openssl-1.1.0c/Configurations/unix-Makefile.tmpl.build	2016-11-10 15:03:43.000000000 +0100
-+++ openssl-1.1.0c/Configurations/unix-Makefile.tmpl	2016-11-11 13:26:36.094400833 +0100
-@@ -630,7 +630,7 @@ install_man_docs:
- 	@\
- 	OUTSUFFIX='.$${SEC}$(MANSUFFIX)'; \
- 	OUTTOP="$(DESTDIR)$(MANDIR)"; \
--	GENERATE='pod2man --name=$$NAME --section=$$SEC --center=OpenSSL --release=$(VERSION)'; \
-+	GENERATE='TZ=UTC pod2man --name=$$NAME --section=$$SEC --center=OpenSSL --release=$(VERSION)'; \
- 	$(PROCESS_PODS)
+diff -up openssl-1.1.0f/Configurations/unix-Makefile.tmpl.build openssl-1.1.0f/Configurations/unix-Makefile.tmpl
+--- openssl-1.1.0f/Configurations/unix-Makefile.tmpl.build	2017-06-02 13:51:39.621289504 +0200
++++ openssl-1.1.0f/Configurations/unix-Makefile.tmpl	2017-06-02 13:54:45.298654812 +0200
+@@ -553,7 +553,7 @@ uninstall_runtime:
+ install_man_docs:
+ 	@[ -n "$(INSTALLTOP)" ] || (echo INSTALLTOP should not be empty; exit 1)
+ 	@echo "*** Installing manpages"
+-	$(PERL) $(SRCDIR)/util/process_docs.pl \
++	TZ=UTC $(PERL) $(SRCDIR)/util/process_docs.pl \
+ 		--destdir=$(DESTDIR)$(MANDIR) --type=man --suffix=$(MANSUFFIX)
  
  uninstall_man_docs:
-diff -up openssl-1.1.0c/Configurations/10-main.conf.build openssl-1.1.0c/Configurations/10-main.conf
---- openssl-1.1.0c/Configurations/10-main.conf.build	2016-11-10 15:03:43.000000000 +0100
-+++ openssl-1.1.0c/Configurations/10-main.conf	2016-11-11 13:29:26.502289226 +0100
-@@ -656,6 +656,7 @@ sub vms_info {
+@@ -565,7 +565,7 @@ uninstall_man_docs:
+ install_html_docs:
+ 	@[ -n "$(INSTALLTOP)" ] || (echo INSTALLTOP should not be empty; exit 1)
+ 	@echo "*** Installing HTML manpages"
+-	$(PERL) $(SRCDIR)/util/process_docs.pl \
++	TZ=UTC $(PERL) $(SRCDIR)/util/process_docs.pl \
+ 		--destdir=$(DESTDIR)$(HTMLDIR) --type=html
+ 
+ uninstall_html_docs:
+diff -up openssl-1.1.0f/Configurations/10-main.conf.build openssl-1.1.0f/Configurations/10-main.conf
+--- openssl-1.1.0f/Configurations/10-main.conf.build	2017-05-25 14:46:17.000000000 +0200
++++ openssl-1.1.0f/Configurations/10-main.conf	2017-06-02 13:51:39.622289528 +0200
+@@ -662,6 +662,7 @@ sub vms_info {
          cflags           => add("-m64 -DL_ENDIAN"),
          perlasm_scheme   => "linux64le",
          shared_ldflag    => add("-m64"),
@@ -21,7 +30,7 @@ diff -up openssl-1.1.0c/Configurations/10-main.conf.build openssl-1.1.0c/Configu
      },
  
      "linux-armv4" => {
-@@ -696,6 +697,7 @@ sub vms_info {
+@@ -702,6 +703,7 @@ sub vms_info {
      "linux-aarch64" => {
          inherit_from     => [ "linux-generic64", asm("aarch64_asm") ],
          perlasm_scheme   => "linux64",
@@ -29,3 +38,36 @@ diff -up openssl-1.1.0c/Configurations/10-main.conf.build openssl-1.1.0c/Configu
      },
      "linux-arm64ilp32" => {  # https://wiki.linaro.org/Platform/arm64-ilp32
          inherit_from     => [ "linux-generic32", asm("aarch64_asm") ],
+diff -up openssl-1.1.0f/test/evptests.txt.build openssl-1.1.0f/test/evptests.txt
+--- openssl-1.1.0f/test/evptests.txt.build	2017-05-25 14:46:21.000000000 +0200
++++ openssl-1.1.0f/test/evptests.txt	2017-06-02 15:05:49.422161136 +0200
+@@ -3690,14 +3690,6 @@ PublicKey=Bob-25519-PUBLIC
+ MCowBQYDK2VuAyEA3p7bfXt9wbTTW2HC7OQ1Nz+DQ8hbeGdNrfx+FG+IK08=
+ -----END PUBLIC KEY-----
+ 
+-Derive=Alice-25519
+-PeerKey=Bob-25519-PUBLIC
+-SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+-
+-Derive=Bob-25519
+-PeerKey=Alice-25519-PUBLIC
+-SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+-
+ # Illegal sign/verify operations with X25519 key
+ 
+ Sign=Alice-25519
+@@ -3710,6 +3702,14 @@ Result = KEYOP_INIT_ERROR
+ Function = EVP_PKEY_verify_init
+ Reason = operation not supported for this keytype
+ 
++Derive=Alice-25519
++PeerKey=Bob-25519-PUBLIC
++SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
++
++Derive=Bob-25519
++PeerKey=Alice-25519-PUBLIC
++SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
++
+ ## ECDH Tests: test with randomly generated keys for all the listed curves
+ 
+ 

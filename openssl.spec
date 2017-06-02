@@ -21,7 +21,7 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0e
+Version: 1.1.0f
 Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
@@ -70,6 +70,7 @@ BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
 BuildRequires: /usr/bin/pod2man
 BuildRequires: perl(Test::Harness), perl(Test::More), perl(Math::BigInt)
+BuildRequires: perl(Module::Load::Conditional)
 Requires: coreutils, make
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
 
@@ -236,7 +237,7 @@ RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY"
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method \
-	no-mdc2 no-ec2m no-gost no-srp \
+	no-mdc2 no-ec2m \
 	shared  ${sslarch} $RPM_OPT_FLAGS
 
 util/mkdef.pl crypto update
@@ -427,6 +428,11 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Jun  2 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-1
+- update to upstream version 1.1.0f
+- SRP and GOST is now allowed, note that GOST support requires
+  adding GOST engine which is not part of openssl anymore
+
 * Thu Feb 16 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0e-1
 - update to upstream version 1.1.0e
 - add documentation of the PROFILE=SYSTEM special cipher string (#1420232)
