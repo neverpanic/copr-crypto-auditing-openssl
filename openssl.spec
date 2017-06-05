@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -61,6 +61,7 @@ Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 # Backported fixes including security fixes
+Patch70: openssl-1.1.0-thread-local.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -161,6 +162,8 @@ cp %{SOURCE13} test/
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
 %patch44 -p1 -b .preserve-nl
+
+%patch70 -p1 -b .thread-local
 
 %build
 # Figure out which flags we want to use.
@@ -428,6 +431,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Jun  5 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-2
+- only release thread-local key if we created it (from upstream) (#1458775)
+
 * Fri Jun  2 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-1
 - update to upstream version 1.1.0f
 - SRP and GOST is now allowed, note that GOST support requires
