@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -60,6 +60,7 @@ Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch43: openssl-1.1.0-afalg-eventfd2.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
+Patch45: openssl-1.1.0-weak-ciphers.patch
 # Backported fixes including security fixes
 Patch70: openssl-1.1.0-thread-local.patch
 
@@ -162,6 +163,7 @@ cp %{SOURCE13} test/
 %patch42 -p1 -b .fips
 %patch43 -p1 -b .eventfd2
 %patch44 -p1 -b .preserve-nl
+%patch45 -p1 -b .weak-ciphers
 
 %patch70 -p1 -b .thread-local
 
@@ -240,6 +242,7 @@ RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY"
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method \
+	enable-weak-ssl-ciphers \
 	no-mdc2 no-ec2m \
 	shared  ${sslarch} $RPM_OPT_FLAGS
 
@@ -431,6 +434,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Jun 15 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-3
+- enable 3DES SSL ciphersuites, RC4 is kept disabled (#1453066)
+
 * Mon Jun  5 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-2
 - only release thread-local key if we created it (from upstream) (#1458775)
 
