@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -63,6 +63,7 @@ Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
 # Backported fixes including security fixes
 Patch70: openssl-1.1.0-thread-local.patch
+Patch71: openssl-1.1.0-dtls-failure.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -166,6 +167,7 @@ cp %{SOURCE13} test/
 %patch45 -p1 -b .weak-ciphers
 
 %patch70 -p1 -b .thread-local
+%patch71 -p1 -b .dtls-failure
 
 %build
 # Figure out which flags we want to use.
@@ -434,6 +436,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Jun 23 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-4
+- make DTLS work (#1462541)
+
 * Thu Jun 15 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-3
 - enable 3DES SSL ciphersuites, RC4 is kept disabled (#1453066)
 
