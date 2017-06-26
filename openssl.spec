@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -53,7 +53,7 @@ Patch34: openssl-1.1.0-starttls-xmpp.patch
 Patch35: openssl-1.1.0-chil-fixes.patch
 Patch36: openssl-1.1.0-secure-getenv.patch
 Patch37: openssl-1.1.0-ec-curves.patch
-Patch38: openssl-1.1.0-no-md5-verify.patch
+Patch38: openssl-1.1.0-no-weak-verify.patch
 Patch39: openssl-1.1.0-cc-reqs.patch
 Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
@@ -436,6 +436,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Jun 26 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-5
+- disable verification of all insecure hashes
+
 * Fri Jun 23 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-4
 - make DTLS work (#1462541)
 
