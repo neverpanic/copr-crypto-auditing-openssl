@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 5%{?dist}
+Release: 6%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -68,7 +68,7 @@ Patch71: openssl-1.1.0-dtls-failure.patch
 License: OpenSSL
 Group: System Environment/Libraries
 URL: http://www.openssl.org/
-BuildRequires: coreutils, krb5-devel, perl, sed, zlib-devel, /usr/bin/cmp
+BuildRequires: coreutils, krb5-devel, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
 BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
 BuildRequires: /usr/bin/pod2man
@@ -124,7 +124,7 @@ protocols.
 %package perl
 Summary: Perl scripts provided with OpenSSL
 Group: Applications/Internet
-Requires: perl
+Requires: perl-interpreter
 Requires: %{name}%{?_isa} = %{epoch}:%{version}-%{release}
 
 %description perl
@@ -436,6 +436,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Jul 13 2017 Petr Pisar <ppisar@redhat.com> - 1:1.1.0f-6
+- perl dependency renamed to perl-interpreter
+  <https://fedoraproject.org/wiki/Changes/perl_Package_to_Install_Core_Modules>
+
 * Mon Jun 26 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0f-5
 - disable verification of all insecure hashes
 
