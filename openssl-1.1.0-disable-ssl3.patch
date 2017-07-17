@@ -1,3 +1,30 @@
+diff -up openssl-1.1.0f/apps/s_client.c.disable-ssl3 openssl-1.1.0f/apps/s_client.c
+--- openssl-1.1.0f/apps/s_client.c.disable-ssl3	2017-06-05 15:42:44.838853312 +0200
++++ openssl-1.1.0f/apps/s_client.c	2017-07-17 14:50:06.468821871 +0200
+@@ -1486,6 +1486,9 @@ int s_client_main(int argc, char **argv)
+     if (sdebug)
+         ssl_ctx_security_debug(ctx, sdebug);
+ 
++    if (min_version == SSL3_VERSION && max_version == SSL3_VERSION)
++        SSL_CTX_clear_options(ctx, SSL_OP_NO_SSLv3);
++
+     if (ssl_config) {
+         if (SSL_CTX_config(ctx, ssl_config) == 0) {
+             BIO_printf(bio_err, "Error using configuration \"%s\"\n",
+diff -up openssl-1.1.0f/apps/s_server.c.disable-ssl3 openssl-1.1.0f/apps/s_server.c
+--- openssl-1.1.0f/apps/s_server.c.disable-ssl3	2017-05-25 14:46:18.000000000 +0200
++++ openssl-1.1.0f/apps/s_server.c	2017-07-17 14:49:50.434447583 +0200
+@@ -1614,6 +1614,10 @@ int s_server_main(int argc, char *argv[]
+     }
+     if (sdebug)
+         ssl_ctx_security_debug(ctx, sdebug);
++
++    if (min_version == SSL3_VERSION && max_version == SSL3_VERSION)
++        SSL_CTX_clear_options(ctx, SSL_OP_NO_SSLv3);
++
+     if (ssl_config) {
+         if (SSL_CTX_config(ctx, ssl_config) == 0) {
+             BIO_printf(bio_err, "Error using configuration \"%s\"\n",
 diff -up openssl-1.1.0/ssl/ssl_lib.c.disable-ssl3 openssl-1.1.0/ssl/ssl_lib.c
 --- openssl-1.1.0/ssl/ssl_lib.c.disable-ssl3	2016-08-25 17:29:22.000000000 +0200
 +++ openssl-1.1.0/ssl/ssl_lib.c	2016-09-08 11:08:05.252082263 +0200

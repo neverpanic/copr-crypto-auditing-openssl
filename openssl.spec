@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0f
-Release: 6%{?dist}
+Release: 7%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -436,6 +436,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Jul 17 2017 Tomáš Mráz <tmraz@redhat.com> 1:1.1.0f-7
+- make s_client and s_server work with -ssl3 option (#1471783)
+
 * Thu Jul 13 2017 Petr Pisar <ppisar@redhat.com> - 1:1.1.0f-6
 - perl dependency renamed to perl-interpreter
   <https://fedoraproject.org/wiki/Changes/perl_Package_to_Install_Core_Modules>
