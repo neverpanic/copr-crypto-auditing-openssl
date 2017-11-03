@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0f
-Release: 9%{?dist}
+Version: 1.1.0g
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -58,12 +58,9 @@ Patch39: openssl-1.1.0-cc-reqs.patch
 Patch40: openssl-1.1.0-disable-ssl3.patch
 Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
-Patch43: openssl-1.1.0-afalg-eventfd2.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
 # Backported fixes including security fixes
-Patch70: openssl-1.1.0-thread-local.patch
-Patch71: openssl-1.1.0-dtls-failure.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -157,17 +154,13 @@ cp %{SOURCE13} test/
 %patch35 -p1 -b .chil
 %patch36 -p1 -b .secure-getenv
 %patch37 -p1 -b .curves
-%patch38 -p1 -b .no-md5-verify
+%patch38 -p1 -b .no-weak-verify
 %patch39 -p1 -b .cc-reqs
 %patch40 -p1 -b .disable-ssl3
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
-%patch43 -p1 -b .eventfd2
 %patch44 -p1 -b .preserve-nl
 %patch45 -p1 -b .weak-ciphers
-
-%patch70 -p1 -b .thread-local
-%patch71 -p1 -b .dtls-failure
 
 %build
 # Figure out which flags we want to use.
@@ -234,6 +227,8 @@ sslarch=linux-generic64
 # Also add -DPURIFY to make using valgrind with openssl easier as we do not
 # want to depend on the uninitialized memory as a source of entropy anyway.
 RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY"
+
+export HASHBANGPERL=/usr/bin/perl
 
 # ia64, x86_64, ppc are OK by default
 # Configure the build tree.  Override OpenSSL defaults with known-good defaults
@@ -436,6 +431,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Nov  3 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-1
+- update to upstream version 1.1.0g
+
 * Thu Aug 03 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0f-9
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Binutils_Mass_Rebuild
 

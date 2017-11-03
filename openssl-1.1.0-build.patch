@@ -38,12 +38,12 @@ diff -up openssl-1.1.0f/Configurations/10-main.conf.build openssl-1.1.0f/Configu
      },
      "linux-arm64ilp32" => {  # https://wiki.linaro.org/Platform/arm64-ilp32
          inherit_from     => [ "linux-generic32", asm("aarch64_asm") ],
-diff -up openssl-1.1.0f/test/evptests.txt.build openssl-1.1.0f/test/evptests.txt
---- openssl-1.1.0f/test/evptests.txt.build	2017-05-25 14:46:21.000000000 +0200
-+++ openssl-1.1.0f/test/evptests.txt	2017-06-02 15:05:49.422161136 +0200
-@@ -3690,14 +3690,6 @@ PublicKey=Bob-25519-PUBLIC
- MCowBQYDK2VuAyEA3p7bfXt9wbTTW2HC7OQ1Nz+DQ8hbeGdNrfx+FG+IK08=
- -----END PUBLIC KEY-----
+diff -up openssl-1.1.0g/test/evptests.txt.build openssl-1.1.0g/test/evptests.txt
+--- openssl-1.1.0g/test/evptests.txt.build	2017-11-02 15:29:05.000000000 +0100
++++ openssl-1.1.0g/test/evptests.txt	2017-11-03 16:37:01.253671494 +0100
+@@ -3707,14 +3707,6 @@ MCowBQYDK2VuAyEA3p7bfXt9wbTTW2HC7OQ1Nz+D
+ 
+ PrivPubKeyPair = Bob-25519:Bob-25519-PUBLIC
  
 -Derive=Alice-25519
 -PeerKey=Bob-25519-PUBLIC
@@ -56,7 +56,7 @@ diff -up openssl-1.1.0f/test/evptests.txt.build openssl-1.1.0f/test/evptests.txt
  # Illegal sign/verify operations with X25519 key
  
  Sign=Alice-25519
-@@ -3710,6 +3702,14 @@ Result = KEYOP_INIT_ERROR
+@@ -3727,6 +3719,14 @@ Result = KEYOP_INIT_ERROR
  Function = EVP_PKEY_verify_init
  Reason = operation not supported for this keytype
  

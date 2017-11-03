@@ -1,6 +1,6 @@
-diff -up openssl-1.1.0f/crypto/asn1/a_verify.c.no-weak-verify openssl-1.1.0f/crypto/asn1/a_verify.c
---- openssl-1.1.0f/crypto/asn1/a_verify.c.no-weak-verify	2017-05-25 14:46:18.000000000 +0200
-+++ openssl-1.1.0f/crypto/asn1/a_verify.c	2017-06-26 16:26:49.496989272 +0200
+diff -up openssl-1.1.0g/crypto/asn1/a_verify.c.no-md5-verify openssl-1.1.0g/crypto/asn1/a_verify.c
+--- openssl-1.1.0g/crypto/asn1/a_verify.c.no-md5-verify	2017-11-02 15:29:02.000000000 +0100
++++ openssl-1.1.0g/crypto/asn1/a_verify.c	2017-11-03 16:15:46.125801341 +0100
 @@ -7,6 +7,9 @@
   * https://www.openssl.org/source/license.html
   */
@@ -10,8 +10,8 @@ diff -up openssl-1.1.0f/crypto/asn1/a_verify.c.no-weak-verify openssl-1.1.0f/cry
 +
  #include <stdio.h>
  #include <time.h>
- 
-@@ -129,6 +132,12 @@ int ASN1_item_verify(const ASN1_ITEM *it
+ #include <sys/types.h>
+@@ -126,6 +129,12 @@ int ASN1_item_verify(const ASN1_ITEM *it
          if (ret != 2)
              goto err;
          ret = -1;
