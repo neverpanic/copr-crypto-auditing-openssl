@@ -1,0 +1,3 @@
+PURPOSE of /CoreOS/openssl/Sanity/simple-rsapss-test
+Description: Test if RSA-PSS signature scheme is supported
+Author: Hubert Kario <hkario@redhat.com>
