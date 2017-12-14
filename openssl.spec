@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0g
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -71,7 +71,7 @@ BuildRequires: /usr/bin/rename
 BuildRequires: /usr/bin/pod2man
 BuildRequires: perl(Test::Harness), perl(Test::More), perl(Math::BigInt)
 BuildRequires: perl(Module::Load::Conditional)
-Requires: coreutils, make
+Requires: coreutils
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
 
 %description
@@ -287,7 +287,7 @@ make test
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 # Install OpenSSL.
-install -d $RPM_BUILD_ROOT{%{_bindir},%{_includedir},%{_libdir},%{_mandir},%{_libdir}/openssl}
+install -d $RPM_BUILD_ROOT{%{_bindir},%{_includedir},%{_libdir},%{_mandir},%{_libdir}/openssl,%{_pkgdocdir}}
 make DESTDIR=$RPM_BUILD_ROOT install
 rename so.%{soversion} so.%{version} $RPM_BUILD_ROOT%{_libdir}/*.so.%{soversion}
 for lib in $RPM_BUILD_ROOT%{_libdir}/*.so.%{version} ; do
@@ -299,7 +299,7 @@ done
 # Install a makefile for generating keys and self-signed certs, and a script
 # for generating them on the fly.
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/certs
-install -m644 %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/certs/Makefile
+install -m644 %{SOURCE2} $RPM_BUILD_ROOT%{_pkgdocdir}/Makefile.certificate
 install -m755 %{SOURCE6} $RPM_BUILD_ROOT%{_bindir}/make-dummy-cert
 install -m755 %{SOURCE7} $RPM_BUILD_ROOT%{_bindir}/renew-dummy-cert
 
@@ -378,11 +378,11 @@ export LD_LIBRARY_PATH
 %doc FAQ NEWS README README.FIPS
 %{_bindir}/make-dummy-cert
 %{_bindir}/renew-dummy-cert
-%{_sysconfdir}/pki/tls/certs/Makefile
 %{_bindir}/openssl
 %{_mandir}/man1*/*
 %{_mandir}/man5*/*
 %{_mandir}/man7*/*
+%{_pkgdocdir}/Makefile.certificate
 %exclude %{_mandir}/man1*/*.pl*
 %exclude %{_mandir}/man1*/c_rehash*
 %exclude %{_mandir}/man1*/tsget*
@@ -431,6 +431,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Dec 14 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-2
+- put the Makefile.certificate in pkgdocdir and drop the requirement on make
+
 * Fri Nov  3 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-1
 - update to upstream version 1.1.0g
 
