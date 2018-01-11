@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0g
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -60,6 +60,7 @@ Patch41: openssl-1.1.0-system-cipherlist.patch
 Patch42: openssl-1.1.0-fips.patch
 Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
+Patch46: openssl-1.1.0-silent-rnd-write.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -161,6 +162,7 @@ cp %{SOURCE13} test/
 %patch42 -p1 -b .fips
 %patch44 -p1 -b .preserve-nl
 %patch45 -p1 -b .weak-ciphers
+%patch46 -p1 -b .silent-rnd-write
 
 %build
 # Figure out which flags we want to use.
@@ -431,6 +433,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Jan 11 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-3
+- silence the .rnd write failure as that is auxiliary functionality (#1524833)
+
 * Thu Dec 14 2017 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-2
 - put the Makefile.certificate in pkgdocdir and drop the requirement on make
 
