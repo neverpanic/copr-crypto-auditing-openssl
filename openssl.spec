@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0g
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -247,7 +247,7 @@ export HASHBANGPERL=/usr/bin/perl
 
 util/mkdef.pl crypto update
 
-make all
+make all LDFLAGS="$RPM_LD_FLAGS"
 
 # Overwrite FIPS README
 cp -f %{SOURCE11} .
@@ -433,6 +433,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Feb  1 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-4
+- apply RPM_LD_FLAGS properly (#1541033)
+
 * Thu Jan 11 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-3
 - silence the .rnd write failure as that is auxiliary functionality (#1524833)
 
