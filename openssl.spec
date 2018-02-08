@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0g
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -433,6 +433,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Feb 08 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0g-5
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
+
 * Thu Feb  1 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-4
 - apply RPM_LD_FLAGS properly (#1541033)
 
