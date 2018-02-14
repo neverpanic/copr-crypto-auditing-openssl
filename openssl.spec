@@ -371,9 +371,6 @@ install -m644 %{SOURCE9} \
 LD_LIBRARY_PATH=`pwd`${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 export LD_LIBRARY_PATH
 
-%clean
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
-
 %files
 %{!?_licensedir:%global license %%doc}
 %license LICENSE
