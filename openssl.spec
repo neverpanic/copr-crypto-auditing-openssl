@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0g
-Release: 5%{?dist}
+Release: 6%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -49,7 +49,6 @@ Patch23: openssl-1.1.0-manfix.patch
 Patch31: openssl-1.1.0-ca-dir.patch
 Patch32: openssl-1.1.0-version-add-engines.patch
 Patch33: openssl-1.1.0-apps-dgst.patch
-Patch34: openssl-1.1.0-starttls-xmpp.patch
 Patch35: openssl-1.1.0-chil-fixes.patch
 Patch36: openssl-1.1.0-secure-getenv.patch
 Patch37: openssl-1.1.0-ec-curves.patch
@@ -66,6 +65,7 @@ Patch46: openssl-1.1.0-silent-rnd-write.patch
 License: OpenSSL
 Group: System Environment/Libraries
 URL: http://www.openssl.org/
+BuildRequires: gcc
 BuildRequires: coreutils, krb5-devel, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
 BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
@@ -151,7 +151,6 @@ cp %{SOURCE13} test/
 %patch31 -p1 -b .ca-dir
 %patch32 -p1 -b .version-add-engines
 %patch33 -p1 -b .dgst
-%patch34 -p1 -b .xmpp
 %patch35 -p1 -b .chil
 %patch36 -p1 -b .secure-getenv
 %patch37 -p1 -b .curves
@@ -228,7 +227,7 @@ sslarch=linux-generic64
 # marked as not requiring an executable stack.
 # Also add -DPURIFY to make using valgrind with openssl easier as we do not
 # want to depend on the uninitialized memory as a source of entropy anyway.
-RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY"
+RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY $RPM_LD_FLAGS"
 
 export HASHBANGPERL=/usr/bin/perl
 
@@ -247,7 +246,7 @@ export HASHBANGPERL=/usr/bin/perl
 
 util/mkdef.pl crypto update
 
-make all LDFLAGS="$RPM_LD_FLAGS"
+make all
 
 # Overwrite FIPS README
 cp -f %{SOURCE11} .
@@ -430,6 +429,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Feb 23 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-6
+- one more try to apply RPM_LD_FLAGS properly (#1541033)
+- dropped unneeded starttls xmpp patch (#1417017)
+
 * Thu Feb 08 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0g-5
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
 
