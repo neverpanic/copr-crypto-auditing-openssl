@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0g
-Release: 6%{?dist}
+Version: 1.1.0h
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -86,6 +86,7 @@ Summary: A general purpose cryptography library with TLS implementation
 Group: System Environment/Libraries
 Requires: ca-certificates >= 2008-5
 Requires: crypto-policies
+Recommends: openssl-pkcs11%{?_isa}
 # Needed obsoletes due to the base/lib subpackage split
 Obsoletes: openssl < 1:1.0.1-0.3.beta3
 Obsoletes: openssl-fips < 1:1.0.1e-28
@@ -429,6 +430,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Mar 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-1
+- update to upstream version 1.1.0h
+- add Recommends for openssl-pkcs11
+
 * Fri Feb 23 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0g-6
 - one more try to apply RPM_LD_FLAGS properly (#1541033)
 - dropped unneeded starttls xmpp patch (#1417017)
