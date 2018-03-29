@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0h
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -246,7 +246,8 @@ export HASHBANGPERL=/usr/bin/perl
 	no-mdc2 no-ec2m \
 	shared  ${sslarch} $RPM_OPT_FLAGS
 
-util/mkdef.pl crypto update
+# Do not run this in a production package the FIPS symbols must be patched-in
+#util/mkdef.pl crypto update
 
 make all
 
@@ -431,6 +432,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Mar 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-2
+- fix FIPS symbol versions
+
 * Thu Mar 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-1
 - update to upstream version 1.1.0h
 - add Recommends for openssl-pkcs11

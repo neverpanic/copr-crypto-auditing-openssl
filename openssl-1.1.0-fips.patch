@@ -12215,6 +12215,51 @@ diff -up openssl-1.1.0h/test/dsatest.c.fips openssl-1.1.0h/test/dsatest.c
          goto end;
      }
      if (h != 2) {
+diff -up openssl-1.1.0h/util/libcrypto.num.fips openssl-1.1.0h/util/libcrypto.num
+--- openssl-1.1.0h/util/libcrypto.num.fips	2018-03-27 15:50:41.000000000 +0200
++++ openssl-1.1.0h/util/libcrypto.num	2018-03-29 18:06:26.962651662 +0200
+@@ -4232,5 +4232,40 @@ ZINT64_it
+ ZINT64_it                               4215	1_1_0f	EXIST:EXPORT_VAR_AS_FUNCTION:FUNCTION:
+ CRYPTO_secure_clear_free                4315	1_1_0g	EXIST::FUNCTION:
+ EVP_PKEY_set1_engine                    4347	1_1_0g	EXIST::FUNCTION:ENGINE
+-OCSP_resp_get0_signer                   4374	1_1_0h	EXIST::FUNCTION:OCSP
++FIPS_drbg_reseed                        4348	1_1_0g	EXIST::FUNCTION:
++FIPS_selftest_check                     4349	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_set_method                    4350	1_1_0g	EXIST::FUNCTION:
++FIPS_get_default_drbg                   4351	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_set_reseed_interval           4352	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_set_app_data                  4353	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_method                        4354	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_status                        4355	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_instantiate                   4356	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_set_callbacks                 4357	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_new                           4358	1_1_0g	EXIST::FUNCTION:
++FIPS_dsa_paramgen_check_g               4359	1_1_0g	EXIST::FUNCTION:
++FIPS_selftest                           4360	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_set_bits                      4361	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_bytes                         4362	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_get_app_data                  4363	1_1_0g	EXIST::FUNCTION:
++FIPS_selftest_failed                    4364	1_1_0g	EXIST::FUNCTION:
++FIPS_dsa_builtin_paramgen2              4365	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_reset                         4366	1_1_0g	EXIST::FUNCTION:
++ERR_load_FIPS_strings                   4367	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_generate                      4368	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_uninstantiate                 4369	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_set_check_interval            4370	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_free                          4371	1_1_0g	EXIST::FUNCTION:
++FIPS_selftest_drbg_all                  4372	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_get_method                    4373	1_1_0g	EXIST::FUNCTION:
++RAND_set_fips_drbg_type                 4374	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_health_check                  4375	1_1_0g	EXIST::FUNCTION:
++RAND_init_fips                          4376	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_set_rand_callbacks            4377	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_seed                          4378	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_get_strength                  4379	1_1_0g	EXIST::FUNCTION:
++FIPS_rand_strength                      4380	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_get_blocklength               4381	1_1_0g	EXIST::FUNCTION:
++FIPS_drbg_init                          4382	1_1_0g	EXIST::FUNCTION:
++OCSP_resp_get0_signer                   4384	1_1_0h	EXIST::FUNCTION:OCSP
+ X509_get0_authority_key_id              4448	1_1_0h	EXIST::FUNCTION:
 diff -up openssl-1.1.0h/util/mkdef.pl.fips openssl-1.1.0h/util/mkdef.pl
 --- openssl-1.1.0h/util/mkdef.pl.fips	2018-03-27 15:50:41.000000000 +0200
 +++ openssl-1.1.0h/util/mkdef.pl	2018-03-29 14:44:24.644237065 +0200
