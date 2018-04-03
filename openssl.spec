@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0h
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -61,6 +61,7 @@ Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
 Patch46: openssl-1.1.0-silent-rnd-write.patch
 # Backported fixes including security fixes
+Patch70: openssl-1.1.0-missing-quotes.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -164,6 +165,8 @@ cp %{SOURCE13} test/
 %patch44 -p1 -b .preserve-nl
 %patch45 -p1 -b .weak-ciphers
 %patch46 -p1 -b .silent-rnd-write
+
+%patch70 -p1 -b .missing-quotes
 
 %build
 # Figure out which flags we want to use.
@@ -432,6 +435,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Apr  3 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-3
+- fix regression of c_rehash (#1562953)
+
 * Thu Mar 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-2
 - fix FIPS symbol versions
 
