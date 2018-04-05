@@ -11009,16 +11009,16 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
 +                goto err;
 +            if (r > 0)
 +                break;
-+        }
-+        error = ERR_peek_last_error();
-+        if (ERR_GET_LIB(error) == ERR_LIB_BN
-+            && ERR_GET_REASON(error) == BN_R_NO_INVERSE) {
-+            /* GCD != 1 */
-+            ERR_pop_to_mark();
 +        } else {
-+            goto err;
++            error = ERR_peek_last_error();
++            if (ERR_GET_LIB(error) == ERR_LIB_BN
++                && ERR_GET_REASON(error) == BN_R_NO_INVERSE) {
++                /* GCD != 1 */
++                ERR_pop_to_mark();
++            } else {
++                goto err;
++            }
 +        }
-+
 +        if (!BN_GENCB_call(cb, 2, n++))
 +            goto err;
 +    }
@@ -11060,16 +11060,16 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
 +                goto err;
 +            if (r > 0)
 +                break;
-+        }
-+        error = ERR_peek_last_error();
-+        if (ERR_GET_LIB(error) == ERR_LIB_BN
-+            && ERR_GET_REASON(error) == BN_R_NO_INVERSE) {
-+            /* GCD != 1 */
-+            ERR_pop_to_mark();
 +        } else {
-+            goto err;
++            error = ERR_peek_last_error();
++            if (ERR_GET_LIB(error) == ERR_LIB_BN
++                && ERR_GET_REASON(error) == BN_R_NO_INVERSE) {
++                /* GCD != 1 */
++                ERR_pop_to_mark();
++            } else {
++                goto err;
++            }
 +        }
-+
 +        if (!BN_GENCB_call(cb, 2, n++))
 +            goto err;
 +    }
