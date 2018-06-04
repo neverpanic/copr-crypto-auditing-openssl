@@ -15,14 +15,14 @@
 
 # Arches on which we need to prevent arch conflicts on opensslconf.h, must
 # also be handled in opensslconf-new.h.
-%define multilib_arches %{ix86} ia64 %{mips} ppc %{power64} s390 s390x sparcv9 sparc64 x86_64
+%define multilib_arches %{ix86} ia64 %{mips} ppc ppc64 s390 s390x sparcv9 sparc64 x86_64
 
 %global _performance_build 1
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0h
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -435,6 +435,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Jun  4 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-4
+- ppc64le is not multilib arch (#1584994)
+
 * Tue Apr  3 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-3
 - fix regression of c_rehash (#1562953)
 
