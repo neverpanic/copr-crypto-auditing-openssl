@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.0h
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -435,6 +435,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Jun 19 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-5
+- fix FIPS RSA key generation failure
+
 * Mon Jun  4 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.0h-4
 - ppc64le is not multilib arch (#1584994)
 

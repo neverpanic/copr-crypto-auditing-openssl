@@ -10809,8 +10809,8 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_err.c.fips openssl-1.1.0h/crypto/rsa/rsa_
       "operation not supported for this keytype"},
      {ERR_REASON(RSA_R_PADDING_CHECK_FAILED), "padding check failed"},
 diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_gen.c
---- openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips	2018-03-29 14:44:24.620236501 +0200
-+++ openssl-1.1.0h/crypto/rsa/rsa_gen.c	2018-03-29 15:20:36.277287100 +0200
+--- openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips	2018-06-08 14:56:32.413411585 +0200
++++ openssl-1.1.0h/crypto/rsa/rsa_gen.c	2018-06-18 14:51:57.773846354 +0200
 @@ -18,6 +18,75 @@
  #include "internal/cryptlib.h"
  #include <openssl/bn.h>
@@ -10887,7 +10887,7 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
  
  static int rsa_builtin_keygen(RSA *rsa, int bits, BIGNUM *e_value,
                                BN_GENCB *cb);
-@@ -31,11 +100,303 @@ static int rsa_builtin_keygen(RSA *rsa,
+@@ -31,11 +100,281 @@ static int rsa_builtin_keygen(RSA *rsa,
   */
  int RSA_generate_key_ex(RSA *rsa, int bits, BIGNUM *e_value, BN_GENCB *cb)
  {
@@ -10982,7 +10982,11 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
 +    if (!BN_is_zero(rsa->p) && !BN_is_zero(rsa->q))
 +        test = 1;
 +
++    BN_set_flags(r0, BN_FLG_CONSTTIME);
++    BN_set_flags(r1, BN_FLG_CONSTTIME);
 +    BN_set_flags(r2, BN_FLG_CONSTTIME);
++    BN_set_flags(rsa->p, BN_FLG_CONSTTIME);
++    BN_set_flags(rsa->q, BN_FLG_CONSTTIME);
 +
 + retry:
 +    /* generate p and q */
@@ -11104,33 +11108,19 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
 +    if (!BN_sub(r2, rsa->q, BN_value_one()))
 +        goto err;               /* q-1 */
 +
++    /* note that computing gcd is not safe to timing attacks */
 +    if (!BN_gcd(r0, r1, r2, ctx))
 +        goto err;
 +
 +    {
-+        BIGNUM *pr0 = BN_new();
-+
-+        if (pr0 == NULL)
++        if (!BN_div(r0, NULL, r1, r0, ctx))
 +            goto err;
-+        BN_with_flags(pr0, r0, BN_FLG_CONSTTIME);
 +
-+        if (!BN_div(pr0, NULL, r1, pr0, ctx)) {
-+            BN_free(pr0);
++        if (!BN_mul(r0, r0, r2, ctx)) /* lcm(p-1, q-1) */
 +            goto err;
-+        }
 +
-+        if (!BN_mul(pr0, pr0, r2, ctx)) { /* lcm(p-1, q-1) */
-+            BN_free(pr0);
++        if (!BN_mod_inverse(rsa->d, rsa->e, r0, ctx)) /* d */
 +            goto err;
-+        }
-+
-+        if (!BN_mod_inverse(rsa->d, rsa->e, pr0, ctx)) { /* d */
-+            BN_free(pr0);
-+            goto err;
-+        }
-+
-+        /* We MUST free pr0 before any further use of r0 */
-+        BN_free(pr0);
 +    }
 +
 +    if (BN_num_bits(rsa->d) < pbits)
@@ -11154,21 +11144,9 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
 +        BN_free(d);
 +    }
 +
-+    {
-+        BIGNUM *p = BN_new();
-+
-+        if (p == NULL)
-+            goto err;
-+        BN_with_flags(p, rsa->p, BN_FLG_CONSTTIME);
-+
-+        /* calculate inverse of q mod p */
-+        if (!BN_mod_inverse(rsa->iqmp, rsa->q, p, ctx)) {
-+            BN_free(p);
-+            goto err;
-+        }
-+        /* We MUST free p before any further use of rsa->p */
-+        BN_free(p);
-+    }
++    /* calculate inverse of q mod p */
++    if (!BN_mod_inverse(rsa->iqmp, rsa->q, rsa->p, ctx))
++        goto err;
 +
 +    if (!fips_check_rsa(rsa))
 +        goto err;
@@ -11191,7 +11169,7 @@ diff -up openssl-1.1.0h/crypto/rsa/rsa_gen.c.fips openssl-1.1.0h/crypto/rsa/rsa_
  static int rsa_builtin_keygen(RSA *rsa, int bits, BIGNUM *e_value,
                                BN_GENCB *cb)
  {
-@@ -44,6 +405,16 @@ static int rsa_builtin_keygen(RSA *rsa,
+@@ -44,6 +383,16 @@ static int rsa_builtin_keygen(RSA *rsa,
      BN_CTX *ctx = NULL;
      unsigned long error = 0;
  
