@@ -1,5 +1,6 @@
 /*
- * Copyright 2002-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -7,26 +8,12 @@
  * https://www.openssl.org/source/license.html
  */
 
-/* ====================================================================
- * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
- *
- * Portions of the attached software ("Contribution") are developed by
- * SUN MICROSYSTEMS, INC., and are contributed to the OpenSSL project.
- *
- * The Contribution is licensed pursuant to the OpenSSL open source
- * license provided above.
- *
- * The elliptic curve binary polynomial software is originally written by
- * Sheueling Chang Shantz and Douglas Stebila of Sun Microsystems Laboratories.
- *
- */
-
 #include <string.h>
 #include "ec_lcl.h"
 #include <openssl/err.h>
 #include <openssl/obj_mac.h>
 #include <openssl/opensslconf.h>
-#include "e_os.h"
+#include "internal/nelem.h"
 
 typedef struct {
     int field_type,             /* either NID_X9_62_prime_field or
@@ -350,6 +337,8 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
     }
 #endif
 
+    EC_GROUP_set_curve_name(group, curve.nid);
+
     if ((P = EC_POINT_new(group)) == NULL) {
         ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
         goto err;
@@ -414,8 +403,6 @@ EC_GROUP *EC_GROUP_new_by_curve_name(int nid)
         ECerr(EC_F_EC_GROUP_NEW_BY_CURVE_NAME, EC_R_UNKNOWN_GROUP);
         return NULL;
     }
-
-    EC_GROUP_set_curve_name(ret, nid);
 
     return ret;
 }

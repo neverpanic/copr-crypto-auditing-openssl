@@ -19,15 +19,17 @@
 
 %global _performance_build 1
 
+%global prerelease pre8
+
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.0h
-Release: 6%{?dist}
+Version: 1.1.1
+Release: 0.%{prerelease}%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
 # The original openssl upstream tarball cannot be shipped in the .src.rpm.
-Source: openssl-%{version}-hobbled.tar.xz
+Source: openssl-%{version}-%{prerelease}-hobbled.tar.xz
 Source1: hobble-openssl
 Source2: Makefile.certificate
 Source6: make-dummy-cert
@@ -38,30 +40,25 @@ Source11: README.FIPS
 Source12: ec_curve.c
 Source13: ectest.c
 # Build changes
-Patch1: openssl-1.1.0-build.patch
+Patch1: openssl-1.1.1-build.patch
 Patch2: openssl-1.1.0-defaults.patch
 Patch3: openssl-1.1.0-no-html.patch
+Patch4: openssl-1.1.1-man-rename.patch
 # Bug fixes
 Patch21: openssl-1.1.0-issuer-hash.patch
-Patch22: openssl-1.1.0-algo-doc.patch
-Patch23: openssl-1.1.0-manfix.patch
 # Functionality changes
 Patch31: openssl-1.1.0-ca-dir.patch
-Patch32: openssl-1.1.0-version-add-engines.patch
+Patch32: openssl-1.1.1-version-add-engines.patch
 Patch33: openssl-1.1.0-apps-dgst.patch
-Patch35: openssl-1.1.0-chil-fixes.patch
-Patch36: openssl-1.1.0-secure-getenv.patch
-Patch37: openssl-1.1.0-ec-curves.patch
+Patch36: openssl-1.1.1-secure-getenv.patch
+Patch37: openssl-1.1.1-ec-curves.patch
 Patch38: openssl-1.1.0-no-weak-verify.patch
-Patch39: openssl-1.1.0-cc-reqs.patch
-Patch40: openssl-1.1.0-disable-ssl3.patch
-Patch41: openssl-1.1.0-system-cipherlist.patch
-Patch42: openssl-1.1.0-fips.patch
-Patch44: openssl-1.1.0-bio-fd-preserve-nl.patch
+Patch40: openssl-1.1.1-disable-ssl3.patch
+Patch41: openssl-1.1.1-system-cipherlist.patch
+Patch42: openssl-1.1.1-fips.patch
+Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
-Patch46: openssl-1.1.0-silent-rnd-write.patch
 # Backported fixes including security fixes
-Patch70: openssl-1.1.0-missing-quotes.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -71,6 +68,7 @@ BuildRequires: coreutils, krb5-devel, perl-interpreter, sed, zlib-devel, /usr/bi
 BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
 BuildRequires: /usr/bin/pod2man
+BuildRequires: /usr/sbin/sysctl
 BuildRequires: perl(Test::Harness), perl(Test::More), perl(Math::BigInt)
 BuildRequires: perl(Module::Load::Conditional), perl(File::Temp)
 BuildRequires: perl(Time::HiRes)
@@ -134,7 +132,7 @@ package provides Perl scripts for converting certificates and keys
 from other formats to the formats used by the OpenSSL toolkit.
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n %{name}-%{version}-%{prerelease}
 
 # The hobble_openssl is called here redundantly, just to be sure.
 # The tarball has already the sources removed.
@@ -146,27 +144,22 @@ cp %{SOURCE13} test/
 %patch1 -p1 -b .build   %{?_rawbuild}
 %patch2 -p1 -b .defaults
 %patch3 -p1 -b .no-html  %{?_rawbuild}
+%patch4 -p1 -b .man-rename
 
 %patch21 -p1 -b .issuer-hash
-%patch22 -p1 -b .algo-doc
-%patch23 -p1 -b .manfix
 
 %patch31 -p1 -b .ca-dir
 %patch32 -p1 -b .version-add-engines
 %patch33 -p1 -b .dgst
-%patch35 -p1 -b .chil
 %patch36 -p1 -b .secure-getenv
 %patch37 -p1 -b .curves
 %patch38 -p1 -b .no-weak-verify
-%patch39 -p1 -b .cc-reqs
 %patch40 -p1 -b .disable-ssl3
 %patch41 -p1 -b .system-cipherlist
 %patch42 -p1 -b .fips
-%patch44 -p1 -b .preserve-nl
+%patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
-%patch46 -p1 -b .silent-rnd-write
 
-%patch70 -p1 -b .missing-quotes
 
 %build
 # Figure out which flags we want to use.
@@ -246,7 +239,7 @@ export HASHBANGPERL=/usr/bin/perl
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method \
 	enable-weak-ssl-ciphers \
-	no-mdc2 no-ec2m \
+	no-mdc2 no-ec2m no-sm2 \
 	shared  ${sslarch} $RPM_OPT_FLAGS
 
 # Do not run this in a production package the FIPS symbols must be patched-in
@@ -265,6 +258,13 @@ done
 %check
 # Verify that what was compiled actually works.
 
+# Hack - either enable SCTP AUTH chunks in kernel or disable sctp for check
+(sysctl net.sctp.addip_enable=1 && sysctl net.sctp.auth_enable=1) || \
+(echo 'Failed to enable SCTP AUTH chunks, disabling SCTP for tests...' &&
+ sed '/"zlib-dynamic" => "default",/a\ \ "sctp" => "default",' configdata.pm > configdata.pm.new && \
+ touch -r configdata.pm configdata.pm.new && \
+ mv -f configdata.pm.new configdata.pm)
+
 # We must revert patch31 before tests otherwise they will fail
 patch -p1 -R < %{PATCH31}
 
@@ -276,6 +276,8 @@ crypto/fips/fips_standalone_hmac libssl.so.%{soversion} >.libssl.so.%{soversion}
 ln -s .libssl.so.%{soversion}.hmac .libssl.so.hmac
 OPENSSL_ENABLE_MD5_VERIFY=
 export OPENSSL_ENABLE_MD5_VERIFY
+OPENSSL_SYSTEM_CIPHERS_OVERRIDE=xyz_nonexistent_file
+export OPENSSL_SYSTEM_CIPHERS_OVERRIDE
 make test
 
 # Add generation of HMAC checksum of the final stripped library
@@ -344,11 +346,13 @@ mkdir -m755 $RPM_BUILD_ROOT%{_sysconfdir}/pki/CA/certs
 mkdir -m755 $RPM_BUILD_ROOT%{_sysconfdir}/pki/CA/crl
 mkdir -m755 $RPM_BUILD_ROOT%{_sysconfdir}/pki/CA/newcerts
 
-# Ensure the openssl.cnf timestamp is identical across builds to avoid
+# Ensure the config file timestamps are identical across builds to avoid
 # mulitlib conflicts and unnecessary renames on upgrade
 touch -r %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/openssl.cnf
+touch -r %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/ct_log_list.cnf
 
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/openssl.cnf.dist
+rm -f $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/ct_log_list.cnf.dist
 
 # Determine which arch opensslconf.h is going to try to #include.
 basearch=%{_arch}
@@ -399,6 +403,7 @@ export LD_LIBRARY_PATH
 %dir %{_sysconfdir}/pki/tls/misc
 %dir %{_sysconfdir}/pki/tls/private
 %config(noreplace) %{_sysconfdir}/pki/tls/openssl.cnf
+%config(noreplace) %{_sysconfdir}/pki/tls/ct_log_list.cnf
 %attr(0755,root,root) %{_libdir}/libcrypto.so.%{version}
 %attr(0755,root,root) %{_libdir}/libcrypto.so.%{soversion}
 %attr(0755,root,root) %{_libdir}/libssl.so.%{version}
@@ -435,6 +440,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Jul 25 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8.1
+- update to the latest 1.1.1 beta version
+
 * Fri Jul 13 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0h-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
 
