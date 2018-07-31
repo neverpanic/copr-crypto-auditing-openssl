@@ -24,7 +24,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 0.%{prerelease}%{?dist}
+Release: 0.%{prerelease}.2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -47,7 +47,7 @@ Patch4: openssl-1.1.1-man-rename.patch
 # Bug fixes
 Patch21: openssl-1.1.0-issuer-hash.patch
 # Functionality changes
-Patch31: openssl-1.1.0-ca-dir.patch
+Patch31: openssl-1.1.1-conf-paths.patch
 Patch32: openssl-1.1.1-version-add-engines.patch
 Patch33: openssl-1.1.0-apps-dgst.patch
 Patch36: openssl-1.1.1-secure-getenv.patch
@@ -85,7 +85,7 @@ protocols.
 Summary: A general purpose cryptography library with TLS implementation
 Group: System Environment/Libraries
 Requires: ca-certificates >= 2008-5
-Requires: crypto-policies
+Requires: crypto-policies >= 20180730
 Recommends: openssl-pkcs11%{?_isa}
 # Needed obsoletes due to the base/lib subpackage split
 Obsoletes: openssl < 1:1.0.1-0.3.beta3
@@ -148,7 +148,7 @@ cp %{SOURCE13} test/
 
 %patch21 -p1 -b .issuer-hash
 
-%patch31 -p1 -b .ca-dir
+%patch31 -p1 -b .conf-paths
 %patch32 -p1 -b .version-add-engines
 %patch33 -p1 -b .dgst
 %patch36 -p1 -b .secure-getenv
@@ -440,7 +440,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
-* Wed Jul 25 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8.1
+* Fri Jul 27 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8.2
+- load crypto policy config file from the default config
+
+* Wed Jul 25 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8
 - update to the latest 1.1.1 beta version
 
 * Fri Jul 13 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.0h-6
