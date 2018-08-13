@@ -24,7 +24,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 0.%{prerelease}.3%{?dist}
+Release: 0.%{prerelease}.4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -60,6 +60,7 @@ Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
 # Backported fixes including security fixes
+Patch70: openssl-1.1.1-bidi-shutdown.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -162,6 +163,7 @@ cp %{SOURCE13} test/
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
 
+%patch70 -p1 -b .bidi-shutdown
 
 %build
 # Figure out which flags we want to use.
@@ -442,6 +444,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Aug 13 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8.4
+- bidirectional shutdown fixes from upstream
+
 * Mon Aug 13 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre8.3
 - do not put error on stack when using fixed protocol version
   with the default config (#1615098)
