@@ -1,25 +1,7 @@
-diff -up openssl-1.1.1-pre2/doc/man1/openssl.pod.man-rename openssl-1.1.1-pre2/doc/man1/openssl.pod
---- openssl-1.1.1-pre2/doc/man1/openssl.pod.man-rename	2018-02-27 14:40:43.000000000 +0100
-+++ openssl-1.1.1-pre2/doc/man1/openssl.pod	2018-03-06 15:32:44.737652939 +0100
-@@ -170,7 +170,7 @@ Create or examine a Netscape certificate
- 
- Online Certificate Status Protocol utility.
- 
--=item L<B<passwd>|passwd(1)>
-+=item L<B<passwd>|sslpasswd(1)>
- 
- Generation of hashed passwords.
- 
-@@ -202,7 +202,7 @@ Public key algorithm cryptographic opera
- 
- Compute prime numbers.
- 
--=item L<B<rand>|rand(1)>
-+=item L<B<rand>|sslrand(1)>
- 
- Generate pseudo-random bytes.
- 
-@@ -444,13 +444,13 @@ L<dhparam(1)>, L<dsa(1)>, L<dsaparam(1)>
+diff -up openssl-1.1.1-pre9/doc/man1/openssl.pod.man-rename openssl-1.1.1-pre9/doc/man1/openssl.pod
+--- openssl-1.1.1-pre9/doc/man1/openssl.pod.man-rename	2018-08-21 14:14:13.000000000 +0200
++++ openssl-1.1.1-pre9/doc/man1/openssl.pod	2018-08-22 12:13:04.092568064 +0200
+@@ -482,13 +482,13 @@ L<dhparam(1)>, L<dsa(1)>, L<dsaparam(1)>
  L<ec(1)>, L<ecparam(1)>,
  L<enc(1)>, L<engine(1)>, L<errstr(1)>, L<gendsa(1)>, L<genpkey(1)>,
  L<genrsa(1)>, L<nseq(1)>, L<ocsp(1)>,
