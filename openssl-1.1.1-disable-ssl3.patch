@@ -27,17 +27,19 @@ diff -up openssl-1.1.1-pre8/apps/s_server.c.disable-ssl3 openssl-1.1.1-pre8/apps
 diff -up openssl-1.1.1-pre8/ssl/ssl_lib.c.disable-ssl3 openssl-1.1.1-pre8/ssl/ssl_lib.c
 --- openssl-1.1.1-pre8/ssl/ssl_lib.c.disable-ssl3	2018-06-20 16:48:13.000000000 +0200
 +++ openssl-1.1.1-pre8/ssl/ssl_lib.c	2018-07-16 18:08:20.001487652 +0200
-@@ -3016,6 +3016,14 @@ SSL_CTX *SSL_CTX_new(const SSL_METHOD *m
+@@ -3016,6 +3016,16 @@ SSL_CTX *SSL_CTX_new(const SSL_METHOD *m
       */
      ret->options |= SSL_OP_NO_COMPRESSION | SSL_OP_ENABLE_MIDDLEBOX_COMPAT;
  
-+    /*
-+     * Disable SSLv3 by default.  Applications can
-+     * re-enable it by configuring
-+     * SSL_CTX_clear_options(ctx, SSL_OP_NO_SSLv3);
-+     * or by using the SSL_CONF API.
-+     */
-+    ret->options |= SSL_OP_NO_SSLv3;
++    if (meth->version != SSL3_VERSION) {
++        /*
++         * Disable SSLv3 by default.  Applications can
++         * re-enable it by configuring
++         * SSL_CTX_clear_options(ctx, SSL_OP_NO_SSLv3);
++         * or by using the SSL_CONF API.
++         */
++        ret->options |= SSL_OP_NO_SSLv3;
++    }
 +
      ret->ext.status_type = TLSEXT_STATUSTYPE_nothing;
  

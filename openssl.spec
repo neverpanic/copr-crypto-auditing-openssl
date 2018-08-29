@@ -24,7 +24,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 0.%{prerelease}.1%{?dist}
+Release: 0.%{prerelease}.2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -341,6 +341,11 @@ for manpage in man*/* ; do
 done
 for conflict in passwd rand ; do
 	rename ${conflict} ssl${conflict} man*/${conflict}*
+# Fix dangling symlinks
+	manpage=man1/openssl-${conflict}.*
+	if [ -L ${manpage} ] ; then
+		ln -snf ssl${conflict}.1ssl ${manpage}
+	fi
 done
 popd
 
@@ -398,6 +403,7 @@ export LD_LIBRARY_PATH
 %exclude %{_mandir}/man1*/*.pl*
 %exclude %{_mandir}/man1*/c_rehash*
 %exclude %{_mandir}/man1*/tsget*
+%exclude %{_mandir}/man1*/openssl-tsget*
 
 %files libs
 %{!?_licensedir:%global license %%doc}
@@ -433,6 +439,7 @@ export LD_LIBRARY_PATH
 %{_mandir}/man1*/*.pl*
 %{_mandir}/man1*/c_rehash*
 %{_mandir}/man1*/tsget*
+%{_mandir}/man1*/openssl-tsget*
 %dir %{_sysconfdir}/pki/CA
 %dir %{_sysconfdir}/pki/CA/private
 %dir %{_sysconfdir}/pki/CA/certs
@@ -444,6 +451,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Wed Aug 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre9.2
+- fix dangling symlinks to manual pages
+- make SSLv3_method work
+
 * Wed Aug 22 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre9.1
 - update to the latest 1.1.1 beta version
 
