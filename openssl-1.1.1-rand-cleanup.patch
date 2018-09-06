@@ -1,0 +1,13 @@
+diff -up openssl-1.1.1-pre9/crypto/rand/rand_lib.c.rand-cleanup openssl-1.1.1-pre9/crypto/rand/rand_lib.c
+--- openssl-1.1.1-pre9/crypto/rand/rand_lib.c.rand-cleanup	2018-09-06 08:18:19.481566808 +0200
++++ openssl-1.1.1-pre9/crypto/rand/rand_lib.c	2018-09-06 13:28:32.531777065 +0200
+@@ -353,7 +353,8 @@ void rand_cleanup_int(void)
+     if (meth != NULL && meth->cleanup != NULL)
+         meth->cleanup();
+     rand_pool_cleanup();
+-    RAND_set_rand_method(NULL);
++    if (meth != NULL)
++        RAND_set_rand_method(NULL);
+ #ifndef OPENSSL_NO_ENGINE
+     CRYPTO_THREAD_lock_free(rand_engine_lock);
+     rand_engine_lock = NULL;

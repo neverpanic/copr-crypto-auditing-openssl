@@ -24,7 +24,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 0.%{prerelease}.2%{?dist}
+Release: 0.%{prerelease}.3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -59,6 +59,7 @@ Patch42: openssl-1.1.1-fips.patch
 Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
+Patch46: openssl-1.1.1-rand-cleanup.patch
 # Backported fixes including security fixes
 Patch70: openssl-1.1.1-seclevel-check.patch
 
@@ -162,6 +163,7 @@ cp %{SOURCE13} test/
 %patch43 -p1 -b .ignore-bound
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
+%patch46 -p1 -b .rand-cleanup
 
 %patch70 -p1 -b .seclevel-check
 
@@ -243,8 +245,8 @@ export HASHBANGPERL=/usr/bin/perl
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method \
 	enable-weak-ssl-ciphers \
-	no-mdc2 no-ec2m no-sm2 \
-	shared  ${sslarch} $RPM_OPT_FLAGS
+	no-mdc2 no-ec2m no-sm2 no-sm4 \
+	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\""'
 
 # Do not run this in a production package the FIPS symbols must be patched-in
 #util/mkdef.pl crypto update
@@ -451,6 +453,12 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Sep  6 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre9.3
+- do not try to initialize RNG in cleanup if it was not initialized
+  before (#1624554)
+- use only /dev/urandom if getrandom() is not available
+- disable SM4
+
 * Wed Aug 29 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre9.2
 - fix dangling symlinks to manual pages
 - make SSLv3_method work
