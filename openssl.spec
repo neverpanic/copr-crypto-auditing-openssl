@@ -19,17 +19,15 @@
 
 %global _performance_build 1
 
-%global prerelease pre9
-
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 0.%{prerelease}.3%{?dist}
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
 # The original openssl upstream tarball cannot be shipped in the .src.rpm.
-Source: openssl-%{version}-%{prerelease}-hobbled.tar.xz
+Source: openssl-%{version}-hobbled.tar.xz
 Source1: hobble-openssl
 Source2: Makefile.certificate
 Source6: make-dummy-cert
@@ -59,9 +57,7 @@ Patch42: openssl-1.1.1-fips.patch
 Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.0-weak-ciphers.patch
-Patch46: openssl-1.1.1-rand-cleanup.patch
 # Backported fixes including security fixes
-Patch70: openssl-1.1.1-seclevel-check.patch
 
 License: OpenSSL
 Group: System Environment/Libraries
@@ -135,7 +131,7 @@ package provides Perl scripts for converting certificates and keys
 from other formats to the formats used by the OpenSSL toolkit.
 
 %prep
-%setup -q -n %{name}-%{version}-%{prerelease}
+%setup -q -n %{name}-%{version}
 
 # The hobble_openssl is called here redundantly, just to be sure.
 # The tarball has already the sources removed.
@@ -163,9 +159,7 @@ cp %{SOURCE13} test/
 %patch43 -p1 -b .ignore-bound
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
-%patch46 -p1 -b .rand-cleanup
 
-%patch70 -p1 -b .seclevel-check
 
 %build
 # Figure out which flags we want to use.
@@ -453,6 +447,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Sep 13 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-1
+- update to the final 1.1.1 version
+
 * Thu Sep  6 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-0.pre9.3
 - do not try to initialize RNG in cleanup if it was not initialized
   before (#1624554)
