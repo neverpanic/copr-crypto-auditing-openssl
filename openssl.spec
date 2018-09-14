@@ -56,7 +56,8 @@ Patch41: openssl-1.1.1-system-cipherlist.patch
 Patch42: openssl-1.1.1-fips.patch
 Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
-Patch45: openssl-1.1.0-weak-ciphers.patch
+Patch45: openssl-1.1.1-weak-ciphers.patch
+Patch46: openssl-1.1.1-seclevel.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -159,6 +160,7 @@ cp %{SOURCE13} test/
 %patch43 -p1 -b .ignore-bound
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
+%patch46 -p1 -b .seclevel
 
 
 %build
@@ -447,6 +449,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Sep 14 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-2
+- for consistent support of security policies we build
+  RC4 support in TLS (not default) and allow SHA1 in SECLEVEL 2
+
 * Thu Sep 13 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-1
 - update to the final 1.1.1 version
 
