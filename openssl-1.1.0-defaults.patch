@@ -1,6 +1,15 @@
 diff -up openssl-1.1.0-pre5/apps/openssl.cnf.defaults openssl-1.1.0-pre5/apps/openssl.cnf
 --- openssl-1.1.0-pre5/apps/openssl.cnf.defaults	2016-04-19 16:57:52.000000000 +0200
 +++ openssl-1.1.0-pre5/apps/openssl.cnf	2016-07-18 14:22:08.252691017 +0200
+@@ -10,7 +10,7 @@
+ # This definition stops the following lines choking if HOME isn't
+ # defined.
+ HOME			= .
+-RANDFILE		= $ENV::HOME/.rnd
++#RANDFILE		= $ENV::HOME/.rnd
+ 
+ # Extra OBJECT IDENTIFIER info:
+ #oid_file		= $ENV::HOME/.oid
 @@ -72,7 +72,7 @@ cert_opt 	= ca_default		# Certificate fi
  
  default_days	= 365			# how long to certify for
