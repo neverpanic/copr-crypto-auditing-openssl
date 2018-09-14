@@ -1,6 +1,6 @@
 diff -up openssl-1.1.1/crypto/x509/x509_vfy.c.seclevel openssl-1.1.1/crypto/x509/x509_vfy.c
 --- openssl-1.1.1/crypto/x509/x509_vfy.c.seclevel	2018-09-11 14:48:22.000000000 +0200
-+++ openssl-1.1.1/crypto/x509/x509_vfy.c	2018-09-14 10:51:05.126520376 +0200
++++ openssl-1.1.1/crypto/x509/x509_vfy.c	2018-09-14 11:47:39.715317617 +0200
 @@ -3220,6 +3220,7 @@ static int build_chain(X509_STORE_CTX *c
  }
  
@@ -22,7 +22,7 @@ diff -up openssl-1.1.1/crypto/x509/x509_vfy.c.seclevel openssl-1.1.1/crypto/x509
  }
 diff -up openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod.seclevel openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod
 --- openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod.seclevel	2018-09-11 14:48:22.000000000 +0200
-+++ openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod	2018-09-13 15:55:17.579190996 +0200
++++ openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod	2018-09-14 11:47:39.715317617 +0200
 @@ -81,8 +81,10 @@ using MD5 for the MAC is also prohibited
  
  =item B<Level 2>
@@ -38,7 +38,7 @@ diff -up openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod.seclevel openssl-
  
 diff -up openssl-1.1.1/ssl/ssl_cert.c.seclevel openssl-1.1.1/ssl/ssl_cert.c
 --- openssl-1.1.1/ssl/ssl_cert.c.seclevel	2018-09-11 14:48:23.000000000 +0200
-+++ openssl-1.1.1/ssl/ssl_cert.c	2018-09-14 10:50:35.960112056 +0200
++++ openssl-1.1.1/ssl/ssl_cert.c	2018-09-14 11:47:39.716317598 +0200
 @@ -983,6 +983,9 @@ static int ssl_security_default_callback
              return 0;
          break;
@@ -49,3 +49,17 @@ diff -up openssl-1.1.1/ssl/ssl_cert.c.seclevel openssl-1.1.1/ssl/ssl_cert.c
          if (bits < minbits)
              return 0;
      }
+diff -up openssl-1.1.1/test/recipes/25-test_verify.t.seclevel openssl-1.1.1/test/recipes/25-test_verify.t
+--- openssl-1.1.1/test/recipes/25-test_verify.t.seclevel	2018-09-11 14:48:24.000000000 +0200
++++ openssl-1.1.1/test/recipes/25-test_verify.t	2018-09-14 12:36:40.021812399 +0200
+@@ -342,8 +342,8 @@ ok(verify("ee-pss-sha1-cert", "sslserver
+ ok(verify("ee-pss-sha256-cert", "sslserver", ["root-cert"], ["ca-cert"], ),
+     "CA with PSS signature using SHA256");
+ 
+-ok(!verify("ee-pss-sha1-cert", "sslserver", ["root-cert"], ["ca-cert"], "-auth_level", "2"),
+-    "Reject PSS signature using SHA1 and auth level 2");
++ok(!verify("ee-pss-sha1-cert", "sslserver", ["root-cert"], ["ca-cert"], "-auth_level", "3"),
++    "Reject PSS signature using SHA1 and auth level 3");
+ 
+ ok(verify("ee-pss-sha256-cert", "sslserver", ["root-cert"], ["ca-cert"], "-auth_level", "2"),
+     "PSS signature using SHA256 and auth level 2");
