@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -449,6 +449,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Mon Sep 17 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-3
+- reinstate accidentally dropped patch for weak ciphersuites
+
 * Fri Sep 14 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-2
 - for consistent support of security policies we build
   RC4 support in TLS (not default) and allow SHA1 in SECLEVEL 2
