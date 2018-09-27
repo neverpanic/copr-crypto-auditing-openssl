@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -376,9 +376,9 @@ basearch=sparc64
 # Next step of gradual disablement of SSL3.
 # Make SSL3 disappear to newly built dependencies.
 sed -i '/^\#ifndef OPENSSL_NO_SSL_TRACE/i\
-\#ifndef OPENSSL_NO_SSL3\
-\# define OPENSSL_NO_SSL3\
-\#endif\' $RPM_BUILD_ROOT/%{_prefix}/include/openssl/opensslconf.h
+#ifndef OPENSSL_NO_SSL3\
+# define OPENSSL_NO_SSL3\
+#endif' $RPM_BUILD_ROOT/%{_prefix}/include/openssl/opensslconf.h
 
 %ifarch %{multilib_arches}
 # Do an opensslconf.h switcheroo to avoid file conflicts on systems where you
@@ -456,6 +456,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Thu Sep 27 2018 Charalampos Stratakis <cstratak@redhat.com> - 1:1.1.1-5
+- Correctly invoke sed for defining OPENSSL_NO_SSL3
+
 * Thu Sep 27 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-4
 - define OPENSSL_NO_SSL3 so the newly built dependencies do not
   have access to SSL3 API calls anymore
