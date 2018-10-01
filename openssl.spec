@@ -318,13 +318,6 @@ install -m755 %{SOURCE7} $RPM_BUILD_ROOT%{_bindir}/renew-dummy-cert
 mv $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/misc/*.pl $RPM_BUILD_ROOT%{_bindir}
 mv $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/misc/tsget $RPM_BUILD_ROOT%{_bindir}
 
-# Make sure we actually include the headers we built against.
-for header in $RPM_BUILD_ROOT%{_includedir}/openssl/* ; do
-	if [ -f ${header} -a -f include/openssl/$(basename ${header}) ] ; then
-		install -m644 include/openssl/`basename ${header}` ${header}
-	fi
-done
-
 # Rename man pages so that they don't conflict with other system man pages.
 pushd $RPM_BUILD_ROOT%{_mandir}
 ln -s -f config.5 man5/openssl.cnf.5
