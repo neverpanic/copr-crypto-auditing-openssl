@@ -453,11 +453,11 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
 +    ctx = BN_CTX_new();
 +    if (ctx == NULL)
 +        return -1;
-+    BN_CTX_start(ctx);
 +    if (BN_cmp(dsa->g, BN_value_one()) <= 0)
 +        return 0;
 +    if (BN_cmp(dsa->g, dsa->p) >= 0)
 +        return 0;
++    BN_CTX_start(ctx);
 +    tmp = BN_CTX_get(ctx);
 +    if (tmp == NULL)
 +        goto err;
@@ -697,7 +697,7 @@ diff -up openssl-1.1.1/crypto/ec/ecdsa_ossl.c.fips openssl-1.1.1/crypto/ec/ecdsa
 +#ifdef OPENSSL_FIPS
 +    if (FIPS_selftest_failed()) {
 +        FIPSerr(FIPS_F_OSSL_ECDSA_VERIFY_SIG, FIPS_R_FIPS_SELFTEST_FAILED);
-+        return NULL;
++        return -1;
 +    }
 +#endif
 +
@@ -2093,7 +2093,7 @@ diff -up openssl-1.1.1/crypto/fips/fips.c.fips openssl-1.1.1/crypto/fips/fips.c
 +    int ret = 0;
 +
 +    if (!RUN_ONCE(&fips_lock_init, do_fips_lock_init))
-+        return NULL;
++        return 0;
 +
 +    fips_w_lock();
 +    fips_started = 1;
@@ -4255,7 +4255,7 @@ diff -up openssl-1.1.1/crypto/fips/fips_drbg_lib.c.fips openssl-1.1.1/crypto/fip
 diff -up openssl-1.1.1/crypto/fips/fips_drbg_rand.c.fips openssl-1.1.1/crypto/fips/fips_drbg_rand.c
 --- openssl-1.1.1/crypto/fips/fips_drbg_rand.c.fips	2018-09-13 08:51:22.110520923 +0200
 +++ openssl-1.1.1/crypto/fips/fips_drbg_rand.c	2018-09-13 08:51:22.110520923 +0200
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,185 @@
 +/* fips/rand/fips_drbg_rand.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -4409,21 +4409,23 @@ diff -up openssl-1.1.1/crypto/fips/fips_drbg_rand.c.fips openssl-1.1.1/crypto/fi
 +static int fips_drbg_seed(const void *seed, int seedlen)
 +{
 +    DRBG_CTX *dctx = &ossl_dctx;
++    int ret = 1;
 +    CRYPTO_THREAD_write_lock(fips_rand_lock);
 +    if (dctx->rand_seed_cb)
-+        return dctx->rand_seed_cb(dctx, seed, seedlen);
++        ret = dctx->rand_seed_cb(dctx, seed, seedlen);
 +    CRYPTO_THREAD_unlock(fips_rand_lock);
-+    return 1;
++    return ret;
 +}
 +
 +static int fips_drbg_add(const void *seed, int seedlen, double add_entropy)
 +{
 +    DRBG_CTX *dctx = &ossl_dctx;
++    int ret = 1;
 +    CRYPTO_THREAD_write_lock(fips_rand_lock);
 +    if (dctx->rand_add_cb)
-+        return dctx->rand_add_cb(dctx, seed, seedlen, add_entropy);
++        ret = dctx->rand_add_cb(dctx, seed, seedlen, add_entropy);
 +    CRYPTO_THREAD_unlock(fips_rand_lock);
-+    return 1;
++    return ret;
 +}
 +
 +static const RAND_METHOD rand_drbg_meth = {
@@ -9699,7 +9701,7 @@ diff -up openssl-1.1.1/crypto/fips/fips_standalone_hmac.c.fips openssl-1.1.1/cry
 +        }
 +
 +        for (;;) {
-+            char buf[1024];
++            unsigned char buf[1024];
 +            size_t l = fread(buf, 1, sizeof buf, f);
 +
 +            if (l == 0) {
@@ -9856,8 +9858,12 @@ diff -up openssl-1.1.1/crypto/include/internal/fips_int.h.fips openssl-1.1.1/cry
 +#endif
 diff -up openssl-1.1.1/crypto/o_fips.c.fips openssl-1.1.1/crypto/o_fips.c
 --- openssl-1.1.1/crypto/o_fips.c.fips	2018-09-11 14:48:21.000000000 +0200
-+++ openssl-1.1.1/crypto/o_fips.c	2018-09-13 08:51:22.114520830 +0200
-@@ -11,14 +11,25 @@
++++ openssl-1.1.1/crypto/o_fips.c	2018-10-09 18:12:06.787802422 +0200
+@@ -8,17 +8,28 @@
+  */
+ 
+ #include "internal/cryptlib.h"
++#include "internal/fips_int.h"
  
  int FIPS_mode(void)
  {
@@ -9874,8 +9880,7 @@ diff -up openssl-1.1.1/crypto/o_fips.c.fips openssl-1.1.1/crypto/o_fips.c
 +#ifdef OPENSSL_FIPS
 +    if (r && FIPS_module_mode()) /* can be implicitly initialized by OPENSSL_init() */
 +        return 1;
-+    if (!FIPS_module_mode_set(r))
-+        return 0;
++    return FIPS_module_mode_set(r);
 +#else
      if (r == 0)
          return 1;

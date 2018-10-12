@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 5%{?dist}
+Release: 6%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -227,7 +227,7 @@ sslarch=linux-generic64
 # marked as not requiring an executable stack.
 # Also add -DPURIFY to make using valgrind with openssl easier as we do not
 # want to depend on the uninitialized memory as a source of entropy anyway.
-RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -DPURIFY $RPM_LD_FLAGS"
+RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -Wa,--generate-missing-build-notes=yes -DPURIFY $RPM_LD_FLAGS"
 
 export HASHBANGPERL=/usr/bin/perl
 
@@ -449,6 +449,10 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Oct 12 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-6
+- fix SECLEVEL 3 support
+- fix some issues found in Coverity scan
+
 * Thu Sep 27 2018 Charalampos Stratakis <cstratak@redhat.com> - 1:1.1.1-5
 - Correctly invoke sed for defining OPENSSL_NO_SSL3
 
