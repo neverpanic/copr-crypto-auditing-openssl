@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1
-Release: 6%{?dist}
+Release: 7%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -58,6 +58,8 @@ Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.1-weak-ciphers.patch
 Patch46: openssl-1.1.1-seclevel.patch
+Patch47: openssl-1.1.1-coverity.patch
+Patch48: openssl-1.1.1-fips-post-rand.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -161,6 +163,8 @@ cp %{SOURCE13} test/
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
 %patch46 -p1 -b .seclevel
+%patch47 -p1 -b .coverity
+%patch48 -p1 -b .fips-post-rand
 
 
 %build
@@ -449,6 +453,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Fri Nov  9 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-7
+- use /dev/urandom for seeding the RNG in FIPS POST
+
 * Fri Oct 12 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-6
 - fix SECLEVEL 3 support
 - fix some issues found in Coverity scan
