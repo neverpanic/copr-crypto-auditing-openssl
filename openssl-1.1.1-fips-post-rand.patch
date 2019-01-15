@@ -1,6 +1,6 @@
-diff -up openssl-1.1.1/crypto/fips/fips.c.fips-post-rand openssl-1.1.1/crypto/fips/fips.c
---- openssl-1.1.1/crypto/fips/fips.c.fips-post-rand	2018-10-12 17:40:50.631506976 +0200
-+++ openssl-1.1.1/crypto/fips/fips.c	2018-11-08 17:49:08.091064655 +0100
+diff -up openssl-1.1.1a/crypto/fips/fips.c.fips-post-rand openssl-1.1.1a/crypto/fips/fips.c
+--- openssl-1.1.1a/crypto/fips/fips.c.fips-post-rand	2019-01-15 14:14:07.813360637 +0100
++++ openssl-1.1.1a/crypto/fips/fips.c	2019-01-15 14:14:07.838360173 +0100
 @@ -68,6 +68,7 @@
  
  # include <openssl/fips.h>
@@ -51,9 +51,9 @@ diff -up openssl-1.1.1/crypto/fips/fips.c.fips-post-rand openssl-1.1.1/crypto/fi
          ret = 1;
          goto end;
      }
-diff -up openssl-1.1.1/crypto/include/internal/fips_int.h.fips-post-rand openssl-1.1.1/crypto/include/internal/fips_int.h
---- openssl-1.1.1/crypto/include/internal/fips_int.h.fips-post-rand	2018-11-08 17:32:50.806526458 +0100
-+++ openssl-1.1.1/crypto/include/internal/fips_int.h	2018-11-08 17:32:20.533828167 +0100
+diff -up openssl-1.1.1a/crypto/include/internal/fips_int.h.fips-post-rand openssl-1.1.1a/crypto/include/internal/fips_int.h
+--- openssl-1.1.1a/crypto/include/internal/fips_int.h.fips-post-rand	2019-01-15 14:14:07.821360489 +0100
++++ openssl-1.1.1a/crypto/include/internal/fips_int.h	2019-01-15 14:14:07.838360173 +0100
 @@ -76,6 +76,8 @@ int FIPS_selftest_hmac(void);
  int FIPS_selftest_drbg(void);
  int FIPS_selftest_cmac(void);
@@ -63,9 +63,9 @@ diff -up openssl-1.1.1/crypto/include/internal/fips_int.h.fips-post-rand openssl
  int fips_pkey_signature_test(EVP_PKEY *pkey,
                                   const unsigned char *tbs, int tbslen,
                                   const unsigned char *kat,
-diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/crypto/rand/rand_unix.c
---- openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand	2018-09-11 14:48:21.000000000 +0200
-+++ openssl-1.1.1/crypto/rand/rand_unix.c	2018-11-09 14:03:48.504301170 +0100
+diff -up openssl-1.1.1a/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1a/crypto/rand/rand_unix.c
+--- openssl-1.1.1a/crypto/rand/rand_unix.c.fips-post-rand	2018-11-20 14:35:38.000000000 +0100
++++ openssl-1.1.1a/crypto/rand/rand_unix.c	2019-01-15 14:17:22.416748544 +0100
 @@ -16,10 +16,12 @@
  #include <openssl/rand.h>
  #include "rand_lcl.h"
@@ -79,16 +79,7 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
  #endif
  #if defined(__FreeBSD__)
  # include <sys/types.h>
-@@ -86,7 +88,7 @@ static uint64_t get_timer_bits(void);
-     || defined(OPENSSL_SYS_VMS) || defined(OPENSSL_SYS_VXWORKS) \
-     || defined(OPENSSL_SYS_UEFI))
- 
--static ssize_t syscall_random(void *buf, size_t buflen);
-+static ssize_t syscall_random(void *buf, size_t buflen, int nonblock);
- 
- # if defined(OPENSSL_SYS_VOS)
- 
-@@ -248,7 +250,7 @@ static ssize_t sysctl_random(char *buf,
+@@ -258,7 +260,7 @@ static ssize_t sysctl_random(char *buf,
   * syscall_random(): Try to get random data using a system call
   * returns the number of bytes returned in buf, or < 0 on error.
   */
@@ -97,7 +88,7 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
  {
      /*
       * Note: 'buflen' equals the size of the buffer which is used by the
-@@ -270,6 +272,7 @@ static ssize_t syscall_random(void *buf,
+@@ -280,6 +282,7 @@ static ssize_t syscall_random(void *buf,
       * - Linux since 3.17 with glibc 2.25
       * - FreeBSD since 12.0 (1200061)
       */
@@ -105,7 +96,7 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
  #  if defined(__GNUC__) && __GNUC__>=2 && defined(__ELF__) && !defined(__hpux)
      extern int getentropy(void *buffer, size_t length) __attribute__((weak));
  
-@@ -291,10 +294,10 @@ static ssize_t syscall_random(void *buf,
+@@ -301,10 +304,10 @@ static ssize_t syscall_random(void *buf,
      if (p_getentropy.p != NULL)
          return p_getentropy.f(buf, buflen) == 0 ? (ssize_t)buflen : -1;
  #  endif
@@ -118,19 +109,19 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
  #  elif (defined(__FreeBSD__) || defined(__NetBSD__)) && defined(KERN_ARND)
      return sysctl_random(buf, buflen);
  #  else
-@@ -456,8 +459,10 @@ size_t rand_pool_acquire_entropy(RAND_PO
+@@ -454,8 +457,10 @@ size_t rand_pool_acquire_entropy(RAND_PO
      size_t bytes_needed;
      size_t entropy_available = 0;
      unsigned char *buffer;
 -
- #   ifdef OPENSSL_RAND_SEED_GETRANDOM
+ #   if defined(OPENSSL_RAND_SEED_GETRANDOM)
 +    int in_post;
 +
 +    for (in_post = fips_in_post(); in_post >= 0; --in_post) {
      {
          ssize_t bytes;
          /* Maximum allowed number of consecutive unsuccessful attempts */
-@@ -466,7 +471,7 @@ size_t rand_pool_acquire_entropy(RAND_PO
+@@ -464,7 +469,7 @@ size_t rand_pool_acquire_entropy(RAND_PO
          bytes_needed = rand_pool_bytes_needed(pool, 1 /*entropy_factor*/);
          while (bytes_needed != 0 && attempts-- > 0) {
              buffer = rand_pool_add_begin(pool, bytes_needed);
@@ -139,7 +130,7 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
              if (bytes > 0) {
                  rand_pool_add_end(pool, bytes, 8 * bytes);
                  bytes_needed -= bytes;
-@@ -498,8 +503,10 @@ size_t rand_pool_acquire_entropy(RAND_PO
+@@ -496,8 +501,10 @@ size_t rand_pool_acquire_entropy(RAND_PO
              int attempts = 3;
              const int fd = get_random_device(i);
  
@@ -151,7 +142,7 @@ diff -up openssl-1.1.1/crypto/rand/rand_unix.c.fips-post-rand openssl-1.1.1/cryp
  
              while (bytes_needed != 0 && attempts-- > 0) {
                  buffer = rand_pool_add_begin(pool, bytes_needed);
-@@ -559,7 +566,9 @@ size_t rand_pool_acquire_entropy(RAND_PO
+@@ -557,7 +564,9 @@ size_t rand_pool_acquire_entropy(RAND_PO
          }
      }
  #   endif

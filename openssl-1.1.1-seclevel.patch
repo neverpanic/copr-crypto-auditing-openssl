@@ -39,17 +39,6 @@ diff -up openssl-1.1.1/doc/man3/SSL_CTX_set_security_level.pod.seclevel openssl-
 diff -up openssl-1.1.1/ssl/ssl_cert.c.seclevel openssl-1.1.1/ssl/ssl_cert.c
 --- openssl-1.1.1/ssl/ssl_cert.c.seclevel	2018-09-11 14:48:23.000000000 +0200
 +++ openssl-1.1.1/ssl/ssl_cert.c	2018-10-12 15:29:12.673799305 +0200
-@@ -951,8 +951,8 @@ static int ssl_security_default_callback
-             if (level >= 2 && c->algorithm_enc == SSL_RC4)
-                 return 0;
-             /* Level 3: forward secure ciphersuites only */
--            if (level >= 3 && (c->min_tls != TLS1_3_VERSION ||
--                               !(c->algorithm_mkey & (SSL_kEDH | SSL_kEECDH))))
-+            if (level >= 3 && c->min_tls != TLS1_3_VERSION &&
-+                               !(c->algorithm_mkey & (SSL_kEDH | SSL_kEECDH)))
-                 return 0;
-             break;
-         }
 @@ -983,6 +983,9 @@ static int ssl_security_default_callback
              return 0;
          break;

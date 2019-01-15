@@ -316,9 +316,9 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_err.c.fips openssl-1.1.1/crypto/dsa/dsa_er
      {ERR_PACK(ERR_LIB_DSA, 0, DSA_R_PARAMETER_ENCODING_ERROR),
      "parameter encoding error"},
      {ERR_PACK(ERR_LIB_DSA, 0, DSA_R_Q_NOT_PRIME), "q not prime"},
-diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_gen.c
---- openssl-1.1.1/crypto/dsa/dsa_gen.c.fips	2018-09-11 14:48:21.000000000 +0200
-+++ openssl-1.1.1/crypto/dsa/dsa_gen.c	2018-09-13 08:51:22.102521110 +0200
+diff -up openssl-1.1.1a/crypto/dsa/dsa_gen.c.fips openssl-1.1.1a/crypto/dsa/dsa_gen.c
+--- openssl-1.1.1a/crypto/dsa/dsa_gen.c.fips	2018-11-20 14:35:38.000000000 +0100
++++ openssl-1.1.1a/crypto/dsa/dsa_gen.c	2019-01-15 14:05:46.719672088 +0100
 @@ -22,12 +22,22 @@
  #include <openssl/rand.h>
  #include <openssl/sha.h>
@@ -367,9 +367,9 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
      unsigned char *seed = NULL, *seed_tmp = NULL;
      unsigned char md[EVP_MAX_MD_SIZE];
      int mdsize;
-@@ -327,6 +343,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
-     if (mctx == NULL)
+@@ -333,6 +349,20 @@ int dsa_builtin_paramgen2(DSA *ret, size
          goto err;
+     }
  
 +# ifdef OPENSSL_FIPS
 +    if (FIPS_selftest_failed()) {
@@ -388,7 +388,7 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
      if (evpmd == NULL) {
          if (N == 160)
              evpmd = EVP_sha1();
-@@ -427,9 +457,10 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -433,9 +463,10 @@ int dsa_builtin_paramgen2(DSA *ret, size
                  goto err;
              /* Provided seed didn't produce a prime: error */
              if (seed_in) {
@@ -402,7 +402,7 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
              }
  
              /* do a callback call */
-@@ -515,11 +546,14 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -521,11 +552,14 @@ int dsa_builtin_paramgen2(DSA *ret, size
              if (counter >= (int)(4 * L))
                  break;
          }
@@ -417,7 +417,7 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
      }
   end:
      if (!BN_GENCB_call(cb, 2, 1))
-@@ -590,7 +624,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -596,7 +630,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
          BN_free(ret->g);
          ret->g = BN_dup(g);
          if (ret->p == NULL || ret->q == NULL || ret->g == NULL) {
@@ -426,7 +426,7 @@ diff -up openssl-1.1.1/crypto/dsa/dsa_gen.c.fips openssl-1.1.1/crypto/dsa/dsa_ge
              goto err;
          }
          if (counter_ret != NULL)
-@@ -608,3 +642,53 @@ int dsa_builtin_paramgen2(DSA *ret, size
+@@ -614,3 +648,53 @@ int dsa_builtin_paramgen2(DSA *ret, size
      EVP_MD_CTX_free(mctx);
      return ok;
  }

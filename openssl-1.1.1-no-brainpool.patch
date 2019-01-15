@@ -1,0 +1,124 @@
+diff -up openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.in.no-brainpool openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.in
+--- openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.in.no-brainpool	2018-11-20 14:35:42.000000000 +0100
++++ openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.in	2019-01-15 14:55:03.898065698 +0100
+@@ -141,22 +141,23 @@ our @tests = (
+     {
+         name => "ECDSA with brainpool",
+         server =>  {
+-            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
+-            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
+-            "Groups" => "brainpoolP256r1",
++#            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
++#            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
++#            "Groups" => "brainpoolP256r1",
++            "CipherString" => "aNULL",
+         },
+         client => {
+             #We don't restrict this to TLSv1.2, although use of brainpool
+             #should force this anyway so that this should succeed
+             "CipherString" => "aECDSA",
+             "RequestCAFile" => test_pem("root-cert.pem"),
+-            "Groups" => "brainpoolP256r1",
++#            "Groups" => "brainpoolP256r1",
+         },
+         test   => {
+-            "ExpectedServerCertType" =>, "brainpoolP256r1",
+-            "ExpectedServerSignType" =>, "EC",
++#            "ExpectedServerCertType" =>, "brainpoolP256r1",
++#            "ExpectedServerSignType" =>, "EC",
+             # Note: certificate_authorities not sent for TLS < 1.3
+-            "ExpectedServerCANames" =>, "empty",
++#            "ExpectedServerCANames" =>, "empty",
+             "ExpectedResult" => "Success"
+         },
+     },
+@@ -787,18 +788,19 @@ my @tests_tls_1_3 = (
+     {
+         name => "TLS 1.3 ECDSA with brainpool",
+         server =>  {
+-            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
+-            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
+-            "Groups" => "brainpoolP256r1",
++#            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
++#            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
++#            "Groups" => "brainpoolP256r1",
++             "CipherString" => "aNULL",
+         },
+         client => {
+             "RequestCAFile" => test_pem("root-cert.pem"),
+-            "Groups" => "brainpoolP256r1",
++#            "Groups" => "brainpoolP256r1",
+             "MinProtocol" => "TLSv1.3",
+             "MaxProtocol" => "TLSv1.3"
+         },
+         test   => {
+-            "ExpectedResult" => "ServerFail"
++            "ExpectedResult" => "Success"
+         },
+     },
+ );
+diff -up openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.no-brainpool openssl-1.1.1a/test/ssl-tests/20-cert-select.conf
+--- openssl-1.1.1a/test/ssl-tests/20-cert-select.conf.no-brainpool	2018-11-20 14:35:42.000000000 +0100
++++ openssl-1.1.1a/test/ssl-tests/20-cert-select.conf	2019-01-15 14:58:24.420416659 +0100
+@@ -233,23 +233,23 @@ server = 5-ECDSA with brainpool-server
+ client = 5-ECDSA with brainpool-client
+ 
+ [5-ECDSA with brainpool-server]
+-Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
+-CipherString = DEFAULT
+-Groups = brainpoolP256r1
+-PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
++#Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
++CipherString = aNULL
++#Groups = brainpoolP256r1
++#PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
+ 
+ [5-ECDSA with brainpool-client]
+ CipherString = aECDSA
+-Groups = brainpoolP256r1
++#Groups = brainpoolP256r1
+ RequestCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
+ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
+ VerifyMode = Peer
+ 
+ [test-5]
+-ExpectedResult = Success
+-ExpectedServerCANames = empty
+-ExpectedServerCertType = brainpoolP256r1
+-ExpectedServerSignType = EC
++ExpectedResult = ServerFail
++#ExpectedServerCANames = empty
++#ExpectedServerCertType = brainpoolP256r1
++#ExpectedServerSignType = EC
+ 
+ 
+ # ===========================================================
+@@ -1577,14 +1577,14 @@ server = 47-TLS 1.3 ECDSA with brainpool
+ client = 47-TLS 1.3 ECDSA with brainpool-client
+ 
+ [47-TLS 1.3 ECDSA with brainpool-server]
+-Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
+-CipherString = DEFAULT
+-Groups = brainpoolP256r1
+-PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
++#Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
++CipherString = aNULL
++#Groups = brainpoolP256r1
++#PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
+ 
+ [47-TLS 1.3 ECDSA with brainpool-client]
+ CipherString = DEFAULT
+-Groups = brainpoolP256r1
++#Groups = brainpoolP256r1
+ MaxProtocol = TLSv1.3
+ MinProtocol = TLSv1.3
+ RequestCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
+@@ -1592,7 +1592,7 @@ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/ro
+ VerifyMode = Peer
+ 
+ [test-47]
+-ExpectedResult = ServerFail
++ExpectedResult = Success
+ 
+ 
+ # ===========================================================

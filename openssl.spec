@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1
-Release: 7%{?dist}
+Version: 1.1.1a
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -39,7 +39,7 @@ Source12: ec_curve.c
 Source13: ectest.c
 # Build changes
 Patch1: openssl-1.1.1-build.patch
-Patch2: openssl-1.1.0-defaults.patch
+Patch2: openssl-1.1.1-defaults.patch
 Patch3: openssl-1.1.0-no-html.patch
 Patch4: openssl-1.1.1-man-rename.patch
 # Bug fixes
@@ -48,7 +48,7 @@ Patch21: openssl-1.1.0-issuer-hash.patch
 Patch31: openssl-1.1.1-conf-paths.patch
 Patch32: openssl-1.1.1-version-add-engines.patch
 Patch33: openssl-1.1.0-apps-dgst.patch
-Patch36: openssl-1.1.1-secure-getenv.patch
+Patch36: openssl-1.1.1-no-brainpool.patch
 Patch37: openssl-1.1.1-ec-curves.patch
 Patch38: openssl-1.1.0-no-weak-verify.patch
 Patch40: openssl-1.1.1-disable-ssl3.patch
@@ -58,7 +58,6 @@ Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.1-weak-ciphers.patch
 Patch46: openssl-1.1.1-seclevel.patch
-Patch47: openssl-1.1.1-coverity.patch
 Patch48: openssl-1.1.1-fips-post-rand.patch
 # Backported fixes including security fixes
 
@@ -153,7 +152,7 @@ cp %{SOURCE13} test/
 %patch31 -p1 -b .conf-paths
 %patch32 -p1 -b .version-add-engines
 %patch33 -p1 -b .dgst
-%patch36 -p1 -b .secure-getenv
+%patch36 -p1 -b .no-brainpool
 %patch37 -p1 -b .curves
 %patch38 -p1 -b .no-weak-verify
 %patch40 -p1 -b .disable-ssl3
@@ -163,7 +162,6 @@ cp %{SOURCE13} test/
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
 %patch46 -p1 -b .seclevel
-%patch47 -p1 -b .coverity
 %patch48 -p1 -b .fips-post-rand
 
 
@@ -453,6 +451,9 @@ export LD_LIBRARY_PATH
 %postun libs -p /sbin/ldconfig
 
 %changelog
+* Tue Jan 15 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1a-1
+- update to the 1.1.1a release
+
 * Fri Nov  9 2018 Tomáš Mráz <tmraz@redhat.com> 1.1.1-7
 - use /dev/urandom for seeding the RNG in FIPS POST
 
