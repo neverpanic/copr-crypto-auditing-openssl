@@ -446,9 +446,7 @@ export LD_LIBRARY_PATH
 %dir %{_sysconfdir}/pki/CA/crl
 %dir %{_sysconfdir}/pki/CA/newcerts
 
-%post libs -p /sbin/ldconfig
-
-%postun libs -p /sbin/ldconfig
+%ldconfig_scriptlets libs
 
 %changelog
 * Tue Jan 15 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1a-1
