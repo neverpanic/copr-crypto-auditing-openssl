@@ -62,7 +62,6 @@ Patch48: openssl-1.1.1-fips-post-rand.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
-Group: System Environment/Libraries
 URL: http://www.openssl.org/
 BuildRequires: gcc
 BuildRequires: coreutils, krb5-devel, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
@@ -84,7 +83,6 @@ protocols.
 
 %package libs
 Summary: A general purpose cryptography library with TLS implementation
-Group: System Environment/Libraries
 Requires: ca-certificates >= 2008-5
 Requires: crypto-policies >= 20180730
 Recommends: openssl-pkcs11%{?_isa}
@@ -100,7 +98,6 @@ support cryptographic algorithms and protocols.
 
 %package devel
 Summary: Files for development of applications which will use OpenSSL
-Group: Development/Libraries
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
 Requires: krb5-devel%{?_isa}, zlib-devel%{?_isa}
 Requires: pkgconfig
@@ -112,7 +109,6 @@ support various cryptographic algorithms and protocols.
 
 %package static
 Summary:  Libraries for static linking of applications which will use OpenSSL
-Group: Development/Libraries
 Requires: %{name}-devel%{?_isa} = %{epoch}:%{version}-%{release}
 
 %description static
@@ -123,7 +119,6 @@ protocols.
 
 %package perl
 Summary: Perl scripts provided with OpenSSL
-Group: Applications/Internet
 Requires: perl-interpreter
 Requires: %{name}%{?_isa} = %{epoch}:%{version}-%{release}
 
