@@ -10120,7 +10120,7 @@ diff -up openssl-1.1.1/crypto/rsa/rsa_err.c.fips openssl-1.1.1/crypto/rsa/rsa_er
 diff -up openssl-1.1.1/crypto/rsa/rsa_gen.c.fips openssl-1.1.1/crypto/rsa/rsa_gen.c
 --- openssl-1.1.1/crypto/rsa/rsa_gen.c.fips	2018-09-11 14:48:21.000000000 +0200
 +++ openssl-1.1.1/crypto/rsa/rsa_gen.c	2018-09-13 08:51:22.118520736 +0200
-@@ -18,6 +18,78 @@
+@@ -18,6 +18,76 @@
  #include "internal/cryptlib.h"
  #include <openssl/bn.h>
  #include "rsa_locl.h"
@@ -10142,11 +10142,9 @@ diff -up openssl-1.1.1/crypto/rsa/rsa_gen.c.fips openssl-1.1.1/crypto/rsa/rsa_ge
 +
 +    /* Perform pairwise consistency signature test */
 +    if (!fips_pkey_signature_test(pk, tbs, -1,
-+                                  NULL, 0, EVP_sha1(),
++                                  NULL, 0, EVP_sha256(),
 +                                  EVP_MD_CTX_FLAG_PAD_PKCS1, NULL)
-+        || !fips_pkey_signature_test(pk, tbs, -1, NULL, 0, EVP_sha1(),
-+                                     EVP_MD_CTX_FLAG_PAD_X931, NULL)
-+        || !fips_pkey_signature_test(pk, tbs, -1, NULL, 0, EVP_sha1(),
++        || !fips_pkey_signature_test(pk, tbs, -1, NULL, 0, EVP_sha256(),
 +                                     EVP_MD_CTX_FLAG_PAD_PSS, NULL))
 +        goto err;
 +    /* Now perform pairwise consistency encrypt/decrypt test */
@@ -10199,7 +10197,7 @@ diff -up openssl-1.1.1/crypto/rsa/rsa_gen.c.fips openssl-1.1.1/crypto/rsa/rsa_ge
  
  static int rsa_builtin_keygen(RSA *rsa, int bits, int primes, BIGNUM *e_value,
                                BN_GENCB *cb);
-@@ -31,6 +103,13 @@ static int rsa_builtin_keygen(RSA *rsa,
+@@ -31,6 +101,13 @@ static int rsa_builtin_keygen(RSA *rsa,
   */
  int RSA_generate_key_ex(RSA *rsa, int bits, BIGNUM *e_value, BN_GENCB *cb)
  {
@@ -10213,7 +10211,7 @@ diff -up openssl-1.1.1/crypto/rsa/rsa_gen.c.fips openssl-1.1.1/crypto/rsa/rsa_ge
      if (rsa->meth->rsa_keygen != NULL)
          return rsa->meth->rsa_keygen(rsa, bits, e_value, cb);
  
-@@ -41,6 +120,13 @@ int RSA_generate_key_ex(RSA *rsa, int bi
+@@ -41,6 +118,13 @@ int RSA_generate_key_ex(RSA *rsa, int bi
  int RSA_generate_multi_prime_key(RSA *rsa, int bits, int primes,
                                   BIGNUM *e_value, BN_GENCB *cb)
  {
@@ -10227,7 +10225,7 @@ diff -up openssl-1.1.1/crypto/rsa/rsa_gen.c.fips openssl-1.1.1/crypto/rsa/rsa_ge
      /* multi-prime is only supported with the builtin key generation */
      if (rsa->meth->rsa_multi_prime_keygen != NULL) {
          return rsa->meth->rsa_multi_prime_keygen(rsa, bits, primes,
-@@ -57,10 +143,285 @@ int RSA_generate_multi_prime_key(RSA *rs
+@@ -57,10 +141,285 @@ int RSA_generate_multi_prime_key(RSA *rs
          else
              return 0;
      }
