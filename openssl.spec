@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1a
-Release: 2%{?dist}
+Version: 1.1.1b
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -50,7 +50,7 @@ Patch32: openssl-1.1.1-version-add-engines.patch
 Patch33: openssl-1.1.0-apps-dgst.patch
 Patch36: openssl-1.1.1-no-brainpool.patch
 Patch37: openssl-1.1.1-ec-curves.patch
-Patch38: openssl-1.1.0-no-weak-verify.patch
+Patch38: openssl-1.1.1-no-weak-verify.patch
 Patch40: openssl-1.1.1-disable-ssl3.patch
 Patch41: openssl-1.1.1-system-cipherlist.patch
 Patch42: openssl-1.1.1-fips.patch
@@ -59,6 +59,8 @@ Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.1-weak-ciphers.patch
 Patch46: openssl-1.1.1-seclevel.patch
 Patch48: openssl-1.1.1-fips-post-rand.patch
+Patch49: openssl-1.1.1-evp-kdf.patch
+Patch50: openssl-1.1.1-ssh-kdf.patch
 # Backported fixes including security fixes
 
 License: OpenSSL
@@ -158,6 +160,8 @@ cp %{SOURCE13} test/
 %patch45 -p1 -b .weak-ciphers
 %patch46 -p1 -b .seclevel
 %patch48 -p1 -b .fips-post-rand
+%patch49 -p1 -b .evp-kdf
+%patch50 -p1 -b .ssh-kdf
 
 
 %build
@@ -444,6 +448,11 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Feb 28 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-1
+- update to the 1.1.1b release
+- EVP_KDF API backport from master
+- SSH KDF implementation for EVP_KDF API backport from master
+
 * Fri Feb 01 2019 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.1a-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
 

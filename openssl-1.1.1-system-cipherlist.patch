@@ -295,10 +295,10 @@ diff -up openssl-1.1.1-pre9/ssl/ssl_lib.c.system-cipherlist openssl-1.1.1-pre9/s
          || sk_SSL_CIPHER_num(ret->cipher_list) <= 0) {
          SSLerr(SSL_F_SSL_CTX_NEW, SSL_R_LIBRARY_HAS_NO_CIPHERS);
          goto err2;
-diff -up openssl-1.1.1-pre9/test/cipherlist_test.c.system-cipherlist openssl-1.1.1-pre9/test/cipherlist_test.c
---- openssl-1.1.1-pre9/test/cipherlist_test.c.system-cipherlist	2018-08-21 14:14:15.000000000 +0200
-+++ openssl-1.1.1-pre9/test/cipherlist_test.c	2018-08-22 12:15:54.558743609 +0200
-@@ -217,7 +217,9 @@ static int test_default_cipherlist_expli
+diff -up openssl-1.1.1b/test/cipherlist_test.c.system-cipherlist openssl-1.1.1b/test/cipherlist_test.c
+--- openssl-1.1.1b/test/cipherlist_test.c.system-cipherlist	2019-02-28 11:27:15.181936081 +0100
++++ openssl-1.1.1b/test/cipherlist_test.c	2019-02-28 11:28:53.357111055 +0100
+@@ -251,7 +251,9 @@ end:
  
  int setup_tests(void)
  {
@@ -306,5 +306,5 @@ diff -up openssl-1.1.1-pre9/test/cipherlist_test.c.system-cipherlist openssl-1.1
      ADD_TEST(test_default_cipherlist_implicit);
 +#endif
      ADD_TEST(test_default_cipherlist_explicit);
+     ADD_TEST(test_default_cipherlist_clear);
      return 1;
- }

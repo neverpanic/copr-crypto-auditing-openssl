@@ -1,6 +1,6 @@
-diff -up openssl-1.1.1/apps/speed.c.curves openssl-1.1.1/apps/speed.c
---- openssl-1.1.1/apps/speed.c.curves	2018-09-11 14:48:20.000000000 +0200
-+++ openssl-1.1.1/apps/speed.c	2018-09-13 09:24:24.840081023 +0200
+diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
+--- openssl-1.1.1b/apps/speed.c.curves	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/apps/speed.c	2019-02-28 11:20:42.347170167 +0100
 @@ -489,82 +489,28 @@ static const OPT_PAIR rsa_choices[] = {
  static double rsa_results[RSA_NUM][2];  /* 2 ops: sign then verify */
  #endif /* OPENSSL_NO_RSA */
@@ -98,11 +98,11 @@ diff -up openssl-1.1.1/apps/speed.c.curves openssl-1.1.1/apps/speed.c
 -        {"nistp192", NID_X9_62_prime192v1, 192},
          {"nistp224", NID_secp224r1, 224},
          {"nistp256", NID_X9_62_prime256v1, 256},
-         {"nistp384", NID_secp384r1, 384}, 
+         {"nistp384", NID_secp384r1, 384},
          {"nistp521", NID_secp521r1, 521},
 -        /* Binary Curves */
 -        {"nistk163", NID_sect163k1, 163},
--        {"nistk233", NID_sect233k1, 233}, 
+-        {"nistk233", NID_sect233k1, 233},
 -        {"nistk283", NID_sect283k1, 283},
 -        {"nistk409", NID_sect409k1, 409},
 -        {"nistk571", NID_sect571k1, 571},
@@ -170,10 +170,10 @@ diff -up openssl-1.1.1/apps/speed.c.curves openssl-1.1.1/apps/speed.c
      /* default iteration count for the last two EC Curves */
      ecdh_c[R_EC_X25519][0] = count / 1800;
      ecdh_c[R_EC_X448][0] = count / 7200;
-diff -up openssl-1.1.1/crypto/ec/ecp_smpl.c.curves openssl-1.1.1/crypto/ec/ecp_smpl.c
---- openssl-1.1.1/crypto/ec/ecp_smpl.c.curves	2018-09-11 14:48:21.000000000 +0200
-+++ openssl-1.1.1/crypto/ec/ecp_smpl.c	2018-09-13 09:09:26.841792619 +0200
-@@ -144,6 +144,11 @@ int ec_GFp_simple_group_set_curve(EC_GRO
+diff -up openssl-1.1.1b/crypto/ec/ecp_smpl.c.curves openssl-1.1.1b/crypto/ec/ecp_smpl.c
+--- openssl-1.1.1b/crypto/ec/ecp_smpl.c.curves	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ecp_smpl.c	2019-02-28 11:19:30.628479300 +0100
+@@ -145,6 +145,11 @@ int ec_GFp_simple_group_set_curve(EC_GRO
          return 0;
      }
  
@@ -185,10 +185,10 @@ diff -up openssl-1.1.1/crypto/ec/ecp_smpl.c.curves openssl-1.1.1/crypto/ec/ecp_s
      if (ctx == NULL) {
          ctx = new_ctx = BN_CTX_new();
          if (ctx == NULL)
-diff -up openssl-1.1.1/test/ecdsatest.c.curves openssl-1.1.1/test/ecdsatest.c
---- openssl-1.1.1/test/ecdsatest.c.curves	2018-09-11 14:48:24.000000000 +0200
-+++ openssl-1.1.1/test/ecdsatest.c	2018-09-13 09:09:26.841792619 +0200
-@@ -173,6 +173,7 @@ static int x9_62_tests(void)
+diff -up openssl-1.1.1b/test/ecdsatest.c.curves openssl-1.1.1b/test/ecdsatest.c
+--- openssl-1.1.1b/test/ecdsatest.c.curves	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/ecdsatest.c	2019-02-28 11:19:30.628479300 +0100
+@@ -176,6 +176,7 @@ static int x9_62_tests(void)
      if (!change_rand())
          goto x962_err;
  
@@ -196,7 +196,7 @@ diff -up openssl-1.1.1/test/ecdsatest.c.curves openssl-1.1.1/test/ecdsatest.c
      if (!TEST_true(x9_62_test_internal(NID_X9_62_prime192v1,
                   "3342403536405981729393488334694600415596881826869351677613",
                   "5735822328888155254683894997897571951568553642892029982342")))
-@@ -183,6 +184,7 @@ static int x9_62_tests(void)
+@@ -186,6 +187,7 @@ static int x9_62_tests(void)
                   "3238135532097973577080787768312505059318910517550078427819"
                               "78505179448783")))
          goto x962_err;
