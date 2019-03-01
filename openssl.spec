@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -448,6 +448,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Mar  1 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-2
+- use .include = syntax in the config file to allow it
+  to be parsed by 1.0.2 version (#1668916)
+
 * Thu Feb 28 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-1
 - update to the 1.1.1b release
 - EVP_KDF API backport from master
