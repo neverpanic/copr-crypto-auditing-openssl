@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -47,7 +47,7 @@ Patch21: openssl-1.1.0-issuer-hash.patch
 # Functionality changes
 Patch31: openssl-1.1.1-conf-paths.patch
 Patch32: openssl-1.1.1-version-add-engines.patch
-Patch33: openssl-1.1.0-apps-dgst.patch
+Patch33: openssl-1.1.1-apps-dgst.patch
 Patch36: openssl-1.1.1-no-brainpool.patch
 Patch37: openssl-1.1.1-ec-curves.patch
 Patch38: openssl-1.1.1-no-weak-verify.patch
@@ -448,6 +448,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Mar 15 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-3
+- fix regression in EVP_PBE_scrypt() (#1688284)
+- fix incorrect help message in ca app (#1553206)
+
 * Fri Mar  1 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-2
 - use .include = syntax in the config file to allow it
   to be parsed by 1.0.2 version (#1668916)

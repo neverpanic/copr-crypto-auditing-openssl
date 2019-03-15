@@ -634,7 +634,7 @@ diff -up openssl-1.1.1b/crypto/evp/pbe_scrypt.c.evp-kdf openssl-1.1.1b/crypto/ev
  /*
   * Maximum permitted memory allow this to be overridden with Configuration
   * option: e.g. -DSCRYPT_MAX_MEM=0 for maximum possible.
-@@ -160,107 +37,39 @@ int EVP_PBE_scrypt(const char *pass, siz
+@@ -160,107 +37,43 @@ int EVP_PBE_scrypt(const char *pass, siz
                     uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem,
                     unsigned char *key, size_t keylen)
  {
@@ -706,6 +706,10 @@ diff -up openssl-1.1.1b/crypto/evp/pbe_scrypt.c.evp-kdf openssl-1.1.1b/crypto/ev
 +    if (pass == NULL) {
 +        pass = empty;
 +        passlen = 0;
++    }
++    if (salt == NULL) {
++        salt = (const unsigned char *)empty;
++        saltlen = 0;
      }
 -
      if (maxmem == 0)
