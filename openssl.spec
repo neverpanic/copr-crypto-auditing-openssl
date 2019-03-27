@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -66,7 +66,7 @@ Patch50: openssl-1.1.1-ssh-kdf.patch
 License: OpenSSL
 URL: http://www.openssl.org/
 BuildRequires: gcc
-BuildRequires: coreutils, krb5-devel, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
+BuildRequires: coreutils, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
 BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
 BuildRequires: /usr/bin/pod2man
@@ -88,9 +88,6 @@ Summary: A general purpose cryptography library with TLS implementation
 Requires: ca-certificates >= 2008-5
 Requires: crypto-policies >= 20180730
 Recommends: openssl-pkcs11%{?_isa}
-# Needed obsoletes due to the base/lib subpackage split
-Obsoletes: openssl < 1:1.0.1-0.3.beta3
-Obsoletes: openssl-fips < 1:1.0.1e-28
 Provides: openssl-fips = %{epoch}:%{version}-%{release}
 
 %description libs
@@ -101,7 +98,6 @@ support cryptographic algorithms and protocols.
 %package devel
 Summary: Files for development of applications which will use OpenSSL
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
-Requires: krb5-devel%{?_isa}, zlib-devel%{?_isa}
 Requires: pkgconfig
 
 %description devel
@@ -448,6 +444,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Mar 27 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-4
+- drop unused BuildRequires and Requires in the -devel subpackage
+
 * Fri Mar 15 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-3
 - fix regression in EVP_PBE_scrypt() (#1688284)
 - fix incorrect help message in ca app (#1553206)
