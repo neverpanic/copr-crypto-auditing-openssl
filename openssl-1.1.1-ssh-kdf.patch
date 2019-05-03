@@ -5580,3 +5580,33 @@ index 285c4311a6..7f2dcd2291 100644
 +Ctrl.type = type:A
 +Output = FF
 +Result = KDF_MISMATCH
+From 148cc5ee246e108b1e7332035037bab53574b0a9 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Thu, 18 Apr 2019 08:26:29 -0400
+Subject: [PATCH] Change the digest string from "md" to "digest"
+
+Conform to other modules which were changed at the last minute and this
+discrepancy was not noticed.
+Retain "md" as an alias so not to break 3rd party backports/tests scripts.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+---
+ crypto/kdf/sshkdf.c        | 3 +++
+ test/recipes/20-test_kdf.t | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 test/recipes/20-test_kdf.t
+
+diff --git a/crypto/kdf/sshkdf.c b/crypto/kdf/sshkdf.c
+index 300e1adbb23..f585e8a0d6d 100644
+--- a/crypto/kdf/sshkdf.c
++++ b/crypto/kdf/sshkdf.c
+@@ -125,6 +125,9 @@ static int kdf_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type,
+         return 0;
+     }
+ 
++    if (strcmp(type, "digest") == 0)
++        return kdf_md2ctrl(impl, kdf_sshkdf_ctrl, EVP_KDF_CTRL_SET_MD, value);
++    /* alias, for historical reasons */
+     if (strcmp(type, "md") == 0)
+         return kdf_md2ctrl(impl, kdf_sshkdf_ctrl, EVP_KDF_CTRL_SET_MD, value);
+ 

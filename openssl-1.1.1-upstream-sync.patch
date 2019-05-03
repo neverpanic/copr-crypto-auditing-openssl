@@ -1,0 +1,2282 @@
+diff -up openssl-1.1.1b/apps/asn1pars.c.sync openssl-1.1.1b/apps/asn1pars.c
+--- openssl-1.1.1b/apps/asn1pars.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/apps/asn1pars.c	2019-05-03 08:55:51.532407003 +0200
+@@ -170,17 +170,17 @@ int asn1parse_main(int argc, char **argv
+     if (derfile && (derout = bio_open_default(derfile, 'w', FORMAT_ASN1)) == NULL)
+         goto end;
+ 
++    if ((buf = BUF_MEM_new()) == NULL)
++        goto end;
+     if (strictpem) {
+-        if (PEM_read_bio(in, &name, &header, &str, &num) !=
+-            1) {
++        if (PEM_read_bio(in, &name, &header, &str, &num) != 1) {
+             BIO_printf(bio_err, "Error reading PEM file\n");
+             ERR_print_errors(bio_err);
+             goto end;
+         }
++        buf->data = (char *)str;
++        buf->length = buf->max = num;
+     } else {
+-
+-        if ((buf = BUF_MEM_new()) == NULL)
+-            goto end;
+         if (!BUF_MEM_grow(buf, BUFSIZ * 8))
+             goto end;           /* Pre-allocate :-) */
+ 
+@@ -303,8 +303,6 @@ int asn1parse_main(int argc, char **argv
+     BUF_MEM_free(buf);
+     OPENSSL_free(name);
+     OPENSSL_free(header);
+-    if (strictpem)
+-        OPENSSL_free(str);
+     ASN1_TYPE_free(at);
+     sk_OPENSSL_STRING_free(osk);
+     return ret;
+diff -up openssl-1.1.1b/crypto/aes/asm/aesp8-ppc.pl.sync openssl-1.1.1b/crypto/aes/asm/aesp8-ppc.pl
+--- openssl-1.1.1b/crypto/aes/asm/aesp8-ppc.pl.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/aes/asm/aesp8-ppc.pl	2019-05-03 08:55:51.551406676 +0200
+@@ -1829,7 +1829,7 @@ Lctr32_enc8x_three:
+ 	stvx_u		$out1,$x10,$out
+ 	stvx_u		$out2,$x20,$out
+ 	addi		$out,$out,0x30
+-	b		Lcbc_dec8x_done
++	b		Lctr32_enc8x_done
+ 
+ .align	5
+ Lctr32_enc8x_two:
+@@ -1841,7 +1841,7 @@ Lctr32_enc8x_two:
+ 	stvx_u		$out0,$x00,$out
+ 	stvx_u		$out1,$x10,$out
+ 	addi		$out,$out,0x20
+-	b		Lcbc_dec8x_done
++	b		Lctr32_enc8x_done
+ 
+ .align	5
+ Lctr32_enc8x_one:
+diff -up openssl-1.1.1b/crypto/bio/b_addr.c.sync openssl-1.1.1b/crypto/bio/b_addr.c
+--- openssl-1.1.1b/crypto/bio/b_addr.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bio/b_addr.c	2019-05-03 08:55:51.555406608 +0200
+@@ -683,6 +683,12 @@ int BIO_lookup_ex(const char *host, cons
+         hints.ai_family = family;
+         hints.ai_socktype = socktype;
+         hints.ai_protocol = protocol;
++#ifdef AI_ADDRCONFIG
++#ifdef AF_UNSPEC
++        if (family == AF_UNSPEC)
++#endif
++            hints.ai_flags |= AI_ADDRCONFIG;
++#endif
+ 
+         if (lookup_type == BIO_LOOKUP_SERVER)
+             hints.ai_flags |= AI_PASSIVE;
+diff -up openssl-1.1.1b/crypto/bio/bss_mem.c.sync openssl-1.1.1b/crypto/bio/bss_mem.c
+--- openssl-1.1.1b/crypto/bio/bss_mem.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bio/bss_mem.c	2019-05-03 08:55:51.556406591 +0200
+@@ -57,7 +57,12 @@ static const BIO_METHOD secmem_method =
+     NULL,                      /* mem_callback_ctrl */
+ };
+ 
+-/* BIO memory stores buffer and read pointer  */
++/*
++ * BIO memory stores buffer and read pointer
++ * however the roles are different for read only BIOs.
++ * In that case the readp just stores the original state
++ * to be used for reset.
++ */
+ typedef struct bio_buf_mem_st {
+     struct buf_mem_st *buf;   /* allocated buffer */
+     struct buf_mem_st *readp; /* read pointer */
+@@ -192,11 +197,14 @@ static int mem_read(BIO *b, char *out, i
+     BIO_BUF_MEM *bbm = (BIO_BUF_MEM *)b->ptr;
+     BUF_MEM *bm = bbm->readp;
+ 
++    if (b->flags & BIO_FLAGS_MEM_RDONLY)
++        bm = bbm->buf;
+     BIO_clear_retry_flags(b);
+     ret = (outl >= 0 && (size_t)outl > bm->length) ? (int)bm->length : outl;
+     if ((out != NULL) && (ret > 0)) {
+         memcpy(out, bm->data, ret);
+         bm->length -= ret;
++        bm->max -= ret;
+         bm->data += ret;
+     } else if (bm->length == 0) {
+         ret = b->num;
+@@ -241,29 +249,36 @@ static long mem_ctrl(BIO *b, int cmd, lo
+     BIO_BUF_MEM *bbm = (BIO_BUF_MEM *)b->ptr;
+     BUF_MEM *bm;
+ 
++    if (b->flags & BIO_FLAGS_MEM_RDONLY)
++        bm = bbm->buf;
++    else
++        bm = bbm->readp;
++
+     switch (cmd) {
+     case BIO_CTRL_RESET:
+         bm = bbm->buf;
+         if (bm->data != NULL) {
+-            /* For read only case reset to the start again */
+-            if ((b->flags & BIO_FLAGS_MEM_RDONLY) || (b->flags & BIO_FLAGS_NONCLEAR_RST)) {
+-                bm->length = bm->max;
++            if (!(b->flags & BIO_FLAGS_MEM_RDONLY)) {
++                if (b->flags & BIO_FLAGS_NONCLEAR_RST) {
++                    bm->length = bm->max;
++                } else {
++                    memset(bm->data, 0, bm->max);
++                    bm->length = 0;
++                }
++                *bbm->readp = *bbm->buf;
+             } else {
+-                memset(bm->data, 0, bm->max);
+-                bm->length = 0;
++                /* For read only case just reset to the start again */
++                *bbm->buf = *bbm->readp;
+             }
+-            *bbm->readp = *bbm->buf;
+         }
+         break;
+     case BIO_CTRL_EOF:
+-        bm = bbm->readp;
+         ret = (long)(bm->length == 0);
+         break;
+     case BIO_C_SET_BUF_MEM_EOF_RETURN:
+         b->num = (int)num;
+         break;
+     case BIO_CTRL_INFO:
+-        bm = bbm->readp;
+         ret = (long)bm->length;
+         if (ptr != NULL) {
+             pptr = (char **)ptr;
+@@ -278,8 +293,9 @@ static long mem_ctrl(BIO *b, int cmd, lo
+         break;
+     case BIO_C_GET_BUF_MEM_PTR:
+         if (ptr != NULL) {
+-            mem_buf_sync(b);
+-            bm = bbm->readp;
++            if (!(b->flags & BIO_FLAGS_MEM_RDONLY))
++                mem_buf_sync(b);
++            bm = bbm->buf;
+             pptr = (char **)ptr;
+             *pptr = (char *)bm;
+         }
+@@ -294,7 +310,6 @@ static long mem_ctrl(BIO *b, int cmd, lo
+         ret = 0L;
+         break;
+     case BIO_CTRL_PENDING:
+-        bm = bbm->readp;
+         ret = (long)bm->length;
+         break;
+     case BIO_CTRL_DUP:
+@@ -318,6 +333,8 @@ static int mem_gets(BIO *bp, char *buf,
+     BIO_BUF_MEM *bbm = (BIO_BUF_MEM *)bp->ptr;
+     BUF_MEM *bm = bbm->readp;
+ 
++    if (bp->flags & BIO_FLAGS_MEM_RDONLY)
++        bm = bbm->buf;
+     BIO_clear_retry_flags(bp);
+     j = bm->length;
+     if ((size - 1) < j)
+diff -up openssl-1.1.1b/crypto/bn/asm/ppc.pl.sync openssl-1.1.1b/crypto/bn/asm/ppc.pl
+--- openssl-1.1.1b/crypto/bn/asm/ppc.pl.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bn/asm/ppc.pl	2019-05-03 08:55:51.530407037 +0200
+@@ -258,6 +258,7 @@ $data=<<EOF;
+ # .text section
+ 
+ 	.machine	"any"
++	.text
+ 
+ #
+ #	NOTE:	The following label name should be changed to
+diff -up openssl-1.1.1b/crypto/bn/bn_ctx.c.sync openssl-1.1.1b/crypto/bn/bn_ctx.c
+--- openssl-1.1.1b/crypto/bn/bn_ctx.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bn/bn_ctx.c	2019-05-03 08:55:51.524407140 +0200
+@@ -194,6 +194,8 @@ void BN_CTX_start(BN_CTX *ctx)
+ 
+ void BN_CTX_end(BN_CTX *ctx)
+ {
++    if (ctx == NULL)
++        return;
+     CTXDBG_ENTRY("BN_CTX_end", ctx);
+     if (ctx->err_stack)
+         ctx->err_stack--;
+diff -up openssl-1.1.1b/crypto/bn/bn_lib.c.sync openssl-1.1.1b/crypto/bn/bn_lib.c
+--- openssl-1.1.1b/crypto/bn/bn_lib.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bn/bn_lib.c	2019-05-03 08:55:51.525407123 +0200
+@@ -338,6 +338,8 @@ void BN_swap(BIGNUM *a, BIGNUM *b)
+ 
+ void BN_clear(BIGNUM *a)
+ {
++    if (a == NULL)
++        return;
+     bn_check_top(a);
+     if (a->d != NULL)
+         OPENSSL_cleanse(a->d, sizeof(*a->d) * a->dmax);
+diff -up openssl-1.1.1b/crypto/bn/bn_prime.c.sync openssl-1.1.1b/crypto/bn/bn_prime.c
+--- openssl-1.1.1b/crypto/bn/bn_prime.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/bn/bn_prime.c	2019-05-03 08:55:51.525407123 +0200
+@@ -135,8 +135,7 @@ int BN_generate_prime_ex(BIGNUM *ret, in
+     found = 1;
+  err:
+     OPENSSL_free(mods);
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     bn_check_top(ret);
+     return found;
+diff -up openssl-1.1.1b/crypto/chacha/build.info.sync openssl-1.1.1b/crypto/chacha/build.info
+--- openssl-1.1.1b/crypto/chacha/build.info.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/chacha/build.info	2019-05-03 08:55:51.538406900 +0200
+@@ -9,6 +9,8 @@ GENERATE[chacha-armv4.S]=asm/chacha-armv
+ INCLUDE[chacha-armv4.o]=..
+ GENERATE[chacha-armv8.S]=asm/chacha-armv8.pl $(PERLASM_SCHEME)
+ INCLUDE[chacha-armv8.o]=..
++GENERATE[chacha-s390x.S]=asm/chacha-s390x.pl $(PERLASM_SCHEME)
++INCLUDE[chacha-s390x.o]=..
+ 
+ BEGINRAW[Makefile(unix)]
+ ##### CHACHA assembler implementations
+diff -up openssl-1.1.1b/crypto/conf/conf_sap.c.sync openssl-1.1.1b/crypto/conf/conf_sap.c
+--- openssl-1.1.1b/crypto/conf/conf_sap.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/conf/conf_sap.c	2019-05-03 08:55:51.550406694 +0200
+@@ -35,6 +35,7 @@ void OPENSSL_config(const char *appname)
+     memset(&settings, 0, sizeof(settings));
+     if (appname != NULL)
+         settings.appname = strdup(appname);
++    settings.flags = DEFAULT_CONF_MFLAGS;
+     OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, &settings);
+ }
+ #endif
+diff -up openssl-1.1.1b/crypto/dh/dh_check.c.sync openssl-1.1.1b/crypto/dh/dh_check.c
+--- openssl-1.1.1b/crypto/dh/dh_check.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/dh/dh_check.c	2019-05-03 08:55:51.525407123 +0200
+@@ -58,10 +58,8 @@ int DH_check_params(const DH *dh, int *r
+ 
+     ok = 1;
+  err:
+-    if (ctx != NULL) {
+-        BN_CTX_end(ctx);
+-        BN_CTX_free(ctx);
+-    }
++    BN_CTX_end(ctx);
++    BN_CTX_free(ctx);
+     return ok;
+ }
+ 
+@@ -171,10 +169,8 @@ int DH_check(const DH *dh, int *ret)
+     }
+     ok = 1;
+  err:
+-    if (ctx != NULL) {
+-        BN_CTX_end(ctx);
+-        BN_CTX_free(ctx);
+-    }
++    BN_CTX_end(ctx);
++    BN_CTX_free(ctx);
+     return ok;
+ }
+ 
+@@ -225,9 +221,7 @@ int DH_check_pub_key(const DH *dh, const
+ 
+     ok = 1;
+  err:
+-    if (ctx != NULL) {
+-        BN_CTX_end(ctx);
+-        BN_CTX_free(ctx);
+-    }
++    BN_CTX_end(ctx);
++    BN_CTX_free(ctx);
+     return ok;
+ }
+diff -up openssl-1.1.1b/crypto/dh/dh_gen.c.sync openssl-1.1.1b/crypto/dh/dh_gen.c
+--- openssl-1.1.1b/crypto/dh/dh_gen.c.sync	2019-05-03 08:55:45.170516224 +0200
++++ openssl-1.1.1b/crypto/dh/dh_gen.c	2019-05-03 08:55:51.525407123 +0200
+@@ -144,9 +144,7 @@ static int dh_builtin_genparams(DH *ret,
+         ok = 0;
+     }
+ 
+-    if (ctx != NULL) {
+-        BN_CTX_end(ctx);
+-        BN_CTX_free(ctx);
+-    }
++    BN_CTX_end(ctx);
++    BN_CTX_free(ctx);
+     return ok;
+ }
+diff -up openssl-1.1.1b/crypto/dh/dh_key.c.sync openssl-1.1.1b/crypto/dh/dh_key.c
+--- openssl-1.1.1b/crypto/dh/dh_key.c.sync	2019-05-03 08:55:45.170516224 +0200
++++ openssl-1.1.1b/crypto/dh/dh_key.c	2019-05-03 08:55:51.526407106 +0200
+@@ -237,10 +237,8 @@ static int compute_key(unsigned char *ke
+ 
+     ret = BN_bn2bin(tmp, key);
+  err:
+-    if (ctx != NULL) {
+-        BN_CTX_end(ctx);
+-        BN_CTX_free(ctx);
+-    }
++    BN_CTX_end(ctx);
++    BN_CTX_free(ctx);
+     return ret;
+ }
+ 
+diff -up openssl-1.1.1b/crypto/dsa/dsa_gen.c.sync openssl-1.1.1b/crypto/dsa/dsa_gen.c
+--- openssl-1.1.1b/crypto/dsa/dsa_gen.c.sync	2019-05-03 08:55:45.171516207 +0200
++++ openssl-1.1.1b/crypto/dsa/dsa_gen.c	2019-05-03 08:55:51.526407106 +0200
+@@ -308,8 +308,7 @@ int dsa_builtin_paramgen(DSA *ret, size_
+         if (seed_out)
+             memcpy(seed_out, seed, qsize);
+     }
+-    if (ctx)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     BN_MONT_CTX_free(mont);
+     return ok;
+@@ -641,8 +640,7 @@ int dsa_builtin_paramgen2(DSA *ret, size
+     OPENSSL_free(seed);
+     if (seed_out != seed_tmp)
+         OPENSSL_free(seed_tmp);
+-    if (ctx)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     BN_MONT_CTX_free(mont);
+     EVP_MD_CTX_free(mctx);
+diff -up openssl-1.1.1b/crypto/ec/ecdh_ossl.c.sync openssl-1.1.1b/crypto/ec/ecdh_ossl.c
+--- openssl-1.1.1b/crypto/ec/ecdh_ossl.c.sync	2019-05-03 08:55:45.171516207 +0200
++++ openssl-1.1.1b/crypto/ec/ecdh_ossl.c	2019-05-03 08:55:51.556406591 +0200
+@@ -123,7 +123,7 @@ int ecdh_simple_compute_key(unsigned cha
+     ret = 1;
+ 
+  err:
+-    EC_POINT_free(tmp);
++    EC_POINT_clear_free(tmp);
+     if (ctx)
+         BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+diff -up openssl-1.1.1b/crypto/ec/ec_lib.c.sync openssl-1.1.1b/crypto/ec/ec_lib.c
+--- openssl-1.1.1b/crypto/ec/ec_lib.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ec_lib.c	2019-05-03 08:55:51.527407088 +0200
+@@ -1074,8 +1074,7 @@ static int ec_field_inverse_mod_ord(cons
+     ret = 1;
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(new_ctx);
+     return ret;
+ }
+diff -up openssl-1.1.1b/crypto/ec/ec_mult.c.sync openssl-1.1.1b/crypto/ec/ec_mult.c
+--- openssl-1.1.1b/crypto/ec/ec_mult.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ec_mult.c	2019-05-03 08:55:51.540406865 +0200
+@@ -378,7 +378,7 @@ int ec_scalar_mul_ladder(const EC_GROUP
+ 
+  err:
+     EC_POINT_free(p);
+-    EC_POINT_free(s);
++    EC_POINT_clear_free(s);
+     BN_CTX_end(ctx);
+ 
+     return ret;
+@@ -441,7 +441,7 @@ int ec_wNAF_mul(const EC_GROUP *group, E
+          * scalar multiplication implementation based on a Montgomery ladder,
+          * with various timing attack defenses.
+          */
+-        if ((scalar != NULL) && (num == 0)) {
++        if ((scalar != group->order) && (scalar != NULL) && (num == 0)) {
+             /*-
+              * In this case we want to compute scalar * GeneratorPoint: this
+              * codepath is reached most prominently by (ephemeral) key
+@@ -452,7 +452,7 @@ int ec_wNAF_mul(const EC_GROUP *group, E
+              */
+             return ec_scalar_mul_ladder(group, r, scalar, NULL, ctx);
+         }
+-        if ((scalar == NULL) && (num == 1)) {
++        if ((scalar == NULL) && (num == 1) && (scalars[0] != group->order)) {
+             /*-
+              * In this case we want to compute scalar * VariablePoint: this
+              * codepath is reached most prominently by the second half of ECDH,
+@@ -948,8 +948,7 @@ int ec_wNAF_precompute_mult(EC_GROUP *gr
+     ret = 1;
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(new_ctx);
+     EC_ec_pre_comp_free(pre_comp);
+     if (points) {
+diff -up openssl-1.1.1b/crypto/ec/ecp_nistp521.c.sync openssl-1.1.1b/crypto/ec/ecp_nistp521.c
+--- openssl-1.1.1b/crypto/ec/ecp_nistp521.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ecp_nistp521.c	2019-05-03 08:55:51.532407003 +0200
+@@ -357,10 +357,15 @@ static void felem_diff64(felem out, cons
+ static void felem_diff_128_64(largefelem out, const felem in)
+ {
+     /*
+-     * In order to prevent underflow, we add 0 mod p before subtracting.
++     * In order to prevent underflow, we add 64p mod p (which is equivalent
++     * to 0 mod p) before subtracting. p is 2^521 - 1, i.e. in binary a 521
++     * digit number with all bits set to 1. See "The representation of field
++     * elements" comment above for a description of how limbs are used to
++     * represent a number. 64p is represented with 8 limbs containing a number
++     * with 58 bits set and one limb with a number with 57 bits set.
+      */
+-    static const limb two63m6 = (((limb) 1) << 62) - (((limb) 1) << 5);
+-    static const limb two63m5 = (((limb) 1) << 62) - (((limb) 1) << 4);
++    static const limb two63m6 = (((limb) 1) << 63) - (((limb) 1) << 6);
++    static const limb two63m5 = (((limb) 1) << 63) - (((limb) 1) << 5);
+ 
+     out[0] += two63m6 - in[0];
+     out[1] += two63m5 - in[1];
+diff -up openssl-1.1.1b/crypto/ec/ecp_nistz256.c.sync openssl-1.1.1b/crypto/ec/ecp_nistz256.c
+--- openssl-1.1.1b/crypto/ec/ecp_nistz256.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ecp_nistz256.c	2019-05-03 08:55:51.528407071 +0200
+@@ -888,8 +888,7 @@ __owur static int ecp_nistz256_mult_prec
+     ret = 1;
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(new_ctx);
+ 
+     EC_nistz256_pre_comp_free(pre_comp);
+diff -up openssl-1.1.1b/crypto/ec/ecp_smpl.c.sync openssl-1.1.1b/crypto/ec/ecp_smpl.c
+--- openssl-1.1.1b/crypto/ec/ecp_smpl.c.sync	2019-05-03 08:55:45.152516533 +0200
++++ openssl-1.1.1b/crypto/ec/ecp_smpl.c	2019-05-03 08:55:51.528407071 +0200
+@@ -312,8 +312,7 @@ int ec_GFp_simple_group_check_discrimina
+     ret = 1;
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(new_ctx);
+     return ret;
+ }
+@@ -792,8 +791,7 @@ int ec_GFp_simple_add(const EC_GROUP *gr
+     ret = 1;
+ 
+  end:
+-    if (ctx)                    /* otherwise we already called BN_CTX_end */
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(new_ctx);
+     return ret;
+ }
+diff -up openssl-1.1.1b/crypto/err/err.c.sync openssl-1.1.1b/crypto/err/err.c
+--- openssl-1.1.1b/crypto/err/err.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/err/err.c	2019-05-03 08:55:51.548406728 +0200
+@@ -523,8 +523,24 @@ static unsigned long get_error_values(in
+         return ERR_R_INTERNAL_ERROR;
+     }
+ 
++    while (es->bottom != es->top) {
++        if (es->err_flags[es->top] & ERR_FLAG_CLEAR) {
++            err_clear(es, es->top);
++            es->top = es->top > 0 ? es->top - 1 : ERR_NUM_ERRORS - 1;
++            continue;
++        }
++        i = (es->bottom + 1) % ERR_NUM_ERRORS;
++        if (es->err_flags[i] & ERR_FLAG_CLEAR) {
++            es->bottom = i;
++            err_clear(es, es->bottom);
++            continue;
++        }
++        break;
++    }
++
+     if (es->bottom == es->top)
+         return 0;
++
+     if (top)
+         i = es->top;            /* last error */
+     else
+@@ -913,25 +929,6 @@ int ERR_clear_last_mark(void)
+     return 1;
+ }
+ 
+-#ifdef UINTPTR_T
+-# undef UINTPTR_T
+-#endif
+-/*
+- * uintptr_t is the answer, but unfortunately C89, current "least common
+- * denominator" doesn't define it. Most legacy platforms typedef it anyway,
+- * so that attempt to fill the gaps means that one would have to identify
+- * that track these gaps, which would be undesirable. Macro it is...
+- */
+-#if defined(__VMS) && __INITIAL_POINTER_SIZE==64
+-/*
+- * But we can't use size_t on VMS, because it adheres to sizeof(size_t)==4
+- * even in 64-bit builds, which means that it won't work as mask.
+- */
+-# define UINTPTR_T unsigned long long
+-#else
+-# define UINTPTR_T size_t
+-#endif
+-
+ void err_clear_last_constant_time(int clear)
+ {
+     ERR_STATE *es;
+@@ -943,11 +940,11 @@ void err_clear_last_constant_time(int cl
+ 
+     top = es->top;
+ 
+-    es->err_flags[top] &= ~(0 - clear);
+-    es->err_buffer[top] &= ~(0UL - clear);
+-    es->err_file[top] = (const char *)((UINTPTR_T)es->err_file[top] &
+-                                       ~((UINTPTR_T)0 - clear));
+-    es->err_line[top] |= 0 - clear;
+-
+-    es->top = (top + ERR_NUM_ERRORS - clear) % ERR_NUM_ERRORS;
++    /*
++     * Flag error as cleared but remove it elsewhere to avoid two errors
++     * accessing the same error stack location, revealing timing information.
++     */
++    clear = constant_time_select_int(constant_time_eq_int(clear, 0),
++                                     0, ERR_FLAG_CLEAR);
++    es->err_flags[top] |= clear;
+ }
+diff -up openssl-1.1.1b/crypto/evp/digest.c.sync openssl-1.1.1b/crypto/evp/digest.c
+--- openssl-1.1.1b/crypto/evp/digest.c.sync	2019-05-03 08:55:51.553406642 +0200
++++ openssl-1.1.1b/crypto/evp/digest.c	2019-05-03 08:56:40.800561168 +0200
+@@ -171,6 +171,9 @@ int EVP_DigestUpdate(EVP_MD_CTX *ctx, co
+ #ifdef OPENSSL_FIPS
+     FIPS_selftest_check();
+ #endif
++    if (count == 0)
++        return 1;
++
+     return ctx->update(ctx, data, count);
+ }
+ 
+diff -up openssl-1.1.1b/crypto/evp/e_aria.c.sync openssl-1.1.1b/crypto/evp/e_aria.c
+--- openssl-1.1.1b/crypto/evp/e_aria.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/evp/e_aria.c	2019-05-03 08:55:51.545406779 +0200
+@@ -486,6 +486,16 @@ static int aria_gcm_cipher(EVP_CIPHER_CT
+     return 0;
+ }
+ 
++static int aria_gcm_cleanup(EVP_CIPHER_CTX *ctx)
++{
++    EVP_ARIA_GCM_CTX *gctx = EVP_C_DATA(EVP_ARIA_GCM_CTX, ctx);
++
++    if (gctx->iv != EVP_CIPHER_CTX_iv_noconst(ctx))
++        OPENSSL_free(gctx->iv);
++
++    return 1;
++}
++
+ static int aria_ccm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+                             const unsigned char *iv, int enc)
+ {
+@@ -727,6 +737,8 @@ static int aria_ccm_cipher(EVP_CIPHER_CT
+     }
+ }
+ 
++#define aria_ccm_cleanup    NULL
++
+ #define ARIA_AUTH_FLAGS  (EVP_CIPH_FLAG_DEFAULT_ASN1 \
+                           | EVP_CIPH_CUSTOM_IV | EVP_CIPH_FLAG_CUSTOM_CIPHER \
+                           | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT \
+@@ -739,7 +751,7 @@ static const EVP_CIPHER aria_##keylen##_
+         ARIA_AUTH_FLAGS|EVP_CIPH_##MODE##_MODE,    \
+         aria_##mode##_init_key,                    \
+         aria_##mode##_cipher,                      \
+-        NULL,                                      \
++        aria_##mode##_cleanup,                     \
+         sizeof(EVP_ARIA_##MODE##_CTX),             \
+         NULL,NULL,aria_##mode##_ctrl,NULL };       \
+ const EVP_CIPHER *EVP_aria_##keylen##_##mode(void) \
+diff -up openssl-1.1.1b/crypto/evp/e_chacha20_poly1305.c.sync openssl-1.1.1b/crypto/evp/e_chacha20_poly1305.c
+--- openssl-1.1.1b/crypto/evp/e_chacha20_poly1305.c.sync	2019-05-03 08:55:45.216515434 +0200
++++ openssl-1.1.1b/crypto/evp/e_chacha20_poly1305.c	2019-05-03 08:55:51.551406676 +0200
+@@ -30,6 +30,8 @@ typedef struct {
+ 
+ #define data(ctx)   ((EVP_CHACHA_KEY *)(ctx)->cipher_data)
+ 
++#define CHACHA20_POLY1305_MAX_IVLEN     12
++
+ static int chacha_init_key(EVP_CIPHER_CTX *ctx,
+                            const unsigned char user_key[CHACHA_KEY_SIZE],
+                            const unsigned char iv[CHACHA_CTR_SIZE], int enc)
+@@ -533,7 +535,7 @@ static int chacha20_poly1305_ctrl(EVP_CI
+         return 1;
+ 
+     case EVP_CTRL_AEAD_SET_IVLEN:
+-        if (arg <= 0 || arg > CHACHA_CTR_SIZE)
++        if (arg <= 0 || arg > CHACHA20_POLY1305_MAX_IVLEN)
+             return 0;
+         actx->nonce_len = arg;
+         return 1;
+diff -up openssl-1.1.1b/crypto/evp/evp_enc.c.sync openssl-1.1.1b/crypto/evp/evp_enc.c
+--- openssl-1.1.1b/crypto/evp/evp_enc.c.sync	2019-05-03 08:55:45.174516155 +0200
++++ openssl-1.1.1b/crypto/evp/evp_enc.c	2019-05-03 08:55:51.544406797 +0200
+@@ -338,6 +338,11 @@ static int evp_EncryptDecryptUpdate(EVP_
+ 
+     bl = ctx->cipher->block_size;
+ 
++    if (inl <= 0) {
++        *outl = 0;
++        return inl == 0;
++    }
++
+     if (ctx->cipher->flags & EVP_CIPH_FLAG_CUSTOM_CIPHER) {
+         /* If block size > 1 then the cipher will have to do this check */
+         if (bl == 1 && is_partially_overlapping(out, in, cmpl)) {
+@@ -353,10 +358,6 @@ static int evp_EncryptDecryptUpdate(EVP_
+         return 1;
+     }
+ 
+-    if (inl <= 0) {
+-        *outl = 0;
+-        return inl == 0;
+-    }
+     if (is_partially_overlapping(out + ctx->buf_len, in, cmpl)) {
+         EVPerr(EVP_F_EVP_ENCRYPTDECRYPTUPDATE, EVP_R_PARTIALLY_OVERLAPPING);
+         return 0;
+@@ -490,6 +491,11 @@ int EVP_DecryptUpdate(EVP_CIPHER_CTX *ct
+     if (EVP_CIPHER_CTX_test_flags(ctx, EVP_CIPH_FLAG_LENGTH_BITS))
+         cmpl = (cmpl + 7) / 8;
+ 
++    if (inl <= 0) {
++        *outl = 0;
++        return inl == 0;
++    }
++
+     if (ctx->cipher->flags & EVP_CIPH_FLAG_CUSTOM_CIPHER) {
+         if (b == 1 && is_partially_overlapping(out, in, cmpl)) {
+             EVPerr(EVP_F_EVP_DECRYPTUPDATE, EVP_R_PARTIALLY_OVERLAPPING);
+@@ -505,11 +511,6 @@ int EVP_DecryptUpdate(EVP_CIPHER_CTX *ct
+         return 1;
+     }
+ 
+-    if (inl <= 0) {
+-        *outl = 0;
+-        return inl == 0;
+-    }
+-
+     if (ctx->flags & EVP_CIPH_NO_PADDING)
+         return evp_EncryptDecryptUpdate(ctx, out, outl, in, inl);
+ 
+diff -up openssl-1.1.1b/crypto/hmac/hmac.c.sync openssl-1.1.1b/crypto/hmac/hmac.c
+--- openssl-1.1.1b/crypto/hmac/hmac.c.sync	2019-05-03 08:55:45.189515898 +0200
++++ openssl-1.1.1b/crypto/hmac/hmac.c	2019-05-03 08:55:51.538406900 +0200
+@@ -35,6 +35,13 @@ int HMAC_Init_ex(HMAC_CTX *ctx, const vo
+         return 0;
+     }
+ 
++    /*
++     * The HMAC construction is not allowed  to be used with the
++     * extendable-output functions (XOF) shake128 and shake256.
++     */
++    if ((EVP_MD_meth_get_flags(md) & EVP_MD_FLAG_XOF) != 0)
++        return 0;
++
+     if (key != NULL) {
+ #ifdef OPENSSL_FIPS
+         if (FIPS_mode() && !(EVP_MD_flags(md) & EVP_MD_FLAG_FIPS)
+diff -up openssl-1.1.1b/crypto/init.c.sync openssl-1.1.1b/crypto/init.c
+--- openssl-1.1.1b/crypto/init.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/init.c	2019-05-03 08:55:51.550406694 +0200
+@@ -702,7 +702,7 @@ int OPENSSL_init_crypto(uint64_t opts, c
+         ret = RUN_ONCE(&config, ossl_init_config);
+         conf_settings = NULL;
+         CRYPTO_THREAD_unlock(init_lock);
+-        if (!ret)
++        if (ret <= 0)
+             return 0;
+     }
+ 
+diff -up openssl-1.1.1b/crypto/modes/asm/ghash-x86_64.pl.sync openssl-1.1.1b/crypto/modes/asm/ghash-x86_64.pl
+--- openssl-1.1.1b/crypto/modes/asm/ghash-x86_64.pl.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/modes/asm/ghash-x86_64.pl	2019-05-03 08:55:51.534406969 +0200
+@@ -1155,6 +1155,7 @@ ___
+ } else {
+ $code.=<<___;
+ 	jmp	.L_init_clmul
++.cfi_endproc
+ .size	gcm_init_avx,.-gcm_init_avx
+ ___
+ }
+@@ -1594,6 +1595,7 @@ ___
+ } else {
+ $code.=<<___;
+ 	jmp	.L_ghash_clmul
++.cfi_endproc
+ .size	gcm_ghash_avx,.-gcm_ghash_avx
+ ___
+ }
+diff -up openssl-1.1.1b/crypto/modes/ccm128.c.sync openssl-1.1.1b/crypto/modes/ccm128.c
+--- openssl-1.1.1b/crypto/modes/ccm128.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/modes/ccm128.c	2019-05-03 08:55:51.543406814 +0200
+@@ -425,7 +425,7 @@ size_t CRYPTO_ccm128_tag(CCM128_CONTEXT
+ 
+     M *= 2;
+     M += 2;
+-    if (len < M)
++    if (len != M)
+         return 0;
+     memcpy(tag, ctx->cmac.c, M);
+     return M;
+diff -up openssl-1.1.1b/crypto/o_str.c.sync openssl-1.1.1b/crypto/o_str.c
+--- openssl-1.1.1b/crypto/o_str.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/o_str.c	2019-05-03 08:55:51.550406694 +0200
+@@ -223,7 +223,26 @@ int openssl_strerror_r(int errnum, char
+ #if defined(_MSC_VER) && _MSC_VER>=1400
+     return !strerror_s(buf, buflen, errnum);
+ #elif defined(_GNU_SOURCE)
+-    return strerror_r(errnum, buf, buflen) != NULL;
++    char *err;
++
++    /*
++     * GNU strerror_r may not actually set buf.
++     * It can return a pointer to some (immutable) static string in which case
++     * buf is left unused.
++     */
++    err = strerror_r(errnum, buf, buflen);
++    if (err == NULL)
++        return 0;
++    /*
++     * If err is statically allocated, err != buf and we need to copy the data.
++     * If err points somewhere inside buf, OPENSSL_strlcpy can handle this,
++     * since src and dest are not annotated with __restrict and the function
++     * reads src byte for byte and writes to dest.
++     * If err == buf we do not have to copy anything.
++     */
++    if (err != buf)
++        OPENSSL_strlcpy(buf, err, buflen);
++    return 1;
+ #elif (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || \
+       (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE >= 600)
+     /*
+@@ -234,6 +253,7 @@ int openssl_strerror_r(int errnum, char
+     return !strerror_r(errnum, buf, buflen);
+ #else
+     char *err;
++
+     /* Fall back to non-thread safe strerror()...its all we can do */
+     if (buflen < 2)
+         return 0;
+@@ -241,8 +261,7 @@ int openssl_strerror_r(int errnum, char
+     /* Can this ever happen? */
+     if (err == NULL)
+         return 0;
+-    strncpy(buf, err, buflen - 1);
+-    buf[buflen - 1] = '\0';
++    OPENSSL_strlcpy(buf, err, buflen);
+     return 1;
+ #endif
+ }
+diff -up openssl-1.1.1b/crypto/poly1305/build.info.sync openssl-1.1.1b/crypto/poly1305/build.info
+--- openssl-1.1.1b/crypto/poly1305/build.info.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/poly1305/build.info	2019-05-03 08:55:51.538406900 +0200
+@@ -17,6 +17,7 @@ GENERATE[poly1305-armv8.S]=asm/poly1305-
+ INCLUDE[poly1305-armv8.o]=..
+ GENERATE[poly1305-mips.S]=asm/poly1305-mips.pl $(PERLASM_SCHEME)
+ INCLUDE[poly1305-mips.o]=..
++GENERATE[poly1305-s390x.S]=asm/poly1305-s390x.pl $(PERLASM_SCHEME)
+ 
+ BEGINRAW[Makefile(unix)]
+ {- $builddir -}/poly1305-%.S:	{- $sourcedir -}/asm/poly1305-%.pl
+diff -up openssl-1.1.1b/crypto/rc4/build.info.sync openssl-1.1.1b/crypto/rc4/build.info
+--- openssl-1.1.1b/crypto/rc4/build.info.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rc4/build.info	2019-05-03 08:55:51.538406900 +0200
+@@ -11,6 +11,8 @@ GENERATE[rc4-md5-x86_64.s]=asm/rc4-md5-x
+ 
+ GENERATE[rc4-parisc.s]=asm/rc4-parisc.pl $(PERLASM_SCHEME)
+ 
++GENERATE[rc4-s390x.s]=asm/rc4-s390x.pl $(PERLASM_SCHEME)
++
+ BEGINRAW[Makefile]
+ # GNU make "catch all"
+ {- $builddir -}/rc4-%.s:	{- $sourcedir -}/asm/rc4-%.pl
+diff -up openssl-1.1.1b/crypto/rsa/rsa_ameth.c.sync openssl-1.1.1b/crypto/rsa/rsa_ameth.c
+--- openssl-1.1.1b/crypto/rsa/rsa_ameth.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_ameth.c	2019-05-03 08:55:51.533406986 +0200
+@@ -583,10 +583,12 @@ static RSA_PSS_PARAMS *rsa_ctx_to_pss(EV
+         return NULL;
+     if (saltlen == -1) {
+         saltlen = EVP_MD_size(sigmd);
+-    } else if (saltlen == -2) {
++    } else if (saltlen == -2 || saltlen == -3) {
+         saltlen = EVP_PKEY_size(pk) - EVP_MD_size(sigmd) - 2;
+         if ((EVP_PKEY_bits(pk) & 0x7) == 1)
+             saltlen--;
++        if (saltlen < 0)
++            return NULL;
+     }
+ 
+     return rsa_pss_params_create(sigmd, mgf1md, saltlen);
+diff -up openssl-1.1.1b/crypto/rsa/rsa_gen.c.sync openssl-1.1.1b/crypto/rsa/rsa_gen.c
+--- openssl-1.1.1b/crypto/rsa/rsa_gen.c.sync	2019-05-03 08:55:45.191515864 +0200
++++ openssl-1.1.1b/crypto/rsa/rsa_gen.c	2019-05-03 08:55:51.528407071 +0200
+@@ -746,8 +746,7 @@ static int rsa_builtin_keygen(RSA *rsa,
+         RSAerr(RSA_F_RSA_BUILTIN_KEYGEN, ERR_LIB_BN);
+         ok = 0;
+     }
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     return ok;
+ }
+diff -up openssl-1.1.1b/crypto/rsa/rsa_oaep.c.sync openssl-1.1.1b/crypto/rsa/rsa_oaep.c
+--- openssl-1.1.1b/crypto/rsa/rsa_oaep.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_oaep.c	2019-05-03 08:55:51.549406711 +0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 1999-2018 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright 1999-2019 The OpenSSL Project Authors. All Rights Reserved.
+  *
+  * Licensed under the OpenSSL license (the "License").  You may not use
+  * this file except in compliance with the License.  You can obtain a copy
+@@ -143,7 +143,7 @@ int RSA_padding_check_PKCS1_OAEP_mgf1(un
+      * |num| is the length of the modulus; |flen| is the length of the
+      * encoded message. Therefore, for any |from| that was obtained by
+      * decrypting a ciphertext, we must have |flen| <= |num|. Similarly,
+-     * num < 2 * mdlen + 2 must hold for the modulus irrespective of
++     * |num| >= 2 * |mdlen| + 2 must hold for the modulus irrespective of
+      * the ciphertext, see PKCS #1 v2.2, section 7.1.2.
+      * This does not leak any side-channel information.
+      */
+@@ -179,17 +179,16 @@ int RSA_padding_check_PKCS1_OAEP_mgf1(un
+         from -= 1 & mask;
+         *--em = *from & mask;
+     }
+-    from = em;
+ 
+     /*
+      * The first byte must be zero, however we must not leak if this is
+      * true. See James H. Manger, "A Chosen Ciphertext  Attack on RSA
+      * Optimal Asymmetric Encryption Padding (OAEP) [...]", CRYPTO 2001).
+      */
+-    good = constant_time_is_zero(from[0]);
++    good = constant_time_is_zero(em[0]);
+ 
+-    maskedseed = from + 1;
+-    maskeddb = from + 1 + mdlen;
++    maskedseed = em + 1;
++    maskeddb = em + 1 + mdlen;
+ 
+     if (PKCS1_MGF1(seed, mdlen, maskeddb, dblen, mgf1md))
+         goto cleanup;
+@@ -230,29 +229,30 @@ int RSA_padding_check_PKCS1_OAEP_mgf1(un
+     mlen = dblen - msg_index;
+ 
+     /*
+-     * For good measure, do this check in constant tine as well.
++     * For good measure, do this check in constant time as well.
+      */
+     good &= constant_time_ge(tlen, mlen);
+ 
+     /*
+-     * Even though we can't fake result's length, we can pretend copying
+-     * |tlen| bytes where |mlen| bytes would be real. Last |tlen| of |dblen|
+-     * bytes are viewed as circular buffer with start at |tlen|-|mlen'|,
+-     * where |mlen'| is "saturated" |mlen| value. Deducing information
+-     * about failure or |mlen| would take attacker's ability to observe
+-     * memory access pattern with byte granularity *as it occurs*. It
+-     * should be noted that failure is indistinguishable from normal
+-     * operation if |tlen| is fixed by protocol.
++     * Move the result in-place by |dblen|-|mdlen|-1-|mlen| bytes to the left.
++     * Then if |good| move |mlen| bytes from |db|+|mdlen|+1 to |to|.
++     * Otherwise leave |to| unchanged.
++     * Copy the memory back in a way that does not reveal the size of
++     * the data being copied via a timing side channel. This requires copying
++     * parts of the buffer multiple times based on the bits set in the real
++     * length. Clear bits do a non-copy with identical access pattern.
++     * The loop below has overall complexity of O(N*log(N)).
+      */
+-    tlen = constant_time_select_int(constant_time_lt(dblen, tlen), dblen, tlen);
+-    msg_index = constant_time_select_int(good, msg_index, dblen - tlen);
+-    mlen = dblen - msg_index;
+-    for (from = db + msg_index, mask = good, i = 0; i < tlen; i++) {
+-        unsigned int equals = constant_time_eq(i, mlen);
+-
+-        from -= dblen & equals; /* if (i == dblen) rewind   */
+-        mask &= mask ^ equals;  /* if (i == dblen) mask = 0 */
+-        to[i] = constant_time_select_8(mask, from[i], to[i]);
++    tlen = constant_time_select_int(constant_time_lt(dblen - mdlen - 1, tlen),
++                                    dblen - mdlen - 1, tlen);
++    for (msg_index = 1; msg_index < dblen - mdlen - 1; msg_index <<= 1) {
++        mask = ~constant_time_eq(msg_index & (dblen - mdlen - 1 - mlen), 0);
++        for (i = mdlen + 1; i < dblen - msg_index; i++)
++            db[i] = constant_time_select_8(mask, db[i + msg_index], db[i]);
++    }
++    for (i = 0; i < tlen; i++) {
++        mask = good & constant_time_lt(i, mlen);
++        to[i] = constant_time_select_8(mask, db[i + mdlen + 1], to[i]);
+     }
+ 
+     /*
+diff -up openssl-1.1.1b/crypto/rsa/rsa_ossl.c.sync openssl-1.1.1b/crypto/rsa/rsa_ossl.c
+--- openssl-1.1.1b/crypto/rsa/rsa_ossl.c.sync	2019-05-03 08:55:45.191515864 +0200
++++ openssl-1.1.1b/crypto/rsa/rsa_ossl.c	2019-05-03 08:55:51.548406728 +0200
+@@ -174,8 +174,7 @@ static int rsa_ossl_public_encrypt(int f
+      */
+     r = BN_bn2binpad(ret, to, num);
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     OPENSSL_clear_free(buf, num);
+     return r;
+@@ -396,8 +395,7 @@ static int rsa_ossl_private_encrypt(int
+      */
+     r = BN_bn2binpad(res, to, num);
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     OPENSSL_clear_free(buf, num);
+     return r;
+@@ -539,11 +537,10 @@ static int rsa_ossl_private_decrypt(int
+         goto err;
+     }
+     RSAerr(RSA_F_RSA_OSSL_PRIVATE_DECRYPT, RSA_R_PADDING_CHECK_FAILED);
+-    err_clear_last_constant_time(r >= 0);
++    err_clear_last_constant_time(1 & ~constant_time_msb(r));
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     OPENSSL_clear_free(buf, num);
+     return r;
+@@ -655,8 +652,7 @@ static int rsa_ossl_public_decrypt(int f
+         RSAerr(RSA_F_RSA_OSSL_PUBLIC_DECRYPT, RSA_R_PADDING_CHECK_FAILED);
+ 
+  err:
+-    if (ctx != NULL)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     OPENSSL_clear_free(buf, num);
+     return r;
+diff -up openssl-1.1.1b/crypto/rsa/rsa_pk1.c.sync openssl-1.1.1b/crypto/rsa/rsa_pk1.c
+--- openssl-1.1.1b/crypto/rsa/rsa_pk1.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_pk1.c	2019-05-03 08:55:51.549406711 +0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 1995-2018 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright 1995-2019 The OpenSSL Project Authors. All Rights Reserved.
+  *
+  * Licensed under the OpenSSL license (the "License").  You may not use
+  * this file except in compliance with the License.  You can obtain a copy
+@@ -192,15 +192,14 @@ int RSA_padding_check_PKCS1_type_2(unsig
+         from -= 1 & mask;
+         *--em = *from & mask;
+     }
+-    from = em;
+ 
+-    good = constant_time_is_zero(from[0]);
+-    good &= constant_time_eq(from[1], 2);
++    good = constant_time_is_zero(em[0]);
++    good &= constant_time_eq(em[1], 2);
+ 
+     /* scan over padding data */
+     found_zero_byte = 0;
+     for (i = 2; i < num; i++) {
+-        unsigned int equals0 = constant_time_is_zero(from[i]);
++        unsigned int equals0 = constant_time_is_zero(em[i]);
+ 
+         zero_index = constant_time_select_int(~found_zero_byte & equals0,
+                                               i, zero_index);
+@@ -208,7 +207,7 @@ int RSA_padding_check_PKCS1_type_2(unsig
+     }
+ 
+     /*
+-     * PS must be at least 8 bytes long, and it starts two bytes into |from|.
++     * PS must be at least 8 bytes long, and it starts two bytes into |em|.
+      * If we never found a 0-byte, then |zero_index| is 0 and the check
+      * also fails.
+      */
+@@ -227,24 +226,25 @@ int RSA_padding_check_PKCS1_type_2(unsig
+     good &= constant_time_ge(tlen, mlen);
+ 
+     /*
+-     * Even though we can't fake result's length, we can pretend copying
+-     * |tlen| bytes where |mlen| bytes would be real. Last |tlen| of |num|
+-     * bytes are viewed as circular buffer with start at |tlen|-|mlen'|,
+-     * where |mlen'| is "saturated" |mlen| value. Deducing information
+-     * about failure or |mlen| would take attacker's ability to observe
+-     * memory access pattern with byte granularity *as it occurs*. It
+-     * should be noted that failure is indistinguishable from normal
+-     * operation if |tlen| is fixed by protocol.
+-     */
+-    tlen = constant_time_select_int(constant_time_lt(num, tlen), num, tlen);
+-    msg_index = constant_time_select_int(good, msg_index, num - tlen);
+-    mlen = num - msg_index;
+-    for (from += msg_index, mask = good, i = 0; i < tlen; i++) {
+-        unsigned int equals = constant_time_eq(i, mlen);
+-
+-        from -= tlen & equals;  /* if (i == mlen) rewind   */
+-        mask &= mask ^ equals;  /* if (i == mlen) mask = 0 */
+-        to[i] = constant_time_select_8(mask, from[i], to[i]);
++     * Move the result in-place by |num|-11-|mlen| bytes to the left.
++     * Then if |good| move |mlen| bytes from |em|+11 to |to|.
++     * Otherwise leave |to| unchanged.
++     * Copy the memory back in a way that does not reveal the size of
++     * the data being copied via a timing side channel. This requires copying
++     * parts of the buffer multiple times based on the bits set in the real
++     * length. Clear bits do a non-copy with identical access pattern.
++     * The loop below has overall complexity of O(N*log(N)).
++     */
++    tlen = constant_time_select_int(constant_time_lt(num - 11, tlen),
++                                    num - 11, tlen);
++    for (msg_index = 1; msg_index < num - 11; msg_index <<= 1) {
++        mask = ~constant_time_eq(msg_index & (num - 11 - mlen), 0);
++        for (i = 11; i < num - msg_index; i++)
++            em[i] = constant_time_select_8(mask, em[i + msg_index], em[i]);
++    }
++    for (i = 0; i < tlen; i++) {
++        mask = good & constant_time_lt(i, mlen);
++        to[i] = constant_time_select_8(mask, em[i + 11], to[i]);
+     }
+ 
+     OPENSSL_clear_free(em, num);
+diff -up openssl-1.1.1b/crypto/rsa/rsa_pmeth.c.sync openssl-1.1.1b/crypto/rsa/rsa_pmeth.c
+--- openssl-1.1.1b/crypto/rsa/rsa_pmeth.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_pmeth.c	2019-05-03 08:55:51.543406814 +0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2006-2018 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright 2006-2019 The OpenSSL Project Authors. All Rights Reserved.
+  *
+  * Licensed under the OpenSSL license (the "License").  You may not use
+  * this file except in compliance with the License.  You can obtain a copy
+@@ -7,6 +7,8 @@
+  * https://www.openssl.org/source/license.html
+  */
+ 
++#include "internal/constant_time_locl.h"
++
+ #include <stdio.h>
+ #include "internal/cryptlib.h"
+ #include <openssl/asn1t.h>
+@@ -340,10 +342,9 @@ static int pkey_rsa_decrypt(EVP_PKEY_CTX
+         ret = RSA_private_decrypt(inlen, in, out, ctx->pkey->pkey.rsa,
+                                   rctx->pad_mode);
+     }
+-    if (ret < 0)
+-        return ret;
+-    *outlen = ret;
+-    return 1;
++    *outlen = constant_time_select_s(constant_time_msb_s(ret), *outlen, ret);
++    ret = constant_time_select_int(constant_time_msb(ret), ret, 1);
++    return ret;
+ }
+ 
+ static int check_padding_md(const EVP_MD *md, int padding)
+diff -up openssl-1.1.1b/crypto/rsa/rsa_ssl.c.sync openssl-1.1.1b/crypto/rsa/rsa_ssl.c
+--- openssl-1.1.1b/crypto/rsa/rsa_ssl.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_ssl.c	2019-05-03 08:55:51.550406694 +0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 1995-2018 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright 1995-2019 The OpenSSL Project Authors. All Rights Reserved.
+  *
+  * Licensed under the OpenSSL license (the "License").  You may not use
+  * this file except in compliance with the License.  You can obtain a copy
+@@ -55,7 +55,7 @@ int RSA_padding_add_SSLv23(unsigned char
+ 
+ /*
+  * Copy of RSA_padding_check_PKCS1_type_2 with a twist that rejects padding
+- * if nul delimiter is preceded by 8 consecutive 0x03 bytes. It also
++ * if nul delimiter is not preceded by 8 consecutive 0x03 bytes. It also
+  * preserves error code reporting for backward compatibility.
+  */
+ int RSA_padding_check_SSLv23(unsigned char *to, int tlen,
+@@ -67,7 +67,10 @@ int RSA_padding_check_SSLv23(unsigned ch
+     unsigned int good, found_zero_byte, mask, threes_in_row;
+     int zero_index = 0, msg_index, mlen = -1, err;
+ 
+-    if (flen < 10) {
++    if (tlen <= 0 || flen <= 0)
++        return -1;
++
++    if (flen > num || num < 11) {
+         RSAerr(RSA_F_RSA_PADDING_CHECK_SSLV23, RSA_R_DATA_TOO_SMALL);
+         return -1;
+     }
+@@ -89,10 +92,9 @@ int RSA_padding_check_SSLv23(unsigned ch
+         from -= 1 & mask;
+         *--em = *from & mask;
+     }
+-    from = em;
+ 
+-    good = constant_time_is_zero(from[0]);
+-    good &= constant_time_eq(from[1], 2);
++    good = constant_time_is_zero(em[0]);
++    good &= constant_time_eq(em[1], 2);
+     err = constant_time_select_int(good, 0, RSA_R_BLOCK_TYPE_IS_NOT_02);
+     mask = ~good;
+ 
+@@ -100,18 +102,18 @@ int RSA_padding_check_SSLv23(unsigned ch
+     found_zero_byte = 0;
+     threes_in_row = 0;
+     for (i = 2; i < num; i++) {
+-        unsigned int equals0 = constant_time_is_zero(from[i]);
++        unsigned int equals0 = constant_time_is_zero(em[i]);
+ 
+         zero_index = constant_time_select_int(~found_zero_byte & equals0,
+                                               i, zero_index);
+         found_zero_byte |= equals0;
+ 
+         threes_in_row += 1 & ~found_zero_byte;
+-        threes_in_row &= found_zero_byte | constant_time_eq(from[i], 3);
++        threes_in_row &= found_zero_byte | constant_time_eq(em[i], 3);
+     }
+ 
+     /*
+-     * PS must be at least 8 bytes long, and it starts two bytes into |from|.
++     * PS must be at least 8 bytes long, and it starts two bytes into |em|.
+      * If we never found a 0-byte, then |zero_index| is 0 and the check
+      * also fails.
+      */
+@@ -120,7 +122,7 @@ int RSA_padding_check_SSLv23(unsigned ch
+                                    RSA_R_NULL_BEFORE_BLOCK_MISSING);
+     mask = ~good;
+ 
+-    good &= constant_time_lt(threes_in_row, 8);
++    good &= constant_time_ge(threes_in_row, 8);
+     err = constant_time_select_int(mask | good, err,
+                                    RSA_R_SSLV3_ROLLBACK_ATTACK);
+     mask = ~good;
+@@ -139,24 +141,25 @@ int RSA_padding_check_SSLv23(unsigned ch
+     err = constant_time_select_int(mask | good, err, RSA_R_DATA_TOO_LARGE);
+ 
+     /*
+-     * Even though we can't fake result's length, we can pretend copying
+-     * |tlen| bytes where |mlen| bytes would be real. Last |tlen| of |num|
+-     * bytes are viewed as circular buffer with start at |tlen|-|mlen'|,
+-     * where |mlen'| is "saturated" |mlen| value. Deducing information
+-     * about failure or |mlen| would take attacker's ability to observe
+-     * memory access pattern with byte granularity *as it occurs*. It
+-     * should be noted that failure is indistinguishable from normal
+-     * operation if |tlen| is fixed by protocol.
++     * Move the result in-place by |num|-11-|mlen| bytes to the left.
++     * Then if |good| move |mlen| bytes from |em|+11 to |to|.
++     * Otherwise leave |to| unchanged.
++     * Copy the memory back in a way that does not reveal the size of
++     * the data being copied via a timing side channel. This requires copying
++     * parts of the buffer multiple times based on the bits set in the real
++     * length. Clear bits do a non-copy with identical access pattern.
++     * The loop below has overall complexity of O(N*log(N)).
+      */
+-    tlen = constant_time_select_int(constant_time_lt(num, tlen), num, tlen);
+-    msg_index = constant_time_select_int(good, msg_index, num - tlen);
+-    mlen = num - msg_index;
+-    for (from += msg_index, mask = good, i = 0; i < tlen; i++) {
+-        unsigned int equals = constant_time_eq(i, mlen);
+-
+-        from -= tlen & equals;  /* if (i == mlen) rewind   */
+-        mask &= mask ^ equals;  /* if (i == mlen) mask = 0 */
+-        to[i] = constant_time_select_8(mask, from[i], to[i]);
++    tlen = constant_time_select_int(constant_time_lt(num - 11, tlen),
++                                    num - 11, tlen);
++    for (msg_index = 1; msg_index < num - 11; msg_index <<= 1) {
++        mask = ~constant_time_eq(msg_index & (num - 11 - mlen), 0);
++        for (i = 11; i < num - msg_index; i++)
++            em[i] = constant_time_select_8(mask, em[i + msg_index], em[i]);
++    }
++    for (i = 0; i < tlen; i++) {
++        mask = good & constant_time_lt(i, mlen);
++        to[i] = constant_time_select_8(mask, em[i + 11], to[i]);
+     }
+ 
+     OPENSSL_clear_free(em, num);
+diff -up openssl-1.1.1b/crypto/rsa/rsa_x931g.c.sync openssl-1.1.1b/crypto/rsa/rsa_x931g.c
+--- openssl-1.1.1b/crypto/rsa/rsa_x931g.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/rsa/rsa_x931g.c	2019-05-03 08:55:51.530407037 +0200
+@@ -133,8 +133,7 @@ int RSA_X931_derive_ex(RSA *rsa, BIGNUM
+ 
+     ret = 1;
+  err:
+-    if (ctx)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+     BN_CTX_free(ctx2);
+ 
+@@ -188,8 +187,7 @@ int RSA_X931_generate_key_ex(RSA *rsa, i
+     ok = 1;
+ 
+  error:
+-    if (ctx)
+-        BN_CTX_end(ctx);
++    BN_CTX_end(ctx);
+     BN_CTX_free(ctx);
+ 
+     if (ok)
+diff -up openssl-1.1.1b/crypto/x509/x509_lu.c.sync openssl-1.1.1b/crypto/x509/x509_lu.c
+--- openssl-1.1.1b/crypto/x509/x509_lu.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/x509/x509_lu.c	2019-05-03 08:55:51.546406762 +0200
+@@ -297,6 +297,9 @@ int X509_STORE_CTX_get_by_subject(X509_S
+     if (ctx == NULL)
+         return 0;
+ 
++    stmp.type = X509_LU_NONE;
++    stmp.data.ptr = NULL;
++
+     CRYPTO_THREAD_write_lock(ctx->lock);
+     tmp = X509_OBJECT_retrieve_by_subject(ctx->objs, type, name);
+     CRYPTO_THREAD_unlock(ctx->lock);
+diff -up openssl-1.1.1b/doc/man1/pkeyutl.pod.sync openssl-1.1.1b/doc/man1/pkeyutl.pod
+--- openssl-1.1.1b/doc/man1/pkeyutl.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man1/pkeyutl.pod	2019-05-03 08:55:51.555406608 +0200
+@@ -272,20 +272,19 @@ value less than the minimum restriction.
+ =head1 DSA ALGORITHM
+ 
+ The DSA algorithm supports signing and verification operations only. Currently
+-there are no additional options other than B<digest>. Only the SHA1
+-digest can be used and this digest is assumed by default.
++there are no additional B<-pkeyopt> options other than B<digest>. The SHA1
++digest is assumed by default.
+ 
+ =head1 DH ALGORITHM
+ 
+ The DH algorithm only supports the derivation operation and no additional
+-options.
++B<-pkeyopt> options.
+ 
+ =head1 EC ALGORITHM
+ 
+ The EC algorithm supports sign, verify and derive operations. The sign and
+-verify operations use ECDSA and derive uses ECDH. Currently there are no
+-additional options other than B<digest>. Only the SHA1 digest can be used and
+-this digest is assumed by default.
++verify operations use ECDSA and derive uses ECDH. SHA1 is assumed by default for
++the B<-pkeyopt> B<digest> option.
+ 
+ =head1 X25519 and X448 ALGORITHMS
+ 
+diff -up openssl-1.1.1b/doc/man1/ts.pod.sync openssl-1.1.1b/doc/man1/ts.pod
+--- openssl-1.1.1b/doc/man1/ts.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man1/ts.pod	2019-05-03 08:55:51.554406625 +0200
+@@ -262,7 +262,7 @@ specified, the argument is given to the
+ =item B<-I<digest>>
+ 
+ Signing digest to use. Overrides the B<signer_digest> config file
+-option. (Optional)
++option. (Mandatory unless specified in the config file)
+ 
+ =item B<-chain> certs_file.pem
+ 
+@@ -460,7 +460,8 @@ command line option. (Optional)
+ =item B<signer_digest>
+ 
+ Signing digest to use. The same as the
+-B<-I<digest>> command line option. (Optional)
++B<-I<digest>> command line option. (Mandatory unless specified on the command
++line)
+ 
+ =item B<default_policy>
+ 
+diff -up openssl-1.1.1b/doc/man3/BIO_s_mem.pod.sync openssl-1.1.1b/doc/man3/BIO_s_mem.pod
+--- openssl-1.1.1b/doc/man3/BIO_s_mem.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/BIO_s_mem.pod	2019-05-03 08:55:51.556406591 +0200
+@@ -88,6 +88,22 @@ a buffering BIO to the chain will speed
+ Calling BIO_set_mem_buf() on a BIO created with BIO_new_secmem() will
+ give undefined results, including perhaps a program crash.
+ 
++Switching the memory BIO from read write to read only is not supported and
++can give undefined results including a program crash. There are two notable
++exceptions to the rule. The first one is to assign a static memory buffer
++immediately after BIO creation and set the BIO as read only.
++
++The other supported sequence is to start with read write BIO then temporarily
++switch it to read only and call BIO_reset() on the read only BIO immediately
++before switching it back to read write. Before the BIO is freed it must be
++switched back to the read write mode.
++
++Calling BIO_get_mem_ptr() on read only BIO will return a BUF_MEM that
++contains only the remaining data to be read. If the close status of the
++BIO is set to BIO_NOCLOSE, before freeing the BUF_MEM the data pointer
++in it must be set to NULL as the data pointer does not point to an
++allocated memory.
++
+ =head1 BUGS
+ 
+ There should be an option to set the maximum size of a memory BIO.
+diff -up openssl-1.1.1b/doc/man3/BN_CTX_start.pod.sync openssl-1.1.1b/doc/man3/BN_CTX_start.pod
+--- openssl-1.1.1b/doc/man3/BN_CTX_start.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/BN_CTX_start.pod	2019-05-03 08:55:51.554406625 +0200
+@@ -27,6 +27,7 @@ calls must be made before calling any ot
+ B<ctx> as an argument.
+ 
+ Finally, BN_CTX_end() must be called before returning from the function.
++If B<ctx> is NULL, nothing is done.
+ When BN_CTX_end() is called, the B<BIGNUM> pointers obtained from
+ BN_CTX_get() become invalid.
+ 
+diff -up openssl-1.1.1b/doc/man3/BN_new.pod.sync openssl-1.1.1b/doc/man3/BN_new.pod
+--- openssl-1.1.1b/doc/man3/BN_new.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/BN_new.pod	2019-05-03 08:55:51.554406625 +0200
+@@ -27,6 +27,7 @@ OPENSSL_secure_malloc(3) is used to stor
+ BN_clear() is used to destroy sensitive data such as keys when they
+ are no longer needed. It erases the memory used by B<a> and sets it
+ to the value 0.
++If B<a> is NULL, nothing is done.
+ 
+ BN_free() frees the components of the B<BIGNUM>, and if it was created
+ by BN_new(), also the structure itself. BN_clear_free() additionally
+diff -up openssl-1.1.1b/doc/man3/EVP_chacha20.pod.sync openssl-1.1.1b/doc/man3/EVP_chacha20.pod
+--- openssl-1.1.1b/doc/man3/EVP_chacha20.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/EVP_chacha20.pod	2019-05-03 08:55:51.536406934 +0200
+@@ -21,7 +21,15 @@ The ChaCha20 stream cipher for EVP.
+ 
+ =item EVP_chacha20()
+ 
+-The ChaCha20 stream cipher. The key length is 256 bits, the IV is 96 bits long.
++The ChaCha20 stream cipher. The key length is 256 bits, the IV is 128 bits long.
++The first 32 bits consists of a counter in little-endian order followed by a 96
++bit nonce. For example a nonce of:
++
++000000000000000000000002
++
++With an initial counter of 42 (2a in hex) would be expressed as:
++
++2a000000000000000000000000000002
+ 
+ =item EVP_chacha20_poly1305()
+ 
+diff -up openssl-1.1.1b/doc/man3/EVP_EncryptInit.pod.sync openssl-1.1.1b/doc/man3/EVP_EncryptInit.pod
+--- openssl-1.1.1b/doc/man3/EVP_EncryptInit.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/EVP_EncryptInit.pod	2019-05-03 08:55:51.554406625 +0200
+@@ -436,7 +436,9 @@ The following I<ctrl>s are supported for
+ 
+ Sets the nonce length. This call can only be made before specifying the nonce.
+ If not called a default nonce length of 12 (i.e. 96 bits) is used. The maximum
+-nonce length is 16 (B<CHACHA_CTR_SIZE>, i.e. 128-bits).
++nonce length is 12 bytes (i.e. 96-bits). If a nonce of less than 12 bytes is set
++then the nonce is automatically padded with leading 0 bytes to make it 12 bytes
++in length.
+ 
+ =item EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, taglen, tag)
+ 
+diff -up openssl-1.1.1b/doc/man3/HMAC.pod.sync openssl-1.1.1b/doc/man3/HMAC.pod
+--- openssl-1.1.1b/doc/man3/HMAC.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/HMAC.pod	2019-05-03 08:55:51.539406883 +0200
+@@ -63,7 +63,9 @@ If B<md> is NULL, the digest is placed i
+ the output is placed in B<md_len>, unless it is B<NULL>. Note: passing a NULL
+ value for B<md>  to use the static array is not thread safe.
+ 
+-B<evp_md> can be EVP_sha1(), EVP_ripemd160() etc.
++B<evp_md> is a message digest such as EVP_sha1(), EVP_ripemd160() etc. HMAC does
++not support variable output length digests such as EVP_shake128() and
++EVP_shake256().
+ 
+ HMAC_CTX_new() creates a new HMAC_CTX in heap memory.
+ 
+diff -up openssl-1.1.1b/doc/man3/RSA_padding_add_PKCS1_type_1.pod.sync openssl-1.1.1b/doc/man3/RSA_padding_add_PKCS1_type_1.pod
+--- openssl-1.1.1b/doc/man3/RSA_padding_add_PKCS1_type_1.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/RSA_padding_add_PKCS1_type_1.pod	2019-05-03 08:55:51.555406608 +0200
+@@ -5,6 +5,7 @@
+ RSA_padding_add_PKCS1_type_1, RSA_padding_check_PKCS1_type_1,
+ RSA_padding_add_PKCS1_type_2, RSA_padding_check_PKCS1_type_2,
+ RSA_padding_add_PKCS1_OAEP, RSA_padding_check_PKCS1_OAEP,
++RSA_padding_add_PKCS1_OAEP_mgf1, RSA_padding_check_PKCS1_OAEP_mgf1,
+ RSA_padding_add_SSLv23, RSA_padding_check_SSLv23,
+ RSA_padding_add_none, RSA_padding_check_none - asymmetric encryption
+ padding
+@@ -14,35 +15,46 @@ padding
+  #include <openssl/rsa.h>
+ 
+  int RSA_padding_add_PKCS1_type_1(unsigned char *to, int tlen,
+-                                  unsigned char *f, int fl);
++                                  const unsigned char *f, int fl);
+ 
+  int RSA_padding_check_PKCS1_type_1(unsigned char *to, int tlen,
+-                                    unsigned char *f, int fl, int rsa_len);
++                                    const unsigned char *f, int fl, int rsa_len);
+ 
+  int RSA_padding_add_PKCS1_type_2(unsigned char *to, int tlen,
+-                                  unsigned char *f, int fl);
++                                  const unsigned char *f, int fl);
+ 
+  int RSA_padding_check_PKCS1_type_2(unsigned char *to, int tlen,
+-                                    unsigned char *f, int fl, int rsa_len);
++                                    const unsigned char *f, int fl, int rsa_len);
+ 
+  int RSA_padding_add_PKCS1_OAEP(unsigned char *to, int tlen,
+-                                unsigned char *f, int fl, unsigned char *p, int pl);
++                                const unsigned char *f, int fl,
++                                const unsigned char *p, int pl);
+ 
+  int RSA_padding_check_PKCS1_OAEP(unsigned char *to, int tlen,
+-                                  unsigned char *f, int fl, int rsa_len,
+-                                  unsigned char *p, int pl);
++                                  const unsigned char *f, int fl, int rsa_len,
++                                  const unsigned char *p, int pl);
++
++ int RSA_padding_add_PKCS1_OAEP_mgf1(unsigned char *to, int tlen,
++                                     const unsigned char *f, int fl,
++                                     const unsigned char *p, int pl,
++                                     const EVP_MD *md, const EVP_MD *mgf1md);
++
++ int RSA_padding_check_PKCS1_OAEP_mgf1(unsigned char *to, int tlen,
++                                       const unsigned char *f, int fl, int rsa_len,
++                                       const unsigned char *p, int pl,
++                                       const EVP_MD *md, const EVP_MD *mgf1md);
+ 
+  int RSA_padding_add_SSLv23(unsigned char *to, int tlen,
+-                            unsigned char *f, int fl);
++                            const unsigned char *f, int fl);
+ 
+  int RSA_padding_check_SSLv23(unsigned char *to, int tlen,
+-                              unsigned char *f, int fl, int rsa_len);
++                              const unsigned char *f, int fl, int rsa_len);
+ 
+  int RSA_padding_add_none(unsigned char *to, int tlen,
+-                          unsigned char *f, int fl);
++                          const unsigned char *f, int fl);
+ 
+  int RSA_padding_check_none(unsigned char *to, int tlen,
+-                            unsigned char *f, int fl, int rsa_len);
++                            const unsigned char *f, int fl, int rsa_len);
+ 
+ =head1 DESCRIPTION
+ 
+@@ -98,6 +110,10 @@ at B<to>.
+ For RSA_padding_xxx_OAEP(), B<p> points to the encoding parameter
+ of length B<pl>. B<p> may be B<NULL> if B<pl> is 0.
+ 
++For RSA_padding_xxx_OAEP_mgf1(), B<md> points to the md hash,
++if B<md> is B<NULL> that means md=sha1, and B<mgf1md> points to
++the mgf1 hash, if B<mgf1md> is B<NULL> that means mgf1md=md.
++
+ =head1 RETURN VALUES
+ 
+ The RSA_padding_add_xxx() functions return 1 on success, 0 on error.
+@@ -107,15 +123,21 @@ L<ERR_get_error(3)>.
+ 
+ =head1 WARNING
+ 
+-The RSA_padding_check_PKCS1_type_2() padding check leaks timing
++The result of RSA_padding_check_PKCS1_type_2() is a very sensitive
+ information which can potentially be used to mount a Bleichenbacher
+ padding oracle attack. This is an inherent weakness in the PKCS #1
+-v1.5 padding design. Prefer PKCS1_OAEP padding. Otherwise it can
+-be recommended to pass zero-padded B<f>, so that B<fl> equals to
+-B<rsa_len>, and if fixed by protocol, B<tlen> being set to the
+-expected length. In such case leakage would be minimal, it would
+-take attacker's ability to observe memory access pattern with byte
+-granilarity as it occurs, post-factum timing analysis won't do.
++v1.5 padding design. Prefer PKCS1_OAEP padding. If that is not
++possible, the result of RSA_padding_check_PKCS1_type_2() should be
++checked in constant time if it matches the expected length of the
++plaintext and additionally some application specific consistency
++checks on the plaintext need to be performed in constant time.
++If the plaintext is rejected it must be kept secret which of the
++checks caused the application to reject the message.
++Do not remove the zero-padding from the decrypted raw RSA data
++which was computed by RSA_private_decrypt() with B<RSA_NO_PADDING>,
++as this would create a small timing side channel which could be
++used to mount a Bleichenbacher attack against any padding mode
++including PKCS1_OAEP.
+ 
+ =head1 SEE ALSO
+ 
+@@ -125,7 +147,7 @@ L<RSA_sign(3)>, L<RSA_verify(3)>
+ 
+ =head1 COPYRIGHT
+ 
+-Copyright 2000-2016 The OpenSSL Project Authors. All Rights Reserved.
++Copyright 2000-2019 The OpenSSL Project Authors. All Rights Reserved.
+ 
+ Licensed under the OpenSSL license (the "License").  You may not use
+ this file except in compliance with the License.  You can obtain a copy
+diff -up openssl-1.1.1b/doc/man3/RSA_public_encrypt.pod.sync openssl-1.1.1b/doc/man3/RSA_public_encrypt.pod
+--- openssl-1.1.1b/doc/man3/RSA_public_encrypt.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/RSA_public_encrypt.pod	2019-05-03 08:55:51.555406608 +0200
+@@ -8,10 +8,10 @@ RSA_public_encrypt, RSA_private_decrypt
+ 
+  #include <openssl/rsa.h>
+ 
+- int RSA_public_encrypt(int flen, unsigned char *from,
++ int RSA_public_encrypt(int flen, const unsigned char *from,
+                         unsigned char *to, RSA *rsa, int padding);
+ 
+- int RSA_private_decrypt(int flen, unsigned char *from,
++ int RSA_private_decrypt(int flen, const unsigned char *from,
+                          unsigned char *to, RSA *rsa, int padding);
+ 
+ =head1 DESCRIPTION
+@@ -27,6 +27,8 @@ B<padding> denotes one of the following
+ =item RSA_PKCS1_PADDING
+ 
+ PKCS #1 v1.5 padding. This currently is the most widely used mode.
++However, it is highly recommended to use RSA_PKCS1_OAEP_PADDING in
++new applications. SEE WARNING BELOW.
+ 
+ =item RSA_PKCS1_OAEP_PADDING
+ 
+@@ -46,23 +48,35 @@ Encrypting user data directly with RSA i
+ 
+ =back
+ 
+-B<flen> must be less than RSA_size(B<rsa>) - 11 for the PKCS #1 v1.5
+-based padding modes, less than RSA_size(B<rsa>) - 41 for
++B<flen> must not be more than RSA_size(B<rsa>) - 11 for the PKCS #1 v1.5
++based padding modes, not more than RSA_size(B<rsa>) - 42 for
+ RSA_PKCS1_OAEP_PADDING and exactly RSA_size(B<rsa>) for RSA_NO_PADDING.
+-The random number generator must be seeded prior to calling
+-RSA_public_encrypt().
++When a padding mode other than RSA_NO_PADDING is in use, then
++RSA_public_encrypt() will include some random bytes into the ciphertext
++and therefore the ciphertext will be different each time, even if the
++plaintext and the public key are exactly identical.
++The returned ciphertext in B<to> will always be zero padded to exactly
++RSA_size(B<rsa>) bytes.
++B<to> and B<from> may overlap.
+ 
+ RSA_private_decrypt() decrypts the B<flen> bytes at B<from> using the
+-private key B<rsa> and stores the plaintext in B<to>. B<to> must point
+-to a memory section large enough to hold the decrypted data (which is
+-smaller than RSA_size(B<rsa>)). B<padding> is the padding mode that
+-was used to encrypt the data.
++private key B<rsa> and stores the plaintext in B<to>. B<flen> should
++be equal to RSA_size(B<rsa>) but may be smaller, when leading zero
++bytes are in the ciphertext. Those are not important and may be removed,
++but RSA_public_encrypt() does not do that. B<to> must point
++to a memory section large enough to hold the maximal possible decrypted
++data (which is equal to RSA_size(B<rsa>) for RSA_NO_PADDING,
++RSA_size(B<rsa>) - 11 for the PKCS #1 v1.5 based padding modes and
++RSA_size(B<rsa>) - 42 for RSA_PKCS1_OAEP_PADDING).
++B<padding> is the padding mode that was used to encrypt the data.
++B<to> and B<from> may overlap.
+ 
+ =head1 RETURN VALUES
+ 
+ RSA_public_encrypt() returns the size of the encrypted data (i.e.,
+ RSA_size(B<rsa>)). RSA_private_decrypt() returns the size of the
+-recovered plaintext.
++recovered plaintext. A return value of 0 is not an error and
++means only that the plaintext was empty.
+ 
+ On error, -1 is returned; the error codes can be
+ obtained by L<ERR_get_error(3)>.
+@@ -85,7 +99,7 @@ L<RSA_size(3)>
+ 
+ =head1 COPYRIGHT
+ 
+-Copyright 2000-2016 The OpenSSL Project Authors. All Rights Reserved.
++Copyright 2000-2019 The OpenSSL Project Authors. All Rights Reserved.
+ 
+ Licensed under the OpenSSL license (the "License").  You may not use
+ this file except in compliance with the License.  You can obtain a copy
+diff -up openssl-1.1.1b/doc/man3/SSL_CIPHER_get_name.pod.sync openssl-1.1.1b/doc/man3/SSL_CIPHER_get_name.pod
+--- openssl-1.1.1b/doc/man3/SSL_CIPHER_get_name.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/SSL_CIPHER_get_name.pod	2019-05-03 08:55:51.537406917 +0200
+@@ -124,7 +124,10 @@ Textual representation of the cipher nam
+ 
+ =item <protocol version>
+ 
+-Protocol version, such as B<TLSv1.2>, when the cipher was first defined.
++The minimum protocol version that the ciphersuite supports, such as B<TLSv1.2>.
++Note that this is not always the same as the protocol version in which the
++ciphersuite was first defined because some ciphersuites are backwards compatible
++with earlier protocol versions.
+ 
+ =item Kx=<key exchange>
+ 
+diff -up openssl-1.1.1b/doc/man3/SSL_CTX_set_client_hello_cb.pod.sync openssl-1.1.1b/doc/man3/SSL_CTX_set_client_hello_cb.pod
+--- openssl-1.1.1b/doc/man3/SSL_CTX_set_client_hello_cb.pod.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/doc/man3/SSL_CTX_set_client_hello_cb.pod	2019-05-03 08:55:51.534406969 +0200
+@@ -65,6 +65,8 @@ both required, and on success the caller
+ B<*out> using OPENSSL_free().  The contents of B<*out> is an array of integers
+ holding the numerical value of the TLS extension types in the order they appear
+ in the ClientHello.  B<*outlen> contains the number of elements in the array.
++In situations when the ClientHello has no extensions, the function will return
++success with B<*out> set to NULL and B<*outlen> set to 0.
+ 
+ =head1 NOTES
+ 
+diff -up openssl-1.1.1b/include/openssl/err.h.sync openssl-1.1.1b/include/openssl/err.h
+--- openssl-1.1.1b/include/openssl/err.h.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/include/openssl/err.h	2019-05-03 08:55:51.548406728 +0200
+@@ -37,6 +37,7 @@ extern "C" {
+ # define ERR_TXT_STRING          0x02
+ 
+ # define ERR_FLAG_MARK           0x01
++# define ERR_FLAG_CLEAR          0x02
+ 
+ # define ERR_NUM_ERRORS  16
+ typedef struct err_state_st {
+diff -up openssl-1.1.1b/ssl/ssl_lib.c.sync openssl-1.1.1b/ssl/ssl_lib.c
+--- openssl-1.1.1b/ssl/ssl_lib.c.sync	2019-05-03 08:55:45.196515778 +0200
++++ openssl-1.1.1b/ssl/ssl_lib.c	2019-05-03 08:55:51.535406951 +0200
+@@ -5089,6 +5089,11 @@ int SSL_client_hello_get1_extensions_pre
+         if (ext->present)
+             num++;
+     }
++    if (num == 0) {
++        *out = NULL;
++        *outlen = 0;
++        return 1;
++    }
+     if ((present = OPENSSL_malloc(sizeof(*present) * num)) == NULL) {
+         SSLerr(SSL_F_SSL_CLIENT_HELLO_GET1_EXTENSIONS_PRESENT,
+                ERR_R_MALLOC_FAILURE);
+diff -up openssl-1.1.1b/ssl/ssl_locl.h.sync openssl-1.1.1b/ssl/ssl_locl.h
+--- openssl-1.1.1b/ssl/ssl_locl.h.sync	2019-05-03 08:55:45.011518954 +0200
++++ openssl-1.1.1b/ssl/ssl_locl.h	2019-05-03 08:55:51.541406848 +0200
+@@ -574,7 +574,6 @@ struct ssl_session_st {
+         /* Session lifetime hint in seconds */
+         unsigned long tick_lifetime_hint;
+         uint32_t tick_age_add;
+-        int tick_identity;
+         /* Max number of bytes that can be sent as early data */
+         uint32_t max_early_data;
+         /* The ALPN protocol selected for this session */
+@@ -1356,6 +1355,13 @@ struct ssl_st {
+          * as this extension is optional on server side.
+          */
+         uint8_t max_fragment_len_mode;
++
++        /*
++         * On the client side the number of ticket identities we sent in the
++         * ClientHello. On the server side the identity of the ticket we
++         * selected.
++         */
++        int tick_identity;
+     } ext;
+ 
+     /*
+@@ -2052,9 +2058,6 @@ typedef enum downgrade_en {
+ #define TLSEXT_KEX_MODE_FLAG_KE                                 1
+ #define TLSEXT_KEX_MODE_FLAG_KE_DHE                             2
+ 
+-/* An invalid index into the TLSv1.3 PSK identities */
+-#define TLSEXT_PSK_BAD_IDENTITY                                 -1
+-
+ #define SSL_USE_PSS(s) (s->s3->tmp.peer_sigalg != NULL && \
+                         s->s3->tmp.peer_sigalg->sig == EVP_PKEY_RSA_PSS)
+ 
+diff -up openssl-1.1.1b/ssl/statem/extensions_clnt.c.sync openssl-1.1.1b/ssl/statem/extensions_clnt.c
+--- openssl-1.1.1b/ssl/statem/extensions_clnt.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/ssl/statem/extensions_clnt.c	2019-05-03 08:55:51.542406831 +0200
+@@ -993,7 +993,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s
+     const EVP_MD *handmd = NULL, *mdres = NULL, *mdpsk = NULL;
+     int dores = 0;
+ 
+-    s->session->ext.tick_identity = TLSEXT_PSK_BAD_IDENTITY;
++    s->ext.tick_identity = 0;
+ 
+     /*
+      * Note: At this stage of the code we only support adding a single
+@@ -1083,6 +1083,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s
+         agems += s->session->ext.tick_age_add;
+ 
+         reshashsize = EVP_MD_size(mdres);
++        s->ext.tick_identity++;
+         dores = 1;
+     }
+ 
+@@ -1142,6 +1143,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s
+                      ERR_R_INTERNAL_ERROR);
+             return EXT_RETURN_FAIL;
+         }
++        s->ext.tick_identity++;
+     }
+ 
+     if (!WPACKET_close(pkt)
+@@ -1180,11 +1182,6 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s
+         return EXT_RETURN_FAIL;
+     }
+ 
+-    if (dores)
+-        s->session->ext.tick_identity = 0;
+-    if (s->psksession != NULL)
+-        s->psksession->ext.tick_identity = (dores ? 1 : 0);
+-
+     return EXT_RETURN_SENT;
+ #else
+     return EXT_RETURN_NOT_SENT;
+@@ -1927,8 +1924,7 @@ int tls_parse_stoc_early_data(SSL *s, PA
+     }
+ 
+     if (!s->ext.early_data_ok
+-            || !s->hit
+-            || s->session->ext.tick_identity != 0) {
++            || !s->hit) {
+         /*
+          * If we get here then we didn't send early data, or we didn't resume
+          * using the first identity, or the SNI/ALPN is not consistent so the
+@@ -1956,17 +1952,28 @@ int tls_parse_stoc_psk(SSL *s, PACKET *p
+         return 0;
+     }
+ 
+-    if (s->session->ext.tick_identity == (int)identity) {
++    if (identity >= (unsigned int)s->ext.tick_identity) {
++        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_F_TLS_PARSE_STOC_PSK,
++                 SSL_R_BAD_PSK_IDENTITY);
++        return 0;
++    }
++
++    /*
++     * Session resumption tickets are always sent before PSK tickets. If the
++     * ticket index is 0 then it must be for a session resumption ticket if we
++     * sent two tickets, or if we didn't send a PSK ticket.
++     */
++    if (identity == 0 && (s->psksession == NULL || s->ext.tick_identity == 2)) {
+         s->hit = 1;
+         SSL_SESSION_free(s->psksession);
+         s->psksession = NULL;
+         return 1;
+     }
+ 
+-    if (s->psksession == NULL
+-            || s->psksession->ext.tick_identity != (int)identity) {
+-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_F_TLS_PARSE_STOC_PSK,
+-                 SSL_R_BAD_PSK_IDENTITY);
++    if (s->psksession == NULL) {
++        /* Should never happen */
++        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_F_TLS_PARSE_STOC_PSK,
++                 ERR_R_INTERNAL_ERROR);
+         return 0;
+     }
+ 
+@@ -1985,6 +1992,9 @@ int tls_parse_stoc_psk(SSL *s, PACKET *p
+     s->session = s->psksession;
+     s->psksession = NULL;
+     s->hit = 1;
++    /* Early data is only allowed if we used the first ticket */
++    if (identity != 0)
++        s->ext.early_data_ok = 0;
+ #endif
+ 
+     return 1;
+diff -up openssl-1.1.1b/ssl/statem/extensions.c.sync openssl-1.1.1b/ssl/statem/extensions.c
+--- openssl-1.1.1b/ssl/statem/extensions.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/ssl/statem/extensions.c	2019-05-03 08:55:51.541406848 +0200
+@@ -989,7 +989,6 @@ static int final_server_name(SSL *s, uns
+                 ss->ext.ticklen = 0;
+                 ss->ext.tick_lifetime_hint = 0;
+                 ss->ext.tick_age_add = 0;
+-                ss->ext.tick_identity = 0;
+                 if (!ssl_generate_session_id(s, ss)) {
+                     SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_F_FINAL_SERVER_NAME,
+                              ERR_R_INTERNAL_ERROR);
+@@ -1646,7 +1645,6 @@ static int final_early_data(SSL *s, unsi
+ 
+     if (s->max_early_data == 0
+             || !s->hit
+-            || s->session->ext.tick_identity != 0
+             || s->early_data_state != SSL_EARLY_DATA_ACCEPTING
+             || !s->ext.early_data_ok
+             || s->hello_retry_request != SSL_HRR_NONE
+diff -up openssl-1.1.1b/ssl/statem/extensions_srvr.c.sync openssl-1.1.1b/ssl/statem/extensions_srvr.c
+--- openssl-1.1.1b/ssl/statem/extensions_srvr.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/ssl/statem/extensions_srvr.c	2019-05-03 08:55:51.542406831 +0200
+@@ -1274,7 +1274,7 @@ int tls_parse_ctos_psk(SSL *s, PACKET *p
+         goto err;
+     }
+ 
+-    sess->ext.tick_identity = id;
++    s->ext.tick_identity = id;
+ 
+     SSL_SESSION_free(s->session);
+     s->session = sess;
+@@ -1948,7 +1948,7 @@ EXT_RETURN tls_construct_stoc_psk(SSL *s
+ 
+     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_psk)
+             || !WPACKET_start_sub_packet_u16(pkt)
+-            || !WPACKET_put_bytes_u16(pkt, s->session->ext.tick_identity)
++            || !WPACKET_put_bytes_u16(pkt, s->ext.tick_identity)
+             || !WPACKET_close(pkt)) {
+         SSLfatal(s, SSL_AD_INTERNAL_ERROR,
+                  SSL_F_TLS_CONSTRUCT_STOC_PSK, ERR_R_INTERNAL_ERROR);
+diff -up openssl-1.1.1b/ssl/statem/statem_clnt.c.sync openssl-1.1.1b/ssl/statem/statem_clnt.c
+--- openssl-1.1.1b/ssl/statem/statem_clnt.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/ssl/statem/statem_clnt.c	2019-05-03 08:55:51.543406814 +0200
+@@ -1613,10 +1613,7 @@ MSG_PROCESS_RETURN tls_process_server_he
+          * so the PAC-based session secret is always preserved. It'll be
+          * overwritten if the server refuses resumption.
+          */
+-        if (s->session->session_id_length > 0
+-                || (SSL_IS_TLS13(s)
+-                    && s->session->ext.tick_identity
+-                       != TLSEXT_PSK_BAD_IDENTITY)) {
++        if (s->session->session_id_length > 0) {
+             tsan_counter(&s->session_ctx->stats.sess_miss);
+             if (!ssl_get_new_session(s, 0)) {
+                 /* SSLfatal() already called */
+diff -up openssl-1.1.1b/test/bio_memleak_test.c.sync openssl-1.1.1b/test/bio_memleak_test.c
+--- openssl-1.1.1b/test/bio_memleak_test.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/bio_memleak_test.c	2019-05-03 08:55:51.556406591 +0200
+@@ -18,28 +18,170 @@ static int test_bio_memleak(void)
+     int ok = 0;
+     BIO *bio;
+     BUF_MEM bufmem;
+-    const char *str = "BIO test\n";
++    static const char str[] = "BIO test\n";
+     char buf[100];
+ 
+     bio = BIO_new(BIO_s_mem());
+-    if (bio == NULL)
++    if (!TEST_ptr(bio))
+         goto finish;
+-    bufmem.length = strlen(str) + 1;
++    bufmem.length = sizeof(str);
+     bufmem.data = (char *) str;
+     bufmem.max = bufmem.length;
+     BIO_set_mem_buf(bio, &bufmem, BIO_NOCLOSE);
+     BIO_set_flags(bio, BIO_FLAGS_MEM_RDONLY);
++    if (!TEST_int_eq(BIO_read(bio, buf, sizeof(buf)), sizeof(str)))
++        goto finish;
++    if (!TEST_mem_eq(buf, sizeof(str), str, sizeof(str)))
++        goto finish;
++    ok = 1;
+ 
+-    if (BIO_read(bio, buf, sizeof(buf)) <= 0)
+-	goto finish;
++finish:
++    BIO_free(bio);
++    return ok;
++}
+ 
+-    ok = strcmp(buf, str) == 0;
++static int test_bio_get_mem(void)
++{
++    int ok = 0;
++    BIO *bio = NULL;
++    BUF_MEM *bufmem = NULL;
++
++    bio = BIO_new(BIO_s_mem());
++    if (!TEST_ptr(bio))
++        goto finish;
++    if (!TEST_int_eq(BIO_puts(bio, "Hello World\n"), 12))
++        goto finish;
++    BIO_get_mem_ptr(bio, &bufmem);
++    if (!TEST_ptr(bufmem))
++        goto finish;
++    if (!TEST_int_gt(BIO_set_close(bio, BIO_NOCLOSE), 0))
++        goto finish;
++    BIO_free(bio);
++    bio = NULL;
++    if (!TEST_mem_eq(bufmem->data, bufmem->length, "Hello World\n", 12))
++        goto finish;
++    ok = 1;
+ 
+ finish:
+     BIO_free(bio);
++    BUF_MEM_free(bufmem);
+     return ok;
+ }
+ 
++static int test_bio_new_mem_buf(void)
++{
++    int ok = 0;
++    BIO *bio;
++    BUF_MEM *bufmem;
++    char data[16];
++
++    bio = BIO_new_mem_buf("Hello World\n", 12);
++    if (!TEST_ptr(bio))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio, data, 5), 5))
++        goto finish;
++    if (!TEST_mem_eq(data, 5, "Hello", 5))
++        goto finish;
++    if (!TEST_int_gt(BIO_get_mem_ptr(bio, &bufmem), 0))
++        goto finish;
++    if (!TEST_int_lt(BIO_write(bio, "test", 4), 0))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio, data, 16), 7))
++        goto finish;
++    if (!TEST_mem_eq(data, 7, " World\n", 7))
++        goto finish;
++    if (!TEST_int_gt(BIO_reset(bio), 0))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio, data, 16), 12))
++        goto finish;
++    if (!TEST_mem_eq(data, 12, "Hello World\n", 12))
++        goto finish;
++    ok = 1;
++
++finish:
++    BIO_free(bio);
++    return ok;
++}
++
++static int test_bio_rdonly_mem_buf(void)
++{
++    int ok = 0;
++    BIO *bio, *bio2 = NULL;
++    BUF_MEM *bufmem;
++    char data[16];
++
++    bio = BIO_new_mem_buf("Hello World\n", 12);
++    if (!TEST_ptr(bio))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio, data, 5), 5))
++        goto finish;
++    if (!TEST_mem_eq(data, 5, "Hello", 5))
++        goto finish;
++    if (!TEST_int_gt(BIO_get_mem_ptr(bio, &bufmem), 0))
++        goto finish;
++    (void)BIO_set_close(bio, BIO_NOCLOSE);
++
++    bio2 = BIO_new(BIO_s_mem());
++    if (!TEST_ptr(bio2))
++        goto finish;
++    BIO_set_mem_buf(bio2, bufmem, BIO_CLOSE);
++    BIO_set_flags(bio2, BIO_FLAGS_MEM_RDONLY);
++
++    if (!TEST_int_eq(BIO_read(bio2, data, 16), 7))
++        goto finish;
++    if (!TEST_mem_eq(data, 7, " World\n", 7))
++        goto finish;
++    if (!TEST_int_gt(BIO_reset(bio2), 0))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio2, data, 16), 7))
++        goto finish;
++    if (!TEST_mem_eq(data, 7, " World\n", 7))
++        goto finish;
++    ok = 1;
++
++finish:
++    BIO_free(bio);
++    BIO_free(bio2);
++    return ok;
++}
++
++static int test_bio_rdwr_rdonly(void)
++{
++    int ok = 0;
++    BIO *bio = NULL;
++    char data[16];
++
++    bio = BIO_new(BIO_s_mem());
++    if (!TEST_ptr(bio))
++        goto finish;
++    if (!TEST_int_eq(BIO_puts(bio, "Hello World\n"), 12))
++        goto finish;
++
++    BIO_set_flags(bio, BIO_FLAGS_MEM_RDONLY);
++    if (!TEST_int_eq(BIO_read(bio, data, 16), 12))
++        goto finish;
++    if (!TEST_mem_eq(data, 12, "Hello World\n", 12))
++        goto finish;
++    if (!TEST_int_gt(BIO_reset(bio), 0))
++        goto finish;
++
++    BIO_clear_flags(bio, BIO_FLAGS_MEM_RDONLY);
++    if (!TEST_int_eq(BIO_puts(bio, "Hi!\n"), 4))
++        goto finish;
++    if (!TEST_int_eq(BIO_read(bio, data, 16), 16))
++        goto finish;
++
++    if (!TEST_mem_eq(data, 16, "Hello World\nHi!\n", 16))
++        goto finish;
++
++    ok = 1;
++
++finish:
++    BIO_free(bio);
++    return ok;
++}
++
++
+ int global_init(void)
+ {
+     CRYPTO_set_mem_debug(1);
+@@ -50,5 +192,9 @@ int global_init(void)
+ int setup_tests(void)
+ {
+     ADD_TEST(test_bio_memleak);
++    ADD_TEST(test_bio_get_mem);
++    ADD_TEST(test_bio_new_mem_buf);
++    ADD_TEST(test_bio_rdonly_mem_buf);
++    ADD_TEST(test_bio_rdwr_rdonly);
+     return 1;
+ }
+diff -up openssl-1.1.1b/test/ectest.c.sync openssl-1.1.1b/test/ectest.c
+--- openssl-1.1.1b/test/ectest.c.sync	2019-05-03 08:55:45.127516962 +0200
++++ openssl-1.1.1b/test/ectest.c	2019-05-03 08:55:51.524407140 +0200
+@@ -728,6 +728,74 @@ err:
+     BN_CTX_free(ctx);
+     return r;
+ }
++
++/*
++ * Tests a point known to cause an incorrect underflow in an old version of
++ * ecp_nist521.c
++ */
++static int underflow_test(void)
++{
++    BN_CTX *ctx = NULL;
++    EC_GROUP *grp = NULL;
++    EC_POINT *P = NULL, *Q = NULL, *R = NULL;
++    BIGNUM *x1 = NULL, *y1 = NULL, *z1 = NULL, *x2 = NULL, *y2 = NULL;
++    BIGNUM *k = NULL;
++    int testresult = 0;
++    const char *x1str =
++        "1534f0077fffffe87e9adcfe000000000000000000003e05a21d2400002e031b1f4"
++        "b80000c6fafa4f3c1288798d624a247b5e2ffffffffffffffefe099241900004";
++    const char *p521m1 =
++        "1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
++        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe";
++
++    ctx = BN_CTX_new();
++    if (!TEST_ptr(ctx))
++        return 0;
++
++    BN_CTX_start(ctx);
++    x1 = BN_CTX_get(ctx);
++    y1 = BN_CTX_get(ctx);
++    z1 = BN_CTX_get(ctx);
++    x2 = BN_CTX_get(ctx);
++    y2 = BN_CTX_get(ctx);
++    k = BN_CTX_get(ctx);
++    if (!TEST_ptr(k))
++        goto err;
++
++    grp = EC_GROUP_new_by_curve_name(NID_secp521r1);
++    P = EC_POINT_new(grp);
++    Q = EC_POINT_new(grp);
++    R = EC_POINT_new(grp);
++    if (!TEST_ptr(grp) || !TEST_ptr(P) || !TEST_ptr(Q) || !TEST_ptr(R))
++        goto err;
++
++    if (!TEST_int_gt(BN_hex2bn(&x1, x1str), 0)
++            || !TEST_int_gt(BN_hex2bn(&y1, p521m1), 0)
++            || !TEST_int_gt(BN_hex2bn(&z1, p521m1), 0)
++            || !TEST_int_gt(BN_hex2bn(&k, "02"), 0)
++            || !TEST_true(EC_POINT_set_Jprojective_coordinates_GFp(grp, P, x1,
++                                                                   y1, z1, ctx))
++            || !TEST_true(EC_POINT_mul(grp, Q, NULL, P, k, ctx))
++            || !TEST_true(EC_POINT_get_affine_coordinates(grp, Q, x1, y1, ctx))
++            || !TEST_true(EC_POINT_dbl(grp, R, P, ctx))
++            || !TEST_true(EC_POINT_get_affine_coordinates(grp, R, x2, y2, ctx)))
++        goto err;
++
++    if (!TEST_int_eq(BN_cmp(x1, x2), 0)
++            || !TEST_int_eq(BN_cmp(y1, y2), 0))
++        goto err;
++
++    testresult = 1;
++
++ err:
++    BN_CTX_end(ctx);
++    EC_POINT_free(P);
++    EC_POINT_free(Q);
++    EC_GROUP_free(grp);
++    BN_CTX_free(ctx);
++
++    return testresult;
++}
+ # endif
+ 
+ static const unsigned char p521_named[] = {
+@@ -835,6 +903,7 @@ int setup_tests(void)
+ # endif
+ # ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+     ADD_ALL_TESTS(nistp_single_test, OSSL_NELEM(nistp_tests_params));
++    ADD_TEST(underflow_test);
+ # endif
+     ADD_ALL_TESTS(internal_curve_test, crv_len);
+     ADD_ALL_TESTS(internal_curve_test_method, crv_len);
+diff -up openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt.sync openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt
+--- openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt	2019-05-03 08:55:51.552406659 +0200
+@@ -2232,7 +2232,7 @@ IV = 00000000000000000000000000000000
+ Plaintext = 11111111aaaaaaaa11111111bbbbbbbb11111111cccccccc11111111dddddddd22222222aaaaaaaa22222222bbbbbbbb22222222cccccccc22222222dddddddd33333333aaaaaaaa33333333bbbbbbbb33333333cccccccc33333333dddddddd44444444aaaaaaaa44444444bbbbbbbb44444444cccccccc44444444dddddddd55555555aaaaaaaa55555555bbbbbbbb55555555cccccccc55555555dddddddd
+ Ciphertext = 30026c329666141721178b99c0a1f1b2f06940253f7b3089e2a30ea86aa3c88f5940f05ad7ee41d71347bb7261e348f18360473fdf7d4e7723bffb4411cc13f6cdd89f3bc7b9c768145022c7a74f14d7c305cd012a10f16050c23f1ae5c23f45998d13fbaa041e51619577e0772764896a5d4516d8ffceb3bf7e05f613edd9a60cdcedaff9cfcaf4e00d445a54334f73ab2cad944e51d266548e61c6eb0aa1cd
+ 
+-Title = ARIA GCM test vectors from IETF draft-ietf-avtcore-aria-srtp-10
++Title = ARIA GCM test vectors from RFC8269
+ 
+ Cipher = ARIA-128-GCM
+ Key = e91e5e75da65554a48181f3846349562
+@@ -2250,6 +2250,36 @@ Tag = e210d6ced2cf430ff841472915e7ef48
+ Plaintext = f57af5fd4ae19562976ec57a5a7ad55a5af5c5e5c5fdf5c55ad57a4a7272d57262e9729566ed66e97ac54a4a5a7ad5e15ae5fdd5fd5ac5d56ae56ad5c572d54ae54ac55a956afd6aed5a4ac562957a9516991691d572fd14e97ae962ed7a9f4a955af572e162f57a956666e17ae1f54a95f566d54a66e16e4afd6a9f7ae1c5c55ae5d56afde916c5e94a6ec56695e14afde1148416e94ad57ac5146ed59d1cc5
+ Ciphertext = 6f9e4bcbc8c85fc0128fb1e4a0a20cb9932ff74581f54fc013dd054b19f99371425b352d97d3f337b90b63d1b082adeeea9d2d7391897d591b985e55fb50cb5350cf7d38dc27dda127c078a149c8eb98083d66363a46e3726af217d3a00275ad5bf772c7610ea4c23006878f0ee69a8397703169a419303f40b72e4573714d19e2697df61e7c7252e5abc6bade876ac4961bfac4d5e867afca351a48aed52822
+ 
++Title = ARIA GCM self-generated test vectors
++
++Cipher = ARIA-128-GCM
++Key = e91e5e75da65554a48181f3846349562
++# Shorter than default IV
++IV = 0001020304
++AAD = 8008315ebf2e6fe020e8f5eb
++Tag = ebaa2645bb154542117ee46031aa176e
++Plaintext = f57af5fd4ae19562976ec57a5a7ad55a5af5c5e5c5fdf5c55ad57a4a7272d57262e9729566ed66e97ac54a4a5a7ad5e15ae5fdd5fd5ac5d56ae56ad5c572d54ae54ac55a956afd6aed5a4ac562957a9516991691d572fd14e97ae962ed7a9f4a955af572e162f57a956666e17ae1f54a95f566d54a66e16e4afd6a9f7ae1c5c55ae5d56afde916c5e94a6ec56695e14afde1148416e94ad57ac5146ed59d1cc5
++Ciphertext = 1723ccfc0ed44a12520473cfeb63bc933cd450a943f5f1cba78e19d72f80cc102acc51f2459a06cf6435182b8ddd451f83e13479efe5ec7dfbf16229f4017920fb41457a9b6fe1a401b30b2f332d827ae2f86e962326927c1ed8bfedac1f7a00ddde63bd392a8f28a488ba5974689f8d15b9b1739fb50aae0ff244026ec72064003c621b33ffc8086b0a97eefb70604a2826f6499f6eb12d67a0da03fc8e1482
++
++Cipher = ARIA-128-GCM
++Key = e91e5e75da65554a48181f3846349562
++# Longer than default IV
++IV = 000102030405060708090a0b0c0d0e0f
++AAD = 8008315ebf2e6fe020e8f5eb
++Tag = 61f7f44c7da3c60195b29ae0b46051a4
++Plaintext = f57af5fd4ae19562976ec57a5a7ad55a5af5c5e5c5fdf5c55ad57a4a7272d57262e9729566ed66e97ac54a4a5a7ad5e15ae5fdd5fd5ac5d56ae56ad5c572d54ae54ac55a956afd6aed5a4ac562957a9516991691d572fd14e97ae962ed7a9f4a955af572e162f57a956666e17ae1f54a95f566d54a66e16e4afd6a9f7ae1c5c55ae5d56afde916c5e94a6ec56695e14afde1148416e94ad57ac5146ed59d1cc5
++Ciphertext = 0d3e98fcaf7a2c4fe9198d66add90d113e5e0ff47598c40a4bf501960d935a4156c9a4d46c9358a608e10a16479a4247c9ab9bb4a02809e3eac3571b832590fe2ca3e2d545741e36282d96c041fc7d39a46ed60214c2c0ec70f27768dfea4f9563b5d5c2ac33b1368a78f2908f5daf942433fec6ab588f09e908e95cc8dfa85d1a0dfd5835dc14e148323230c63eedc99a9ce942214cb3768b97b821d613629f
++
++Cipher = ARIA-128-GCM
++Key = e91e5e75da65554a48181f3846349562
++# Extra long IV
++IV = 000102030405060708090a0b0c0d0e0f1011
++AAD = 8008315ebf2e6fe020e8f5eb
++Tag = c8b31ab6c2ddccab06b76af4e56e664e
++Plaintext = f57af5fd4ae19562976ec57a5a7ad55a5af5c5e5c5fdf5c55ad57a4a7272d57262e9729566ed66e97ac54a4a5a7ad5e15ae5fdd5fd5ac5d56ae56ad5c572d54ae54ac55a956afd6aed5a4ac562957a9516991691d572fd14e97ae962ed7a9f4a955af572e162f57a956666e17ae1f54a95f566d54a66e16e4afd6a9f7ae1c5c55ae5d56afde916c5e94a6ec56695e14afde1148416e94ad57ac5146ed59d1cc5
++Ciphertext = 616a7bce24206501082cef7267c09a4affa54f8f82eb7fb2cdebdcaab4b6ab05c37e891c2d0fc90d15c5fb684247625c8bc0befad86896ae1c8f5a8506954caba4e13df0a0eb23853d4474e7f3b2c57bb398456a24d198e14566bce8a5f8d3bcdb12994d2fdc0f5cf19aeff990c1fe119e01f9fcc86757b1d43a9accf7b2f913c2208a46c1967f403867f89b46ffe96864c63f042265806ea5270e0dddd0e8dd
++
++
+ Title = ARIA CCM test vectors from IETF draft-ietf-avtcore-aria-srtp-02
+ 
+ # 16-byte Tag
+@@ -2357,14 +2387,41 @@ Operation = ENCRYPT
+ Plaintext = B41E6BE2EBA84A148E2EED84593C5EC7
+ Ciphertext = 9B9B7BFCD1813CB95D0B3618F40F5122
+ 
+-Title = Chacha20
++Title = Chacha20 test vectors from RFC7539
+ 
++# A.1 Test Vector 1
+ Cipher = chacha20
+ Key = 0000000000000000000000000000000000000000000000000000000000000000
+ IV = 00000000000000000000000000000000
+ Plaintext = 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+ Ciphertext = 76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7da41597c5157488d7724e03fb8d84a376a43b8f41518a11cc387b669b2ee6586
+ 
++# A.1 Test Vector 2
++Cipher = chacha20
++Key = 0000000000000000000000000000000000000000000000000000000000000000
++IV = 01000000000000000000000000000000
++Plaintext = 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
++Ciphertext = 9f07e7be5551387a98ba977c732d080dcb0f29a048e3656912c6533e32ee7aed29b721769ce64e43d57133b074d839d531ed1f28510afb45ace10a1f4b794d6f
++
++# A.2 Test Vector 1 is the same as A.1 Test Vector 1
++# A.2 Test Vector 2
++Cipher = chacha20
++Key = 0000000000000000000000000000000000000000000000000000000000000001
++#Counter (first 4 bytes) expressed in little-endian order
++IV = 01000000000000000000000000000002
++Plaintext = 416e79207375626d697373696f6e20746f20746865204945544620696e74656e6465642062792074686520436f6e7472696275746f7220666f72207075626c69636174696f6e20617320616c6c206f722070617274206f6620616e204945544620496e7465726e65742d4472616674206f722052464320616e6420616e792073746174656d656e74206d6164652077697468696e2074686520636f6e74657874206f6620616e204945544620616374697669747920697320636f6e7369646572656420616e20224945544620436f6e747269627574696f6e222e20537563682073746174656d656e747320696e636c756465206f72616c2073746174656d656e747320696e20494554462073657373696f6e732c2061732077656c6c206173207772697474656e20616e6420656c656374726f6e696320636f6d6d756e69636174696f6e73206d61646520617420616e792074696d65206f7220706c6163652c207768696368206172652061646472657373656420746f
++Ciphertext = a3fbf07df3fa2fde4f376ca23e82737041605d9f4f4f57bd8cff2c1d4b7955ec2a97948bd3722915c8f3d337f7d370050e9e96d647b7c39f56e031ca5eb6250d4042e02785ececfa4b4bb5e8ead0440e20b6e8db09d881a7c6132f420e52795042bdfa7773d8a9051447b3291ce1411c680465552aa6c405b7764d5e87bea85ad00f8449ed8f72d0d662ab052691ca66424bc86d2df80ea41f43abf937d3259dc4b2d0dfb48a6c9139ddd7f76966e928e635553ba76c5c879d7b35d49eb2e62b0871cdac638939e25e8a1e0ef9d5280fa8ca328b351c3c765989cbcf3daa8b6ccc3aaf9f3979c92b3720fc88dc95ed84a1be059c6499b9fda236e7e818b04b0bc39c1e876b193bfe5569753f88128cc08aaa9b63d1a16f80ef2554d7189c411f5869ca52c5b83fa36ff216b9c1d30062bebcfd2dc5bce0911934fda79a86f6e698ced759c3ff9b6477338f3da4f9cd8514ea9982ccafb341b2384dd902f3d1ab7ac61dd29c6f21ba5b862f3730e37cfdc4fd806c22f221
++
++# A.2 Test Vector 3
++Cipher = chacha20
++Key = 1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0
++#Counter (first 4 bytes) expressed in little-endian order
++IV = 2a000000000000000000000000000002
++Plaintext = 2754776173206272696c6c69672c20616e642074686520736c6974687920746f7665730a446964206779726520616e642067696d626c6520696e2074686520776162653a0a416c6c206d696d737920776572652074686520626f726f676f7665732c0a416e6420746865206d6f6d65207261746873206f757467726162652e
++Ciphertext = 62e6347f95ed87a45ffae7426f27a1df5fb69110044c0d73118effa95b01e5cf166d3df2d721caf9b21e5fb14c616871fd84c54f9d65b283196c7fe4f60553ebf39c6402c42234e32a356b3e764312a61a5532055716ead6962568f87d3f3f7704c6a8d1bcd1bf4d50d6154b6da731b187b58dfd728afa36757a797ac188d1
++
++Title = Chacha20
++
+ Cipher = chacha20
+ Key = 0000000000000000000000000000000000000000000000000000000000000001
+ IV = 00000000000000000000000000000000
+@@ -2506,3 +2563,12 @@ AAD = f33388860000000000004e91
+ Tag = e0723bce23528ce6ccb10ff9627038bf
+ Plaintext = 496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d
+ Ciphertext = 64a0861575861af460f062c79be643bd5e805cfd345cf389f108670ac76c8cb24c6cfc18755d43eea09ee94e382d26b0bdb7b73c321b0100d4f03b7f355894cf332f830e710b97ce98c8a84abd0b948114ad176e008d33bd60f982b1ff37c8559797a06ef4f0ef61c186324e2b3506383606907b6a7c02b0f9f6157b53c867e4b9166c767b804d46a59b5216cde7a4e99040c5a40433225ee282a1b0a06c523eaf4534d7f83fa1155b0047718cbc546a0d072b04b3564eea1b422273f548271a0bb2316053fa76991955ebd63159434ecebb4e466dae5a1073a6727627097a1049e617d91d361094fa68f0ff77987130305beaba2eda04df997b714d6c6f2c299da65ba25e6a85842bf0440fd98a9a2266b061c4b3a13327c090f9a0789f58aad805275e4378a525f19232bfbfb749ede38480f405cf43ec2f1f8619ebcbc80a89e92a859c7911e674977ab17d4a7126a6b8a477358ff14a344d276ef6e504e10268ac3619fcf90c2d6c03fc2e3d1f290d9bf26c1fa1495dd8f97eec6229a55c2354e4524143551a5cc370a1c622c9390530cff21c3e1ed50c5e3daf97518ccce34156bdbd7eafab8bd417aef25c6c927301731bd319d247a1d5c3186ed10bfd9a7a24bac30e3e4503ed9204154d338b79ea276e7058e7f20f4d4fd1ac93d63f611af7b6d006c2a72add0eedc497b19cb30a198816664f0da00155f2e2d6ac61045b296d614301e0ad4983308028850dd4feffe3a8163970306e4047f5a165cb4befbc129729cd2e286e837e9b606486d402acc3dec5bf8b92387f6e486f2140
++
++Cipher = chacha20-poly1305
++Key = 1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0
++IV = ff000000000102030405060708
++AAD = f33388860000000000004e91
++Tag = e0723bce23528ce6ccb10ff9627038bf
++Plaintext = 496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d
++Ciphertext = 64a0861575861af460f062c79be643bd5e805cfd345cf389f108670ac76c8cb24c6cfc18755d43eea09ee94e382d26b0bdb7b73c321b0100d4f03b7f355894cf332f830e710b97ce98c8a84abd0b948114ad176e008d33bd60f982b1ff37c8559797a06ef4f0ef61c186324e2b3506383606907b6a7c02b0f9f6157b53c867e4b9166c767b804d46a59b5216cde7a4e99040c5a40433225ee282a1b0a06c523eaf4534d7f83fa1155b0047718cbc546a0d072b04b3564eea1b422273f548271a0bb2316053fa76991955ebd63159434ecebb4e466dae5a1073a6727627097a1049e617d91d361094fa68f0ff77987130305beaba2eda04df997b714d6c6f2c299da65ba25e6a85842bf0440fd98a9a2266b061c4b3a13327c090f9a0789f58aad805275e4378a525f19232bfbfb749ede38480f405cf43ec2f1f8619ebcbc80a89e92a859c7911e674977ab17d4a7126a6b8a477358ff14a344d276ef6e504e10268ac3619fcf90c2d6c03fc2e3d1f290d9bf26c1fa1495dd8f97eec6229a55c2354e4524143551a5cc370a1c622c9390530cff21c3e1ed50c5e3daf97518ccce34156bdbd7eafab8bd417aef25c6c927301731bd319d247a1d5c3186ed10bfd9a7a24bac30e3e4503ed9204154d338b79ea276e7058e7f20f4d4fd1ac93d63f611af7b6d006c2a72add0eedc497b19cb30a198816664f0da00155f2e2d6ac61045b296d614301e0ad4983308028850dd4feffe3a8163970306e4047f5a165cb4befbc129729cd2e286e837e9b606486d402acc3dec5bf8b92387f6e486f2140
++Result = INVALID_IV_LENGTH
+diff -up openssl-1.1.1b/test/recipes/30-test_evp_data/evpmac.txt.sync openssl-1.1.1b/test/recipes/30-test_evp_data/evpmac.txt
+--- openssl-1.1.1b/test/recipes/30-test_evp_data/evpmac.txt.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/recipes/30-test_evp_data/evpmac.txt	2019-05-03 08:55:51.539406883 +0200
+@@ -351,6 +351,14 @@ Input = "Sample message for keylen>block
+ Key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f8081828384858687
+ Output = 5f464f5e5b7848e3885e49b2c385f0694985d0e38966242dc4a5fe3fea4b37d46b65ceced5dcf59438dd840bab22269f0ba7febdb9fcf74602a35666b2a32915
+ 
++Title = HMAC self generated tests
++
++MAC = HMAC
++Algorithm = SHAKE128
++Input = "Test that SHAKE128 fails"
++Key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
++Result = DIGESTSIGNINIT_ERROR
++
+ 
+ Title = CMAC tests (from FIPS module)
+ 
+diff -up openssl-1.1.1b/test/recipes/80-test_cms.t.sync openssl-1.1.1b/test/recipes/80-test_cms.t
+--- openssl-1.1.1b/test/recipes/80-test_cms.t.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/recipes/80-test_cms.t	2019-05-03 08:55:51.533406986 +0200
+@@ -308,6 +308,14 @@ my @smime_cms_param_tests = (
+ 	"-CAfile", catfile($smdir, "smroot.pem"), "-out", "smtst.txt" ]
+     ],
+ 
++    [ "signed content test streaming PEM format, RSA keys, PSS signature, saltlen=-3",
++      [ "-sign", "-in", $smcont, "-outform", "PEM", "-nodetach",
++	"-signer", catfile($smdir, "smrsa1.pem"), "-keyopt", "rsa_padding_mode:pss",
++	"-keyopt", "rsa_pss_saltlen:-3", "-out", "test.cms" ],
++      [ "-verify", "-in", "test.cms", "-inform", "PEM",
++	"-CAfile", catfile($smdir, "smroot.pem"), "-out", "smtst.txt" ]
++    ],
++
+     [ "signed content test streaming PEM format, RSA keys, PSS signature, no attributes",
+       [ "-sign", "-in", $smcont, "-outform", "PEM", "-nodetach", "-noattr",
+ 	"-signer", catfile($smdir, "smrsa1.pem"), "-keyopt", "rsa_padding_mode:pss",
+diff -up openssl-1.1.1b/test/rsa_test.c.sync openssl-1.1.1b/test/rsa_test.c
+--- openssl-1.1.1b/test/rsa_test.c.sync	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/test/rsa_test.c	2019-05-03 08:55:51.523407157 +0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 1999-2017 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright 1999-2019 The OpenSSL Project Authors. All Rights Reserved.
+  *
+  * Licensed under the OpenSSL license (the "License").  You may not use
+  * this file except in compliance with the License.  You can obtain a copy
+@@ -268,6 +268,36 @@ err:
+     return ret;
+ }
+ 
++static int test_rsa_sslv23(int idx)
++{
++    int ret = 0;
++    RSA *key;
++    unsigned char ptext[256];
++    unsigned char ctext[256];
++    static unsigned char ptext_ex[] = "\x54\x85\x9b\x34\x2c\x49\xea\x2a";
++    unsigned char ctext_ex[256];
++    int plen;
++    int clen = 0;
++    int num;
++
++    plen = sizeof(ptext_ex) - 1;
++    clen = rsa_setkey(&key, ctext_ex, idx);
++
++    num = RSA_public_encrypt(plen, ptext_ex, ctext, key,
++                             RSA_SSLV23_PADDING);
++    if (!TEST_int_eq(num, clen))
++        goto err;
++
++    num = RSA_private_decrypt(num, ctext, ptext, key, RSA_SSLV23_PADDING);
++    if (!TEST_mem_eq(ptext, num, ptext_ex, plen))
++        goto err;
++
++    ret = 1;
++err:
++    RSA_free(key);
++    return ret;
++}
++
+ static int test_rsa_oaep(int idx)
+ {
+     int ret = 0;
+@@ -332,6 +362,7 @@ err:
+ int setup_tests(void)
+ {
+     ADD_ALL_TESTS(test_rsa_pkcs1, 3);
++    ADD_ALL_TESTS(test_rsa_sslv23, 3);
+     ADD_ALL_TESTS(test_rsa_oaep, 3);
+     return 1;
+ }

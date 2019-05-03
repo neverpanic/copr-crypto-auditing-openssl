@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 5%{?dist}
+Release: 6%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -62,7 +62,7 @@ Patch48: openssl-1.1.1-fips-post-rand.patch
 Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
 # Backported fixes including security fixes
-Patch51: openssl-1.1.1-bio-mem-ptr.patch
+Patch51: openssl-1.1.1-upstream-sync.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -159,7 +159,7 @@ cp %{SOURCE13} test/
 %patch48 -p1 -b .fips-post-rand
 %patch49 -p1 -b .evp-kdf
 %patch50 -p1 -b .ssh-kdf
-%patch51 -p1 -b .bio-mem-ptr
+%patch51 -p1 -b .upstream-sync
 
 
 %build
@@ -446,6 +446,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri May  3 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-6
+- apply new bugfixes from upstream 1.1.1 branch
+
 * Tue Apr 16 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-5
 - fix for BIO_get_mem_ptr() regression in 1.1.1b (#1691853)
 
