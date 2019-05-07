@@ -1,6 +1,6 @@
 diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
---- openssl-1.1.1b/apps/speed.c.fips	2019-02-28 11:30:06.768746376 +0100
-+++ openssl-1.1.1b/apps/speed.c	2019-02-28 11:30:06.779746172 +0100
+--- openssl-1.1.1b/apps/speed.c.fips	2019-05-07 08:56:33.531174336 +0200
++++ openssl-1.1.1b/apps/speed.c	2019-05-07 09:43:06.673989992 +0200
 @@ -1592,7 +1592,8 @@ int speed_main(int argc, char **argv)
              continue;
          if (strcmp(*argv, "rsa") == 0) {
@@ -22,7 +22,22 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
                  dsa_doit[R_DSA_2048] = 1;
              continue;
          }
-@@ -1734,15 +1737,21 @@ int speed_main(int argc, char **argv)
+@@ -1640,12 +1643,12 @@ int speed_main(int argc, char **argv)
+             ecdh_doit[i] = 2;
+             continue;
+         }
+-        if (strcmp(*argv, "eddsa") == 0) {
++        if (!FIPS_mode() && strcmp(*argv, "eddsa") == 0) {
+             for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
+                 eddsa_doit[loop] = 1;
+             continue;
+         }
+-        if (found(*argv, eddsa_choices, &i)) {
++        if (!FIPS_mode() && found(*argv, eddsa_choices, &i)) {
+             eddsa_doit[i] = 2;
+             continue;
+         }
+@@ -1734,23 +1737,30 @@ int speed_main(int argc, char **argv)
      /* No parameters; turn on everything. */
      if ((argc == 0) && !doit[D_EVP]) {
          for (i = 0; i < ALGOR_NUM; i++)
@@ -47,7 +62,18 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
  #endif
  #ifndef OPENSSL_NO_EC
          for (loop = 0; loop < OSSL_NELEM(ecdsa_doit); loop++)
-@@ -1798,30 +1807,46 @@ int speed_main(int argc, char **argv)
+             ecdsa_doit[loop] = 1;
+         for (loop = 0; loop < OSSL_NELEM(ecdh_doit); loop++)
+             ecdh_doit[loop] = 1;
+-        for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
+-            eddsa_doit[loop] = 1;
++        if (!FIPS_mode())
++            for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
++                eddsa_doit[loop] = 1;
+ #endif
+     }
+     for (i = 0; i < ALGOR_NUM; i++)
+@@ -1798,30 +1808,46 @@ int speed_main(int argc, char **argv)
      AES_set_encrypt_key(key24, 192, &aes_ks2);
      AES_set_encrypt_key(key32, 256, &aes_ks3);
  #ifndef OPENSSL_NO_CAMELLIA
@@ -104,7 +130,7 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
  #endif
  #ifndef SIGALRM
  # ifndef OPENSSL_NO_DES
-@@ -2118,6 +2143,7 @@ int speed_main(int argc, char **argv)
+@@ -2118,6 +2144,7 @@ int speed_main(int argc, char **argv)
  
          for (i = 0; i < loopargs_len; i++) {
              loopargs[i].hctx = HMAC_CTX_new();
@@ -124,6 +150,18 @@ diff -up openssl-1.1.1b/Configure.fips openssl-1.1.1b/Configure
      "evp", "asn1", "pem", "x509", "x509v3", "conf", "txt_db", "pkcs7", "pkcs12", "comp", "ocsp", "ui",
      "cms", "ts", "srp", "cmac", "ct", "async", "kdf", "store"
      ];
+diff -up openssl-1.1.1b/crypto/cmac/cm_pmeth.c.fips openssl-1.1.1b/crypto/cmac/cm_pmeth.c
+--- openssl-1.1.1b/crypto/cmac/cm_pmeth.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/cmac/cm_pmeth.c	2019-05-06 14:55:32.866749109 +0200
+@@ -129,7 +129,7 @@ static int pkey_cmac_ctrl_str(EVP_PKEY_C
+ 
+ const EVP_PKEY_METHOD cmac_pkey_meth = {
+     EVP_PKEY_CMAC,
+-    EVP_PKEY_FLAG_SIGCTX_CUSTOM,
++    EVP_PKEY_FLAG_SIGCTX_CUSTOM | EVP_PKEY_FLAG_FIPS,
+     pkey_cmac_init,
+     pkey_cmac_copy,
+     pkey_cmac_cleanup,
 diff -up openssl-1.1.1b/crypto/dh/dh_err.c.fips openssl-1.1.1b/crypto/dh/dh_err.c
 --- openssl-1.1.1b/crypto/dh/dh_err.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/dh/dh_err.c	2019-02-28 11:30:06.779746172 +0100
@@ -284,6 +322,27 @@ diff -up openssl-1.1.1b/crypto/dh/dh_key.c.fips openssl-1.1.1b/crypto/dh/dh_key.
      dh->flags |= DH_FLAG_CACHE_MONT_P;
      return 1;
  }
+diff -up openssl-1.1.1b/crypto/dh/dh_pmeth.c.fips openssl-1.1.1b/crypto/dh/dh_pmeth.c
+--- openssl-1.1.1b/crypto/dh/dh_pmeth.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/dh/dh_pmeth.c	2019-05-06 14:57:29.184723430 +0200
+@@ -480,7 +480,7 @@ static int pkey_dh_derive(EVP_PKEY_CTX *
+ 
+ const EVP_PKEY_METHOD dh_pkey_meth = {
+     EVP_PKEY_DH,
+-    0,
++    EVP_PKEY_FLAG_FIPS,
+     pkey_dh_init,
+     pkey_dh_copy,
+     pkey_dh_cleanup,
+@@ -514,7 +514,7 @@ const EVP_PKEY_METHOD dh_pkey_meth = {
+ 
+ const EVP_PKEY_METHOD dhx_pkey_meth = {
+     EVP_PKEY_DHX,
+-    0,
++    EVP_PKEY_FLAG_FIPS,
+     pkey_dh_init,
+     pkey_dh_copy,
+     pkey_dh_cleanup,
 diff -up openssl-1.1.1b/crypto/dsa/dsa_err.c.fips openssl-1.1.1b/crypto/dsa/dsa_err.c
 --- openssl-1.1.1b/crypto/dsa/dsa_err.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/dsa/dsa_err.c	2019-02-28 11:30:06.798745819 +0100
@@ -638,6 +697,15 @@ diff -up openssl-1.1.1b/crypto/dsa/dsa_pmeth.c.fips openssl-1.1.1b/crypto/dsa/ds
      BN_GENCB_free(pcb);
      if (ret)
          EVP_PKEY_assign_DSA(pkey, dsa);
+@@ -241,7 +241,7 @@ static int pkey_dsa_keygen(EVP_PKEY_CTX
+ 
+ const EVP_PKEY_METHOD dsa_pkey_meth = {
+     EVP_PKEY_DSA,
+-    EVP_PKEY_FLAG_AUTOARGLEN,
++    EVP_PKEY_FLAG_AUTOARGLEN | EVP_PKEY_FLAG_FIPS,
+     pkey_dsa_init,
+     pkey_dsa_copy,
+     pkey_dsa_cleanup,
 diff -up openssl-1.1.1b/crypto/ec/ecdh_ossl.c.fips openssl-1.1.1b/crypto/ec/ecdh_ossl.c
 --- openssl-1.1.1b/crypto/ec/ecdh_ossl.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/ec/ecdh_ossl.c	2019-02-28 11:30:06.801745763 +0100
@@ -772,6 +840,18 @@ diff -up openssl-1.1.1b/crypto/ec/ec_key.c.fips openssl-1.1.1b/crypto/ec/ec_key.
      ECerr(EC_F_EC_KEY_GENERATE_KEY, EC_R_OPERATION_NOT_SUPPORTED);
      return 0;
  }
+diff -up openssl-1.1.1b/crypto/ec/ec_pmeth.c.fips openssl-1.1.1b/crypto/ec/ec_pmeth.c
+--- openssl-1.1.1b/crypto/ec/ec_pmeth.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/ec/ec_pmeth.c	2019-05-06 14:47:34.651077251 +0200
+@@ -434,7 +434,7 @@ static int pkey_ec_keygen(EVP_PKEY_CTX *
+ 
+ const EVP_PKEY_METHOD ec_pkey_meth = {
+     EVP_PKEY_EC,
+-    0,
++    EVP_PKEY_FLAG_FIPS,
+     pkey_ec_init,
+     pkey_ec_copy,
+     pkey_ec_cleanup,
 diff -up openssl-1.1.1b/crypto/evp/c_allc.c.fips openssl-1.1.1b/crypto/evp/c_allc.c
 --- openssl-1.1.1b/crypto/evp/c_allc.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/evp/c_allc.c	2019-02-28 11:30:06.802745744 +0100
@@ -958,8 +1038,93 @@ diff -up openssl-1.1.1b/crypto/evp/digest.c.fips openssl-1.1.1b/crypto/evp/diges
      if (size != NULL)
 diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.c
 --- openssl-1.1.1b/crypto/evp/e_aes.c.fips	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/crypto/evp/e_aes.c	2019-02-28 11:30:06.804745707 +0100
-@@ -2794,9 +2794,9 @@ static int aes_ctr_cipher(EVP_CIPHER_CTX
++++ openssl-1.1.1b/crypto/evp/e_aes.c	2019-05-06 16:32:41.631668333 +0200
+@@ -387,22 +387,33 @@ static int aesni_xts_init_key(EVP_CIPHER
+         return 1;
+ 
+     if (key) {
++        /* The key is two half length keys in reality */
++        const int bytes = EVP_CIPHER_CTX_key_length(ctx) / 2;
++        const int bits = bytes * 8;
++
++        /*
++         * Verify that the two keys are different.
++         * 
++         * This addresses Rogaway's vulnerability.
++         * See comment in aes_xts_init_key() below.
++         */
++        if (memcmp(key, key + bytes, bytes) == 0) {
++            EVPerr(EVP_F_AESNI_XTS_INIT_KEY, EVP_R_XTS_DUPLICATED_KEYS);
++            return 0;
++        }
++
+         /* key_len is two AES keys */
+         if (enc) {
+-            aesni_set_encrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                  &xctx->ks1.ks);
++            aesni_set_encrypt_key(key, bits, &xctx->ks1.ks);
+             xctx->xts.block1 = (block128_f) aesni_encrypt;
+             xctx->stream = aesni_xts_encrypt;
+         } else {
+-            aesni_set_decrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                  &xctx->ks1.ks);
++            aesni_set_decrypt_key(key, bits, &xctx->ks1.ks);
+             xctx->xts.block1 = (block128_f) aesni_decrypt;
+             xctx->stream = aesni_xts_decrypt;
+         }
+ 
+-        aesni_set_encrypt_key(key + EVP_CIPHER_CTX_key_length(ctx) / 2,
+-                              EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                              &xctx->ks2.ks);
++        aesni_set_encrypt_key(key + bytes, bits, &xctx->ks2.ks);
+         xctx->xts.block2 = (block128_f) aesni_encrypt;
+ 
+         xctx->xts.key1 = &xctx->ks1;
+@@ -791,7 +802,21 @@ static int aes_t4_xts_init_key(EVP_CIPHE
+         return 1;
+ 
+     if (key) {
+-        int bits = EVP_CIPHER_CTX_key_length(ctx) * 4;
++        /* The key is two half length keys in reality */
++        const int bytes = EVP_CIPHER_CTX_key_length(ctx) / 2;
++        const int bits = bytes * 8;
++
++        /*
++         * Verify that the two keys are different.
++         * 
++         * This addresses Rogaway's vulnerability.
++         * See comment in aes_xts_init_key() below.
++         */
++        if (memcmp(key, key + bytes, bytes) == 0) {
++            EVPerr(EVP_F_AES_T4_XTS_INIT_KEY, EVP_R_XTS_DUPLICATED_KEYS);
++            return 0;
++        }
++
+         xctx->stream = NULL;
+         /* key_len is two AES keys */
+         if (enc) {
+@@ -808,8 +833,7 @@ static int aes_t4_xts_init_key(EVP_CIPHE
+                 return 0;
+             }
+         } else {
+-            aes_t4_set_decrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                   &xctx->ks1.ks);
++            aes_t4_set_decrypt_key(key, bits, &xctx->ks1.ks);
+             xctx->xts.block1 = (block128_f) aes_t4_decrypt;
+             switch (bits) {
+             case 128:
+@@ -823,9 +847,7 @@ static int aes_t4_xts_init_key(EVP_CIPHE
+             }
+         }
+ 
+-        aes_t4_set_encrypt_key(key + EVP_CIPHER_CTX_key_length(ctx) / 2,
+-                               EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                               &xctx->ks2.ks);
++        aes_t4_set_encrypt_key(key + bytes, bits, &xctx->ks2.ks);
+         xctx->xts.block2 = (block128_f) aes_t4_encrypt;
+ 
+         xctx->xts.key1 = &xctx->ks1;
+@@ -2794,9 +2816,9 @@ static int aes_ctr_cipher(EVP_CIPHER_CTX
      return 1;
  }
  
@@ -972,7 +1137,7 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
  
  static int aes_gcm_cleanup(EVP_CIPHER_CTX *c)
  {
-@@ -2826,6 +2826,11 @@ static int aes_gcm_ctrl(EVP_CIPHER_CTX *
+@@ -2826,6 +2848,11 @@ static int aes_gcm_ctrl(EVP_CIPHER_CTX *
      case EVP_CTRL_AEAD_SET_IVLEN:
          if (arg <= 0)
              return 0;
@@ -984,7 +1149,7 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
          /* Allocate memory for IV if needed */
          if ((arg > EVP_MAX_IV_LENGTH) && (arg > gctx->ivlen)) {
              if (gctx->iv != c->iv)
-@@ -3275,11 +3280,14 @@ static int aes_gcm_cipher(EVP_CIPHER_CTX
+@@ -3275,11 +3302,14 @@ static int aes_gcm_cipher(EVP_CIPHER_CTX
                  | EVP_CIPH_CUSTOM_COPY)
  
  BLOCK_CIPHER_custom(NID_aes, 128, 1, 12, gcm, GCM,
@@ -1002,7 +1167,123 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
  
  static int aes_xts_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
  {
-@@ -3414,6 +3422,14 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
+@@ -3313,8 +3343,33 @@ static int aes_xts_init_key(EVP_CIPHER_C
+     if (!iv && !key)
+         return 1;
+ 
+-    if (key)
++    if (key) {
+         do {
++            /* The key is two half length keys in reality */
++            const int bytes = EVP_CIPHER_CTX_key_length(ctx) / 2;
++            const int bits = bytes * 8;
++
++            /*
++             * Verify that the two keys are different.
++             *
++             * This addresses the vulnerability described in Rogaway's
++             * September 2004 paper:
++             *
++             *      "Efficient Instantiations of Tweakable Blockciphers and
++             *       Refinements to Modes OCB and PMAC".
++             *      (http://web.cs.ucdavis.edu/~rogaway/papers/offsets.pdf)
++             *
++             * FIPS 140-2 IG A.9 XTS-AES Key Generation Requirements states
++             * that:
++             *      "The check for Key_1 != Key_2 shall be done at any place
++             *       BEFORE using the keys in the XTS-AES algorithm to process
++             *       data with them."
++             */
++            if (memcmp(key, key + bytes, bytes) == 0) {
++                EVPerr(EVP_F_AES_XTS_INIT_KEY, EVP_R_XTS_DUPLICATED_KEYS);
++                return 0;
++            }
++
+ #ifdef AES_XTS_ASM
+             xctx->stream = enc ? AES_xts_encrypt : AES_xts_decrypt;
+ #else
+@@ -3324,26 +3379,20 @@ static int aes_xts_init_key(EVP_CIPHER_C
+ #ifdef HWAES_CAPABLE
+             if (HWAES_CAPABLE) {
+                 if (enc) {
+-                    HWAES_set_encrypt_key(key,
+-                                          EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                          &xctx->ks1.ks);
++                    HWAES_set_encrypt_key(key, bits, &xctx->ks1.ks);
+                     xctx->xts.block1 = (block128_f) HWAES_encrypt;
+ # ifdef HWAES_xts_encrypt
+                     xctx->stream = HWAES_xts_encrypt;
+ # endif
+                 } else {
+-                    HWAES_set_decrypt_key(key,
+-                                          EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                          &xctx->ks1.ks);
++                    HWAES_set_decrypt_key(key, bits, &xctx->ks1.ks);
+                     xctx->xts.block1 = (block128_f) HWAES_decrypt;
+ # ifdef HWAES_xts_decrypt
+                     xctx->stream = HWAES_xts_decrypt;
+ #endif
+                 }
+ 
+-                HWAES_set_encrypt_key(key + EVP_CIPHER_CTX_key_length(ctx) / 2,
+-                                      EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                      &xctx->ks2.ks);
++                HWAES_set_encrypt_key(key + bytes, bits, &xctx->ks2.ks);
+                 xctx->xts.block2 = (block128_f) HWAES_encrypt;
+ 
+                 xctx->xts.key1 = &xctx->ks1;
+@@ -3358,20 +3407,14 @@ static int aes_xts_init_key(EVP_CIPHER_C
+ #ifdef VPAES_CAPABLE
+             if (VPAES_CAPABLE) {
+                 if (enc) {
+-                    vpaes_set_encrypt_key(key,
+-                                          EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                          &xctx->ks1.ks);
++                    vpaes_set_encrypt_key(key, bits, &xctx->ks1.ks);
+                     xctx->xts.block1 = (block128_f) vpaes_encrypt;
+                 } else {
+-                    vpaes_set_decrypt_key(key,
+-                                          EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                          &xctx->ks1.ks);
++                    vpaes_set_decrypt_key(key, bits, &xctx->ks1.ks);
+                     xctx->xts.block1 = (block128_f) vpaes_decrypt;
+                 }
+ 
+-                vpaes_set_encrypt_key(key + EVP_CIPHER_CTX_key_length(ctx) / 2,
+-                                      EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                      &xctx->ks2.ks);
++                vpaes_set_encrypt_key(key + bytes, bits, &xctx->ks2.ks);
+                 xctx->xts.block2 = (block128_f) vpaes_encrypt;
+ 
+                 xctx->xts.key1 = &xctx->ks1;
+@@ -3381,22 +3424,19 @@ static int aes_xts_init_key(EVP_CIPHER_C
+                 (void)0;        /* terminate potentially open 'else' */
+ 
+             if (enc) {
+-                AES_set_encrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                    &xctx->ks1.ks);
++                AES_set_encrypt_key(key, bits, &xctx->ks1.ks);
+                 xctx->xts.block1 = (block128_f) AES_encrypt;
+             } else {
+-                AES_set_decrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                    &xctx->ks1.ks);
++                AES_set_decrypt_key(key, bits, &xctx->ks1.ks);
+                 xctx->xts.block1 = (block128_f) AES_decrypt;
+             }
+ 
+-            AES_set_encrypt_key(key + EVP_CIPHER_CTX_key_length(ctx) / 2,
+-                                EVP_CIPHER_CTX_key_length(ctx) * 4,
+-                                &xctx->ks2.ks);
++            AES_set_encrypt_key(key + bytes, bits, &xctx->ks2.ks);
+             xctx->xts.block2 = (block128_f) AES_encrypt;
+ 
+             xctx->xts.key1 = &xctx->ks1;
+         } while (0);
++    }
+ 
+     if (iv) {
+         xctx->xts.key2 = &xctx->ks2;
+@@ -3414,6 +3454,14 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
          return 0;
      if (!out || !in || len < AES_BLOCK_SIZE)
          return 0;
@@ -1017,7 +1298,7 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
      if (xctx->stream)
          (*xctx->stream) (in, out, len,
                           xctx->xts.key1, xctx->xts.key2,
-@@ -3431,8 +3447,10 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
+@@ -3431,8 +3479,10 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
                           | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT \
                           | EVP_CIPH_CUSTOM_COPY)
  
@@ -1030,7 +1311,7 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
  
  static int aes_ccm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
  {
-@@ -3697,11 +3715,11 @@ static int aes_ccm_cipher(EVP_CIPHER_CTX
+@@ -3697,11 +3747,11 @@ static int aes_ccm_cipher(EVP_CIPHER_CTX
  #define aes_ccm_cleanup NULL
  
  BLOCK_CIPHER_custom(NID_aes, 128, 1, 12, ccm, CCM,
@@ -1045,7 +1326,7 @@ diff -up openssl-1.1.1b/crypto/evp/e_aes.c.fips openssl-1.1.1b/crypto/evp/e_aes.
  
  typedef struct {
      union {
-@@ -3794,7 +3812,7 @@ static int aes_wrap_cipher(EVP_CIPHER_CT
+@@ -3794,7 +3844,7 @@ static int aes_wrap_cipher(EVP_CIPHER_CT
      return rv ? (int)rv : -1;
  }
  
@@ -1176,12 +1457,21 @@ diff -up openssl-1.1.1b/crypto/evp/evp_enc.c.fips openssl-1.1.1b/crypto/evp/evp_
          if (!ctx->cipher->init(ctx, key, iv, enc))
 diff -up openssl-1.1.1b/crypto/evp/evp_err.c.fips openssl-1.1.1b/crypto/evp/evp_err.c
 --- openssl-1.1.1b/crypto/evp/evp_err.c.fips	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/crypto/evp/evp_err.c	2019-02-28 11:30:06.805745688 +0100
-@@ -20,6 +20,7 @@ static const ERR_STRING_DATA EVP_str_fun
++++ openssl-1.1.1b/crypto/evp/evp_err.c	2019-05-06 16:41:08.565739361 +0200
+@@ -15,11 +15,16 @@
+ 
+ static const ERR_STRING_DATA EVP_str_functs[] = {
+     {ERR_PACK(ERR_LIB_EVP, EVP_F_AESNI_INIT_KEY, 0), "aesni_init_key"},
++    {ERR_PACK(ERR_LIB_EVP, EVP_F_AESNI_XTS_INIT_KEY, 0), "aesni_xts_init_key"},
+     {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_GCM_CTRL, 0), "aes_gcm_ctrl"},
+     {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_INIT_KEY, 0), "aes_init_key"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_OCB_CIPHER, 0), "aes_ocb_cipher"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_T4_INIT_KEY, 0), "aes_t4_init_key"},
++    {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_T4_XTS_INIT_KEY, 0),
++     "aes_t4_xts_init_key"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_WRAP_CIPHER, 0), "aes_wrap_cipher"},
 +    {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_XTS_CIPHER, 0), "aes_xts_cipher"},
++    {ERR_PACK(ERR_LIB_EVP, EVP_F_AES_XTS_INIT_KEY, 0), "aes_xts_init_key"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_ALG_MODULE_INIT, 0), "alg_module_init"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_ARIA_CCM_INIT_KEY, 0), "aria_ccm_init_key"},
      {ERR_PACK(ERR_LIB_EVP, EVP_F_ARIA_GCM_CTRL, 0), "aria_gcm_ctrl"},
@@ -1201,6 +1491,17 @@ diff -up openssl-1.1.1b/crypto/evp/evp_err.c.fips openssl-1.1.1b/crypto/evp/evp_
      {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_UNKNOWN_CIPHER), "unknown cipher"},
      {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_UNKNOWN_DIGEST), "unknown digest"},
      {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_UNKNOWN_OPTION), "unknown option"},
+@@ -266,6 +269,10 @@ static const ERR_STRING_DATA EVP_str_rea
+     "wrap mode not allowed"},
+     {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_WRONG_FINAL_BLOCK_LENGTH),
+     "wrong final block length"},
++    {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_XTS_DATA_UNIT_IS_TOO_LARGE),
++    "xts data unit is too large"},
++    {ERR_PACK(ERR_LIB_EVP, 0, EVP_R_XTS_DUPLICATED_KEYS),
++    "xts duplicated keys"},
+     {0, NULL}
+ };
+ 
 diff -up openssl-1.1.1b/crypto/evp/evp_lib.c.fips openssl-1.1.1b/crypto/evp/evp_lib.c
 --- openssl-1.1.1b/crypto/evp/evp_lib.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/evp/evp_lib.c	2019-02-28 11:30:06.806745670 +0100
@@ -1280,6 +1581,82 @@ diff -up openssl-1.1.1b/crypto/evp/m_sha1.c.fips openssl-1.1.1b/crypto/evp/m_sha
      init512,
      update512,
      final512,
+diff -up openssl-1.1.1b/crypto/evp/m_sha3.c.fips openssl-1.1.1b/crypto/evp/m_sha3.c
+--- openssl-1.1.1b/crypto/evp/m_sha3.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/evp/m_sha3.c	2019-05-06 16:12:23.012851747 +0200
+@@ -292,7 +292,7 @@ const EVP_MD *EVP_sha3_##bitlen(void)
+         NID_sha3_##bitlen,                           \
+         NID_RSA_SHA3_##bitlen,                       \
+         bitlen / 8,                                  \
+-        EVP_MD_FLAG_DIGALGID_ABSENT,                 \
++        EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS, \
+         s390x_sha3_init,                             \
+         s390x_sha3_update,                           \
+         s390x_sha3_final,                            \
+@@ -305,7 +305,7 @@ const EVP_MD *EVP_sha3_##bitlen(void)
+         NID_sha3_##bitlen,                           \
+         NID_RSA_SHA3_##bitlen,                       \
+         bitlen / 8,                                  \
+-        EVP_MD_FLAG_DIGALGID_ABSENT,                 \
++        EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS, \
+         sha3_init,                                   \
+         sha3_update,                                 \
+         sha3_final,                                  \
+@@ -326,7 +326,7 @@ const EVP_MD *EVP_shake##bitlen(void)
+         NID_shake##bitlen,                           \
+         0,                                           \
+         bitlen / 8,                                  \
+-        EVP_MD_FLAG_XOF,                             \
++        EVP_MD_FLAG_XOF | EVP_MD_FLAG_FIPS,          \
+         s390x_shake_init,                            \
+         s390x_sha3_update,                           \
+         s390x_shake_final,                           \
+@@ -340,7 +340,7 @@ const EVP_MD *EVP_shake##bitlen(void)
+         NID_shake##bitlen,                           \
+         0,                                           \
+         bitlen / 8,                                  \
+-        EVP_MD_FLAG_XOF,                             \
++        EVP_MD_FLAG_XOF | EVP_MD_FLAG_FIPS,          \
+         shake_init,                                  \
+         sha3_update,                                 \
+         sha3_final,                                  \
+@@ -364,7 +364,7 @@ const EVP_MD *EVP_sha3_##bitlen(void)
+         NID_sha3_##bitlen,                      \
+         NID_RSA_SHA3_##bitlen,                  \
+         bitlen / 8,                             \
+-        EVP_MD_FLAG_DIGALGID_ABSENT,            \
++        EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS, \
+         sha3_init,                              \
+         sha3_update,                            \
+         sha3_final,                             \
+@@ -383,7 +383,7 @@ const EVP_MD *EVP_shake##bitlen(void)
+         NID_shake##bitlen,                      \
+         0,                                      \
+         bitlen / 8,                             \
+-        EVP_MD_FLAG_XOF,                        \
++        EVP_MD_FLAG_XOF | EVP_MD_FLAG_FIPS,     \
+         shake_init,                             \
+         sha3_update,                            \
+         sha3_final,                             \
+diff -up openssl-1.1.1b/crypto/evp/pmeth_lib.c.fips openssl-1.1.1b/crypto/evp/pmeth_lib.c
+--- openssl-1.1.1b/crypto/evp/pmeth_lib.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/evp/pmeth_lib.c	2019-05-06 15:11:33.207095983 +0200
+@@ -131,7 +131,15 @@ static EVP_PKEY_CTX *int_ctx_new(EVP_PKE
+         pmeth = ENGINE_get_pkey_meth(e, id);
+     else
+ #endif
++    {
+         pmeth = EVP_PKEY_meth_find(id);
++#ifdef OPENSSL_FIPS
++        if (!(pmeth->flags & EVP_PKEY_FLAG_FIPS) && FIPS_mode()) {
++            EVPerr(EVP_F_INT_CTX_NEW, EVP_R_DISABLED_FOR_FIPS);
++            return NULL;
++        }
++#endif
++    }
+ 
+     if (pmeth == NULL) {
+ #ifndef OPENSSL_NO_ENGINE
 diff -up openssl-1.1.1b/crypto/fips/build.info.fips openssl-1.1.1b/crypto/fips/build.info
 --- openssl-1.1.1b/crypto/fips/build.info.fips	2019-02-28 11:30:06.806745670 +0100
 +++ openssl-1.1.1b/crypto/fips/build.info	2019-02-28 11:30:06.806745670 +0100
@@ -1291,7 +1668,7 @@ diff -up openssl-1.1.1b/crypto/fips/build.info.fips openssl-1.1.1b/crypto/fips/b
 +        fips_post.c fips_drbg_ctr.c fips_drbg_hash.c fips_drbg_hmac.c \
 +        fips_drbg_lib.c fips_drbg_rand.c fips_drbg_selftest.c fips_rand_lib.c \
 +        fips_cmac_selftest.c fips_ecdh_selftest.c fips_ecdsa_selftest.c \
-+        fips_enc.c fips_md.c fips_dh_selftest.c fips_ers.c
++        fips_dh_selftest.c fips_ers.c
 +
 +PROGRAMS_NO_INST=\
 +          fips_standalone_hmac
@@ -2329,7 +2706,7 @@ diff -up openssl-1.1.1b/crypto/fips/fips_cmac_selftest.c.fips openssl-1.1.1b/cry
 +    int rv = 1;
 +
 +    for (n = 0, t = vector; n < sizeof(vector) / sizeof(vector[0]); n++, t++) {
-+        cipher = FIPS_get_cipherbynid(t->nid);
++        cipher = EVP_get_cipherbynid(t->nid);
 +        if (!cipher) {
 +            rv = -1;
 +            goto err;
@@ -3405,7 +3782,7 @@ diff -up openssl-1.1.1b/crypto/fips/fips_drbg_hash.c.fips openssl-1.1.1b/crypto/
 +{
 +    const EVP_MD *md;
 +    DRBG_HASH_CTX *hctx = &dctx->d.hash;
-+    md = FIPS_get_digestbynid(dctx->type);
++    md = EVP_get_digestbynid(dctx->type);
 +    if (!md)
 +        return -2;
 +    switch (dctx->type) {
@@ -7683,203 +8060,10 @@ diff -up openssl-1.1.1b/crypto/fips/fips_ecdsa_selftest.c.fips openssl-1.1.1b/cr
 +}
 +
 +#endif
-diff -up openssl-1.1.1b/crypto/fips/fips_enc.c.fips openssl-1.1.1b/crypto/fips/fips_enc.c
---- openssl-1.1.1b/crypto/fips/fips_enc.c.fips	2019-02-28 11:30:06.815745503 +0100
-+++ openssl-1.1.1b/crypto/fips/fips_enc.c	2019-02-28 11:30:06.814745521 +0100
-@@ -0,0 +1,189 @@
-+/* fipe/evp/fips_enc.c */
-+/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
-+ * All rights reserved.
-+ *
-+ * This package is an SSL implementation written
-+ * by Eric Young (eay@cryptsoft.com).
-+ * The implementation was written so as to conform with Netscapes SSL.
-+ * 
-+ * This library is free for commercial and non-commercial use as long as
-+ * the following conditions are aheared to.  The following conditions
-+ * apply to all code found in this distribution, be it the RC4, RSA,
-+ * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
-+ * included with this distribution is covered by the same copyright terms
-+ * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
-+ * Copyright remains Eric Young's, and as such any Copyright notices in
-+ * the code are not to be removed.
-+ * If this package is used in a product, Eric Young should be given attribution
-+ * as the author of the parts of the library used.
-+ * This can be in the form of a textual message at program startup or
-+ * in documentation (online or textual) provided with the package.
-+ * 
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ * 1. Redistributions of source code must retain the copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ * 2. Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in the
-+ *    documentation and/or other materials provided with the distribution.
-+ * 3. All advertising materials mentioning features or use of this software
-+ *    must display the following acknowledgement:
-+ *    "This product includes cryptographic software written by
-+ *     Eric Young (eay@cryptsoft.com)"
-+ *    The word 'cryptographic' can be left out if the rouines from the library
-+ *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
-+ *    the apps directory (application code) you must include an acknowledgement:
-+ *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
-+ * 
-+ * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
-+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-+ * SUCH DAMAGE.
-+ * 
-+ * The licence and distribution terms for any publically available version or
-+ * derivative of this code cannot be changed.  i.e. this code cannot simply be
-+ * copied and put under another distribution licence
-+ * [including the GNU Public Licence.]
-+ */
-+
-+#include <stdio.h>
-+#include <string.h>
-+#include <openssl/evp.h>
-+#include <openssl/err.h>
-+#include <openssl/fips.h>
-+
-+const EVP_CIPHER *FIPS_get_cipherbynid(int nid)
-+{
-+    switch (nid) {
-+    case NID_aes_128_cbc:
-+        return EVP_aes_128_cbc();
-+
-+    case NID_aes_128_ccm:
-+        return EVP_aes_128_ccm();
-+
-+    case NID_aes_128_cfb1:
-+        return EVP_aes_128_cfb1();
-+
-+    case NID_aes_128_cfb128:
-+        return EVP_aes_128_cfb128();
-+
-+    case NID_aes_128_cfb8:
-+        return EVP_aes_128_cfb8();
-+
-+    case NID_aes_128_ctr:
-+        return EVP_aes_128_ctr();
-+
-+    case NID_aes_128_ecb:
-+        return EVP_aes_128_ecb();
-+
-+    case NID_aes_128_gcm:
-+        return EVP_aes_128_gcm();
-+
-+    case NID_aes_128_ofb128:
-+        return EVP_aes_128_ofb();
-+
-+    case NID_aes_128_xts:
-+        return EVP_aes_128_xts();
-+
-+    case NID_aes_192_cbc:
-+        return EVP_aes_192_cbc();
-+
-+    case NID_aes_192_ccm:
-+        return EVP_aes_192_ccm();
-+
-+    case NID_aes_192_cfb1:
-+        return EVP_aes_192_cfb1();
-+
-+    case NID_aes_192_cfb128:
-+        return EVP_aes_192_cfb128();
-+
-+    case NID_aes_192_cfb8:
-+        return EVP_aes_192_cfb8();
-+
-+    case NID_aes_192_ctr:
-+        return EVP_aes_192_ctr();
-+
-+    case NID_aes_192_ecb:
-+        return EVP_aes_192_ecb();
-+
-+    case NID_aes_192_gcm:
-+        return EVP_aes_192_gcm();
-+
-+    case NID_aes_192_ofb128:
-+        return EVP_aes_192_ofb();
-+
-+    case NID_aes_256_cbc:
-+        return EVP_aes_256_cbc();
-+
-+    case NID_aes_256_ccm:
-+        return EVP_aes_256_ccm();
-+
-+    case NID_aes_256_cfb1:
-+        return EVP_aes_256_cfb1();
-+
-+    case NID_aes_256_cfb128:
-+        return EVP_aes_256_cfb128();
-+
-+    case NID_aes_256_cfb8:
-+        return EVP_aes_256_cfb8();
-+
-+    case NID_aes_256_ctr:
-+        return EVP_aes_256_ctr();
-+
-+    case NID_aes_256_ecb:
-+        return EVP_aes_256_ecb();
-+
-+    case NID_aes_256_gcm:
-+        return EVP_aes_256_gcm();
-+
-+    case NID_aes_256_ofb128:
-+        return EVP_aes_256_ofb();
-+
-+    case NID_aes_256_xts:
-+        return EVP_aes_256_xts();
-+
-+    case NID_des_ede_ecb:
-+        return EVP_des_ede();
-+
-+    case NID_des_ede3_ecb:
-+        return EVP_des_ede3();
-+
-+    case NID_des_ede3_cbc:
-+        return EVP_des_ede3_cbc();
-+
-+    case NID_des_ede3_cfb1:
-+        return EVP_des_ede3_cfb1();
-+
-+    case NID_des_ede3_cfb64:
-+        return EVP_des_ede3_cfb64();
-+
-+    case NID_des_ede3_cfb8:
-+        return EVP_des_ede3_cfb8();
-+
-+    case NID_des_ede3_ofb64:
-+        return EVP_des_ede3_ofb();
-+
-+    case NID_des_ede_cbc:
-+        return EVP_des_ede_cbc();
-+
-+    case NID_des_ede_cfb64:
-+        return EVP_des_ede_cfb64();
-+
-+    case NID_des_ede_ofb64:
-+        return EVP_des_ede_ofb();
-+
-+    default:
-+        return NULL;
-+
-+    }
-+}
 diff -up openssl-1.1.1b/crypto/fips/fips_err.h.fips openssl-1.1.1b/crypto/fips/fips_err.h
---- openssl-1.1.1b/crypto/fips/fips_err.h.fips	2019-02-28 11:30:06.815745503 +0100
-+++ openssl-1.1.1b/crypto/fips/fips_err.h	2019-02-28 11:30:06.815745503 +0100
-@@ -0,0 +1,196 @@
+--- openssl-1.1.1b/crypto/fips/fips_err.h.fips	2019-05-06 16:08:46.792598211 +0200
++++ openssl-1.1.1b/crypto/fips/fips_err.h	2019-05-06 16:19:56.403993551 +0200
+@@ -0,0 +1,197 @@
 +/* crypto/fips_err.h */
 +/* ====================================================================
 + * Copyright (c) 1999-2011 The OpenSSL Project.  All rights reserved.
@@ -7981,6 +8165,7 @@ diff -up openssl-1.1.1b/crypto/fips/fips_err.h.fips openssl-1.1.1b/crypto/fips/f
 +    {ERR_FUNC(FIPS_F_FIPS_RAND_SET_METHOD), "FIPS_rand_set_method"},
 +    {ERR_FUNC(FIPS_F_FIPS_RAND_STATUS), "FIPS_rand_status"},
 +    {ERR_FUNC(FIPS_F_FIPS_RSA_BUILTIN_KEYGEN), "fips_rsa_builtin_keygen"},
++    {ERR_FUNC(FIPS_F_FIPS_SELFTEST), "FIPS_selftest"},
 +    {ERR_FUNC(FIPS_F_FIPS_SELFTEST_AES), "FIPS_selftest_aes"},
 +    {ERR_FUNC(FIPS_F_FIPS_SELFTEST_AES_CCM), "FIPS_selftest_aes_ccm"},
 +    {ERR_FUNC(FIPS_F_FIPS_SELFTEST_AES_GCM), "FIPS_selftest_aes_gcm"},
@@ -8300,158 +8485,10 @@ diff -up openssl-1.1.1b/crypto/fips/fips_locl.h.fips openssl-1.1.1b/crypto/fips/
 +}
 +# endif
 +#endif
-diff -up openssl-1.1.1b/crypto/fips/fips_md.c.fips openssl-1.1.1b/crypto/fips/fips_md.c
---- openssl-1.1.1b/crypto/fips/fips_md.c.fips	2019-02-28 11:30:06.815745503 +0100
-+++ openssl-1.1.1b/crypto/fips/fips_md.c	2019-02-28 11:30:06.815745503 +0100
-@@ -0,0 +1,144 @@
-+/* fips/evp/fips_md.c */
-+/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
-+ * All rights reserved.
-+ *
-+ * This package is an SSL implementation written
-+ * by Eric Young (eay@cryptsoft.com).
-+ * The implementation was written so as to conform with Netscapes SSL.
-+ * 
-+ * This library is free for commercial and non-commercial use as long as
-+ * the following conditions are aheared to.  The following conditions
-+ * apply to all code found in this distribution, be it the RC4, RSA,
-+ * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
-+ * included with this distribution is covered by the same copyright terms
-+ * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
-+ * Copyright remains Eric Young's, and as such any Copyright notices in
-+ * the code are not to be removed.
-+ * If this package is used in a product, Eric Young should be given attribution
-+ * as the author of the parts of the library used.
-+ * This can be in the form of a textual message at program startup or
-+ * in documentation (online or textual) provided with the package.
-+ * 
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ * 1. Redistributions of source code must retain the copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ * 2. Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in the
-+ *    documentation and/or other materials provided with the distribution.
-+ * 3. All advertising materials mentioning features or use of this software
-+ *    must display the following acknowledgement:
-+ *    "This product includes cryptographic software written by
-+ *     Eric Young (eay@cryptsoft.com)"
-+ *    The word 'cryptographic' can be left out if the rouines from the library
-+ *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
-+ *    the apps directory (application code) you must include an acknowledgement:
-+ *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
-+ * 
-+ * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
-+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-+ * SUCH DAMAGE.
-+ * 
-+ * The licence and distribution terms for any publically available version or
-+ * derivative of this code cannot be changed.  i.e. this code cannot simply be
-+ * copied and put under another distribution licence
-+ * [including the GNU Public Licence.]
-+ */
-+/* ====================================================================
-+ * Copyright (c) 1998-2001 The OpenSSL Project.  All rights reserved.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
-+ *
-+ * 2. Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in
-+ *    the documentation and/or other materials provided with the
-+ *    distribution.
-+ *
-+ * 3. All advertising materials mentioning features or use of this
-+ *    software must display the following acknowledgment:
-+ *    "This product includes software developed by the OpenSSL Project
-+ *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
-+ *
-+ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
-+ *    endorse or promote products derived from this software without
-+ *    prior written permission. For written permission, please contact
-+ *    openssl-core@openssl.org.
-+ *
-+ * 5. Products derived from this software may not be called "OpenSSL"
-+ *    nor may "OpenSSL" appear in their names without prior written
-+ *    permission of the OpenSSL Project.
-+ *
-+ * 6. Redistributions of any form whatsoever must retain the following
-+ *    acknowledgment:
-+ *    "This product includes software developed by the OpenSSL Project
-+ *    for use in the OpenSSL Toolkit (http://www.openssl.org/)"
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
-+ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
-+ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
-+ * OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * ====================================================================
-+ *
-+ * This product includes cryptographic software written by Eric Young
-+ * (eay@cryptsoft.com).  This product includes software written by Tim
-+ * Hudson (tjh@cryptsoft.com).
-+ *
-+ */
-+
-+/* Minimal standalone FIPS versions of Digest operations */
-+
-+#define OPENSSL_FIPSAPI
-+
-+#include <stdio.h>
-+#include <string.h>
-+#include <openssl/objects.h>
-+#include <openssl/evp.h>
-+#include <openssl/err.h>
-+#include <openssl/fips.h>
-+
-+const EVP_MD *FIPS_get_digestbynid(int nid)
-+{
-+    switch (nid) {
-+    case NID_sha1:
-+        return EVP_sha1();
-+
-+    case NID_sha224:
-+        return EVP_sha224();
-+
-+    case NID_sha256:
-+        return EVP_sha256();
-+
-+    case NID_sha384:
-+        return EVP_sha384();
-+
-+    case NID_sha512:
-+        return EVP_sha512();
-+
-+    default:
-+        return NULL;
-+    }
-+}
 diff -up openssl-1.1.1b/crypto/fips/fips_post.c.fips openssl-1.1.1b/crypto/fips/fips_post.c
---- openssl-1.1.1b/crypto/fips/fips_post.c.fips	2019-02-28 11:30:06.816745484 +0100
-+++ openssl-1.1.1b/crypto/fips/fips_post.c	2019-02-28 11:30:06.816745484 +0100
-@@ -0,0 +1,222 @@
+--- openssl-1.1.1b/crypto/fips/fips_post.c.fips	2019-05-06 16:08:46.794598177 +0200
++++ openssl-1.1.1b/crypto/fips/fips_post.c	2019-05-06 16:08:46.794598177 +0200
+@@ -0,0 +1,224 @@
 +/* ====================================================================
 + * Copyright (c) 2011 The OpenSSL Project.  All rights reserved.
 + *
@@ -8532,6 +8569,8 @@ diff -up openssl-1.1.1b/crypto/fips/fips_post.c.fips openssl-1.1.1b/crypto/fips/
 +    if (!FIPS_selftest_sha1())
 +        rv = 0;
 +    if (!FIPS_selftest_sha2())
++        rv = 0;
++    if (!FIPS_selftest_sha3())
 +        rv = 0;
 +    if (!FIPS_selftest_hmac())
 +        rv = 0;
@@ -9462,9 +9501,9 @@ diff -up openssl-1.1.1b/crypto/fips/fips_rsa_selftest.c.fips openssl-1.1.1b/cryp
 +
 +#endif                          /* def OPENSSL_FIPS */
 diff -up openssl-1.1.1b/crypto/fips/fips_sha_selftest.c.fips openssl-1.1.1b/crypto/fips/fips_sha_selftest.c
---- openssl-1.1.1b/crypto/fips/fips_sha_selftest.c.fips	2019-02-28 11:30:06.817745466 +0100
-+++ openssl-1.1.1b/crypto/fips/fips_sha_selftest.c	2019-02-28 11:30:06.816745484 +0100
-@@ -0,0 +1,138 @@
+--- openssl-1.1.1b/crypto/fips/fips_sha_selftest.c.fips	2019-05-06 16:08:46.795598159 +0200
++++ openssl-1.1.1b/crypto/fips/fips_sha_selftest.c	2019-05-06 17:35:40.211316880 +0200
+@@ -0,0 +1,223 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -9596,6 +9635,91 @@ diff -up openssl-1.1.1b/crypto/fips/fips_sha_selftest.c.fips openssl-1.1.1b/cryp
 +    EVP_Digest(msg_sha512, sizeof(msg_sha512), md, NULL, EVP_sha512(), NULL);
 +    if (memcmp(dig_sha512, md, sizeof(dig_sha512))) {
 +        FIPSerr(FIPS_F_FIPS_SELFTEST_SHA2, FIPS_R_SELFTEST_FAILED);
++        return 0;
++    }
++
++    return 1;
++}
++
++static const unsigned char msg_sha3_256[] = {
++    0xa1, 0xd7, 0xce, 0x51, 0x04, 0xeb, 0x25, 0xd6,
++    0x13, 0x1b, 0xb8, 0xf6, 0x6e, 0x1f, 0xb1, 0x3f,
++    0x35, 0x23
++};
++
++static const unsigned char dig_sha3_256[] = {
++    0xee, 0x90, 0x62, 0xf3, 0x97, 0x20, 0xb8, 0x21,
++    0xb8, 0x8b, 0xe5, 0xe6, 0x46, 0x21, 0xd7, 0xe0,
++    0xca, 0x02, 0x6a, 0x9f, 0xe7, 0x24, 0x8d, 0x78,
++    0x15, 0x0b, 0x14, 0xbd, 0xba, 0xa4, 0x0b, 0xed
++};
++
++static const unsigned char msg_sha3_512[] = {
++    0x13, 0x3b, 0x49, 0x7b, 0x00, 0x93, 0x27, 0x73,
++    0xa5, 0x3b, 0xa9, 0xbf, 0x8e, 0x61, 0xd5, 0x9f,
++    0x05, 0xf4
++};
++
++static const unsigned char dig_sha3_512[] = {
++    0x78, 0x39, 0x64, 0xa1, 0xcf, 0x41, 0xd6, 0xd2,
++    0x10, 0xa8, 0xd7, 0xc8, 0x1c, 0xe6, 0x97, 0x0a,
++    0xa6, 0x2c, 0x90, 0x53, 0xcb, 0x89, 0xe1, 0x5f,
++    0x88, 0x05, 0x39, 0x57, 0xec, 0xf6, 0x07, 0xf4,
++    0x2a, 0xf0, 0x88, 0x04, 0xe7, 0x6f, 0x2f, 0xbd,
++    0xbb, 0x31, 0x80, 0x9c, 0x9e, 0xef, 0xc6, 0x0e,
++    0x23, 0x3d, 0x66, 0x24, 0x36, 0x7a, 0x3b, 0x9c,
++    0x30, 0xf8, 0xee, 0x5f, 0x65, 0xbe, 0x56, 0xac
++};
++
++static const unsigned char msg_shake_128[] = {
++    0x43, 0xbd, 0xb1, 0x1e, 0xac, 0x71, 0x03, 0x1f,
++    0x02, 0xa1, 0x1c, 0x15, 0xa1, 0x88, 0x5f, 0xa4,
++    0x28, 0x98
++};
++
++static const unsigned char dig_shake_128[] = {
++    0xde, 0x68, 0x02, 0x7d, 0xa1, 0x30, 0x66, 0x3a,
++    0x73, 0x98, 0x0e, 0x35, 0x25, 0xb8, 0x8c, 0x75
++};
++
++static const unsigned char msg_shake_256[] = {
++    0x8f, 0x84, 0xa3, 0x7d, 0xbd, 0x44, 0xd0, 0xf6,
++    0x95, 0x36, 0xc5, 0xf4, 0x44, 0x6b, 0xa3, 0x23,
++    0x9b, 0xfc
++};
++
++static const unsigned char dig_shake_256[] = {
++    0x05, 0xca, 0x83, 0x5e, 0x0c, 0xdb, 0xfa, 0xf5,
++    0x95, 0xc6, 0x86, 0x7e, 0x2d, 0x9d, 0xb9, 0x3f,
++    0xca, 0x9c, 0x8b, 0xc6, 0x65, 0x02, 0x2e, 0xdd,
++    0x6f, 0xe7, 0xb3, 0xda, 0x5e, 0x07, 0xc4, 0xcf
++};
++
++int FIPS_selftest_sha3(void)
++{
++    unsigned char md[SHA512_DIGEST_LENGTH];
++
++    EVP_Digest(msg_sha3_256, sizeof(msg_sha3_256), md, NULL, EVP_sha3_256(), NULL);
++    if (memcmp(dig_sha3_256, md, sizeof(dig_sha3_256))) {
++        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
++        return 0;
++    }
++
++    EVP_Digest(msg_sha3_512, sizeof(msg_sha3_512), md, NULL, EVP_sha3_512(), NULL);
++    if (memcmp(dig_sha3_512, md, sizeof(dig_sha3_512))) {
++        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
++        return 0;
++    }
++
++    EVP_Digest(msg_shake_128, sizeof(msg_shake_128), md, NULL, EVP_shake128(), NULL);
++    if (memcmp(dig_shake_128, md, sizeof(dig_shake_128))) {
++        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
++        return 0;
++    }
++
++    EVP_Digest(msg_shake_256, sizeof(msg_shake_256), md, NULL, EVP_shake256(), NULL);
++    if (memcmp(dig_shake_256, md, sizeof(dig_shake_256))) {
++        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
 +        return 0;
 +    }
 +
@@ -9751,10 +9875,22 @@ diff -up openssl-1.1.1b/crypto/hmac/hmac.c.fips openssl-1.1.1b/crypto/hmac/hmac.
          reset = 1;
          j = EVP_MD_block_size(md);
          if (!ossl_assert(j <= (int)sizeof(ctx->key)))
+diff -up openssl-1.1.1b/crypto/hmac/hm_pmeth.c.fips openssl-1.1.1b/crypto/hmac/hm_pmeth.c
+--- openssl-1.1.1b/crypto/hmac/hm_pmeth.c.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/crypto/hmac/hm_pmeth.c	2019-05-06 14:56:01.123257022 +0200
+@@ -180,7 +180,7 @@ static int pkey_hmac_ctrl_str(EVP_PKEY_C
+ 
+ const EVP_PKEY_METHOD hmac_pkey_meth = {
+     EVP_PKEY_HMAC,
+-    0,
++    EVP_PKEY_FLAG_FIPS,
+     pkey_hmac_init,
+     pkey_hmac_copy,
+     pkey_hmac_cleanup,
 diff -up openssl-1.1.1b/crypto/include/internal/fips_int.h.fips openssl-1.1.1b/crypto/include/internal/fips_int.h
 --- openssl-1.1.1b/crypto/include/internal/fips_int.h.fips	2019-02-28 11:30:06.817745466 +0100
 +++ openssl-1.1.1b/crypto/include/internal/fips_int.h	2019-02-28 11:30:06.817745466 +0100
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,97 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -9848,10 +9984,6 @@ diff -up openssl-1.1.1b/crypto/include/internal/fips_int.h.fips openssl-1.1.1b/c
 +                         const unsigned char *ciphertext, int len);
 +
 +void fips_set_selftest_fail(void);
-+
-+const EVP_MD *FIPS_get_digestbynid(int nid);
-+
-+const EVP_CIPHER *FIPS_get_cipherbynid(int nid);
 +
 +void FIPS_get_timevec(unsigned char *buf, unsigned long *pctr);
 +
@@ -10676,6 +10808,27 @@ diff -up openssl-1.1.1b/crypto/rsa/rsa_ossl.c.fips openssl-1.1.1b/crypto/rsa/rsa
      if (BN_num_bits(rsa->n) > OPENSSL_RSA_MAX_MODULUS_BITS) {
          RSAerr(RSA_F_RSA_OSSL_PUBLIC_DECRYPT, RSA_R_MODULUS_TOO_LARGE);
          return -1;
+diff -up openssl-1.1.1b/crypto/rsa/rsa_pmeth.c.fips openssl-1.1.1b/crypto/rsa/rsa_pmeth.c
+--- openssl-1.1.1b/crypto/rsa/rsa_pmeth.c.fips	2019-05-06 14:48:26.514174053 +0200
++++ openssl-1.1.1b/crypto/rsa/rsa_pmeth.c	2019-05-06 14:45:46.732956649 +0200
+@@ -756,7 +756,7 @@ static int pkey_rsa_keygen(EVP_PKEY_CTX
+ 
+ const EVP_PKEY_METHOD rsa_pkey_meth = {
+     EVP_PKEY_RSA,
+-    EVP_PKEY_FLAG_AUTOARGLEN,
++    EVP_PKEY_FLAG_AUTOARGLEN | EVP_PKEY_FLAG_FIPS,
+     pkey_rsa_init,
+     pkey_rsa_copy,
+     pkey_rsa_cleanup,
+@@ -838,7 +838,7 @@ static int pkey_pss_init(EVP_PKEY_CTX *c
+ 
+ const EVP_PKEY_METHOD rsa_pss_pkey_meth = {
+     EVP_PKEY_RSA_PSS,
+-    EVP_PKEY_FLAG_AUTOARGLEN,
++    EVP_PKEY_FLAG_AUTOARGLEN | EVP_PKEY_FLAG_FIPS,
+     pkey_rsa_init,
+     pkey_rsa_copy,
+     pkey_rsa_cleanup,
 diff -up openssl-1.1.1b/crypto/rsa/rsa_sign.c.fips openssl-1.1.1b/crypto/rsa/rsa_sign.c
 --- openssl-1.1.1b/crypto/rsa/rsa_sign.c.fips	2019-02-26 15:15:30.000000000 +0100
 +++ openssl-1.1.1b/crypto/rsa/rsa_sign.c	2019-02-28 11:30:06.819745428 +0100
@@ -10875,12 +11028,20 @@ diff -up openssl-1.1.1b/include/openssl/dsa.h.fips openssl-1.1.1b/include/openss
  # if OPENSSL_API_COMPAT < 0x10100000L
 diff -up openssl-1.1.1b/include/openssl/evperr.h.fips openssl-1.1.1b/include/openssl/evperr.h
 --- openssl-1.1.1b/include/openssl/evperr.h.fips	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/include/openssl/evperr.h	2019-02-28 11:30:06.821745391 +0100
-@@ -25,6 +25,7 @@ int ERR_load_EVP_strings(void);
++++ openssl-1.1.1b/include/openssl/evperr.h	2019-05-06 16:40:21.324571446 +0200
+@@ -20,11 +20,15 @@ int ERR_load_EVP_strings(void);
+  * EVP function codes.
+  */
+ # define EVP_F_AESNI_INIT_KEY                             165
++# define EVP_F_AESNI_XTS_INIT_KEY                         233
+ # define EVP_F_AES_GCM_CTRL                               196
+ # define EVP_F_AES_INIT_KEY                               133
  # define EVP_F_AES_OCB_CIPHER                             169
  # define EVP_F_AES_T4_INIT_KEY                            178
++# define EVP_F_AES_T4_XTS_INIT_KEY                        234
  # define EVP_F_AES_WRAP_CIPHER                            170
-+# define EVP_F_AES_XTS_CIPHER                             300
++# define EVP_F_AES_XTS_CIPHER                             229
++# define EVP_F_AES_XTS_INIT_KEY                           235
  # define EVP_F_ALG_MODULE_INIT                            177
  # define EVP_F_ARIA_CCM_INIT_KEY                          175
  # define EVP_F_ARIA_GCM_CTRL                              197
@@ -10900,10 +11061,31 @@ diff -up openssl-1.1.1b/include/openssl/evperr.h.fips openssl-1.1.1b/include/ope
  # define EVP_R_UNKNOWN_CIPHER                             160
  # define EVP_R_UNKNOWN_DIGEST                             161
  # define EVP_R_UNKNOWN_OPTION                             169
+@@ -190,5 +193,7 @@ int ERR_load_EVP_strings(void);
+ # define EVP_R_UNSUPPORTED_SALT_TYPE                      126
+ # define EVP_R_WRAP_MODE_NOT_ALLOWED                      170
+ # define EVP_R_WRONG_FINAL_BLOCK_LENGTH                   109
++# define EVP_R_XTS_DATA_UNIT_IS_TOO_LARGE                 191
++# define EVP_R_XTS_DUPLICATED_KEYS                        192
+ 
+ #endif
+diff -up openssl-1.1.1b/include/openssl/evp.h.fips openssl-1.1.1b/include/openssl/evp.h
+--- openssl-1.1.1b/include/openssl/evp.h.fips	2019-02-26 15:15:30.000000000 +0100
++++ openssl-1.1.1b/include/openssl/evp.h	2019-05-06 14:54:13.213136281 +0200
+@@ -1319,6 +1319,9 @@ void EVP_PKEY_asn1_set_security_bits(EVP
+  */
+ # define EVP_PKEY_FLAG_SIGCTX_CUSTOM     4
+ 
++/* Downstream modification, large value to avoid conflict */
++# define EVP_PKEY_FLAG_FIPS              0x4000
++
+ const EVP_PKEY_METHOD *EVP_PKEY_meth_find(int type);
+ EVP_PKEY_METHOD *EVP_PKEY_meth_new(int id, int flags);
+ void EVP_PKEY_meth_get0_info(int *ppkey_id, int *pflags,
 diff -up openssl-1.1.1b/include/openssl/fips.h.fips openssl-1.1.1b/include/openssl/fips.h
---- openssl-1.1.1b/include/openssl/fips.h.fips	2019-02-28 11:30:06.821745391 +0100
-+++ openssl-1.1.1b/include/openssl/fips.h	2019-02-28 11:30:06.821745391 +0100
-@@ -0,0 +1,186 @@
+--- openssl-1.1.1b/include/openssl/fips.h.fips	2019-05-06 16:08:46.800598073 +0200
++++ openssl-1.1.1b/include/openssl/fips.h	2019-05-06 16:43:12.874549821 +0200
+@@ -0,0 +1,187 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -11019,6 +11201,7 @@ diff -up openssl-1.1.1b/include/openssl/fips.h.fips openssl-1.1.1b/include/opens
 +# define FIPS_F_FIPS_RAND_SET_METHOD                      126
 +# define FIPS_F_FIPS_RAND_STATUS                          127
 +# define FIPS_F_FIPS_RSA_BUILTIN_KEYGEN                   101
++# define FIPS_F_FIPS_SELFTEST                             150
 +# define FIPS_F_FIPS_SELFTEST_AES                         110
 +# define FIPS_F_FIPS_SELFTEST_AES_CCM                     145
 +# define FIPS_F_FIPS_SELFTEST_AES_GCM                     129
@@ -11550,6 +11733,17 @@ diff -up openssl-1.1.1b/test/dsatest.c.fips openssl-1.1.1b/test/dsatest.c
          goto end;
      if (!TEST_int_eq(h, 2))
          goto end;
+diff -up openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt.fips openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt
+--- openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt.fips	2019-05-06 16:08:46.857597085 +0200
++++ openssl-1.1.1b/test/recipes/30-test_evp_data/evpciph.txt	2019-05-06 16:35:37.917563292 +0200
+@@ -1184,6 +1184,7 @@ Key = 0000000000000000000000000000000000
+ IV = 00000000000000000000000000000000
+ Plaintext = 0000000000000000000000000000000000000000000000000000000000000000
+ Ciphertext = 917cf69ebd68b2ec9b9fe9a3eadda692cd43d2f59598ed858c02c2652fbf922e
++Result = KEY_SET_ERROR
+ 
+ Cipher = aes-128-xts
+ Key = 1111111111111111111111111111111122222222222222222222222222222222
 diff -up openssl-1.1.1b/util/libcrypto.num.fips openssl-1.1.1b/util/libcrypto.num
 --- openssl-1.1.1b/util/libcrypto.num.fips	2019-02-28 11:30:06.824745335 +0100
 +++ openssl-1.1.1b/util/libcrypto.num	2019-02-28 11:33:54.284516991 +0100

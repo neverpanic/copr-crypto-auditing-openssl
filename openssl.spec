@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 7%{?dist}
+Release: 8%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -64,6 +64,7 @@ Patch50: openssl-1.1.1-ssh-kdf.patch
 # Backported fixes including security fixes
 Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
+Patch53: openssl-1.1.1-fips-crng-test.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -162,6 +163,7 @@ cp %{SOURCE13} test/
 %patch50 -p1 -b .ssh-kdf
 %patch51 -p1 -b .upstream-sync
 %patch52 -p1 -b .s390x-update
+%patch53 -p1 -b .crng-test
 
 
 %build
@@ -448,6 +450,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue May  7 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-8
+- FIPS compliance fixes
+
 * Mon May  6 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-7
 - add S390x chacha20-poly1305 assembler support from master branch
 

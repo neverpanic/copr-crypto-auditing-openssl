@@ -969,7 +969,7 @@ diff -up openssl-1.1.1b/crypto/evp/pkey_kdf.c.evp-kdf openssl-1.1.1b/crypto/evp/
 +
 +const EVP_PKEY_METHOD tls1_prf_pkey_meth = {
 +    EVP_PKEY_TLS1_PRF,
-+    0,
++    EVP_PKEY_FLAG_FIPS,
 +    pkey_kdf_init,
 +    0,
 +    pkey_kdf_cleanup,
@@ -999,7 +999,7 @@ diff -up openssl-1.1.1b/crypto/evp/pkey_kdf.c.evp-kdf openssl-1.1.1b/crypto/evp/
 +
 +const EVP_PKEY_METHOD hkdf_pkey_meth = {
 +    EVP_PKEY_HKDF,
-+    0,
++    EVP_PKEY_FLAG_FIPS,
 +    pkey_kdf_init,
 +    0,
 +    pkey_kdf_cleanup,
