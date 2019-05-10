@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1b
-Release: 8%{?dist}
+Release: 9%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -58,6 +58,7 @@ Patch43: openssl-1.1.1-ignore-bound.patch
 Patch44: openssl-1.1.1-version-override.patch
 Patch45: openssl-1.1.1-weak-ciphers.patch
 Patch46: openssl-1.1.1-seclevel.patch
+Patch47: openssl-1.1.1-ts-sha256-default.patch
 Patch48: openssl-1.1.1-fips-post-rand.patch
 Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
@@ -65,6 +66,7 @@ Patch50: openssl-1.1.1-ssh-kdf.patch
 Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
+Patch54: openssl-1.1.1-regression-fixes.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -158,12 +160,14 @@ cp %{SOURCE13} test/
 %patch44 -p1 -b .version-override
 %patch45 -p1 -b .weak-ciphers
 %patch46 -p1 -b .seclevel
+%patch47 -p1 -b .ts-sha256-default
 %patch48 -p1 -b .fips-post-rand
 %patch49 -p1 -b .evp-kdf
 %patch50 -p1 -b .ssh-kdf
 %patch51 -p1 -b .upstream-sync
 %patch52 -p1 -b .s390x-update
 %patch53 -p1 -b .crng-test
+%patch54 -p1 -b .regression
 
 
 %build
@@ -450,6 +454,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri May 10 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-9
+- Fix two small regressions
+- Change the ts application default hash to SHA256
+
 * Tue May  7 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-8
 - FIPS compliance fixes
 

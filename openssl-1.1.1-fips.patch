@@ -1,6 +1,6 @@
 diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
---- openssl-1.1.1b/apps/speed.c.fips	2019-05-07 08:56:33.531174336 +0200
-+++ openssl-1.1.1b/apps/speed.c	2019-05-07 09:43:06.673989992 +0200
+--- openssl-1.1.1b/apps/speed.c.fips	2019-05-07 11:52:35.887597899 +0200
++++ openssl-1.1.1b/apps/speed.c	2019-05-07 16:51:36.946350159 +0200
 @@ -1592,7 +1592,8 @@ int speed_main(int argc, char **argv)
              continue;
          if (strcmp(*argv, "rsa") == 0) {
@@ -22,8 +22,19 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
                  dsa_doit[R_DSA_2048] = 1;
              continue;
          }
-@@ -1640,12 +1643,12 @@ int speed_main(int argc, char **argv)
-             ecdh_doit[i] = 2;
+@@ -1633,19 +1636,21 @@ int speed_main(int argc, char **argv)
+         }
+         if (strcmp(*argv, "ecdh") == 0) {
+             for (loop = 0; loop < OSSL_NELEM(ecdh_doit); loop++)
+-                ecdh_doit[loop] = 1;
++                if(!FIPS_mode() || (loop != R_EC_X25519 && loop != R_EC_X448))
++                    ecdh_doit[loop] = 1;
+             continue;
+         }
+         if (found(*argv, ecdh_choices, &i)) {
+-            ecdh_doit[i] = 2;
++            if(!FIPS_mode() || (i != R_EC_X25519 && i != R_EC_X448))
++                ecdh_doit[i] = 2;
              continue;
          }
 -        if (strcmp(*argv, "eddsa") == 0) {
@@ -37,7 +48,7 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
              eddsa_doit[i] = 2;
              continue;
          }
-@@ -1734,23 +1737,30 @@ int speed_main(int argc, char **argv)
+@@ -1734,23 +1739,30 @@ int speed_main(int argc, char **argv)
      /* No parameters; turn on everything. */
      if ((argc == 0) && !doit[D_EVP]) {
          for (i = 0; i < ALGOR_NUM; i++)
@@ -73,7 +84,7 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
  #endif
      }
      for (i = 0; i < ALGOR_NUM; i++)
-@@ -1798,30 +1808,46 @@ int speed_main(int argc, char **argv)
+@@ -1798,30 +1810,46 @@ int speed_main(int argc, char **argv)
      AES_set_encrypt_key(key24, 192, &aes_ks2);
      AES_set_encrypt_key(key32, 256, &aes_ks3);
  #ifndef OPENSSL_NO_CAMELLIA
@@ -130,7 +141,7 @@ diff -up openssl-1.1.1b/apps/speed.c.fips openssl-1.1.1b/apps/speed.c
  #endif
  #ifndef SIGALRM
  # ifndef OPENSSL_NO_DES
-@@ -2118,6 +2144,7 @@ int speed_main(int argc, char **argv)
+@@ -2118,6 +2146,7 @@ int speed_main(int argc, char **argv)
  
          for (i = 0; i < loopargs_len; i++) {
              loopargs[i].hctx = HMAC_CTX_new();
@@ -1648,7 +1659,7 @@ diff -up openssl-1.1.1b/crypto/evp/pmeth_lib.c.fips openssl-1.1.1b/crypto/evp/pm
 +    {
          pmeth = EVP_PKEY_meth_find(id);
 +#ifdef OPENSSL_FIPS
-+        if (!(pmeth->flags & EVP_PKEY_FLAG_FIPS) && FIPS_mode()) {
++        if (pmeth && !(pmeth->flags & EVP_PKEY_FLAG_FIPS) && FIPS_mode()) {
 +            EVPerr(EVP_F_INT_CTX_NEW, EVP_R_DISABLED_FOR_FIPS);
 +            return NULL;
 +        }
@@ -9890,7 +9901,7 @@ diff -up openssl-1.1.1b/crypto/hmac/hm_pmeth.c.fips openssl-1.1.1b/crypto/hmac/h
 diff -up openssl-1.1.1b/crypto/include/internal/fips_int.h.fips openssl-1.1.1b/crypto/include/internal/fips_int.h
 --- openssl-1.1.1b/crypto/include/internal/fips_int.h.fips	2019-02-28 11:30:06.817745466 +0100
 +++ openssl-1.1.1b/crypto/include/internal/fips_int.h	2019-02-28 11:30:06.817745466 +0100
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,98 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -9954,6 +9965,7 @@ diff -up openssl-1.1.1b/crypto/include/internal/fips_int.h.fips openssl-1.1.1b/c
 +int FIPS_module_installed(void);
 +int FIPS_selftest_sha1(void);
 +int FIPS_selftest_sha2(void);
++int FIPS_selftest_sha3(void);
 +int FIPS_selftest_aes_ccm(void);
 +int FIPS_selftest_aes_gcm(void);
 +int FIPS_selftest_aes_xts(void);
