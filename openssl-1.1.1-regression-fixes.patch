@@ -22,7 +22,7 @@ diff -up openssl-1.1.1b/crypto/evp/evp_enc.c.regression openssl-1.1.1b/crypto/ev
      bl = ctx->cipher->block_size;
  
 -    if (inl <= 0) {
-+    if (in == NULL && inl <= 0) {
++    if (out != NULL && in == NULL && inl <= 0) {
          *outl = 0;
          return inl == 0;
      }
@@ -31,7 +31,7 @@ diff -up openssl-1.1.1b/crypto/evp/evp_enc.c.regression openssl-1.1.1b/crypto/ev
          cmpl = (cmpl + 7) / 8;
  
 -    if (inl <= 0) {
-+    if (in == NULL && inl <= 0) {
++    if (out != NULL && in == NULL && inl <= 0) {
          *outl = 0;
          return inl == 0;
      }
