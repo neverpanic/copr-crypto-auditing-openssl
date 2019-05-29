@@ -5221,17 +5221,16 @@ diff -up openssl-1.1.1b/test/recipes/30-test_evp_kdf.t.evp-kdf openssl-1.1.1b/te
 +use OpenSSL::Test::Simple;
 +
 +simple_test("test_evp_kdf", "evp_kdf_test");
-diff -up openssl-1.1.1b/test/recipes/30-test_evp.t.evp-kdf openssl-1.1.1b/test/recipes/30-test_evp.t
---- openssl-1.1.1b/test/recipes/30-test_evp.t.evp-kdf	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/test/recipes/30-test_evp.t	2019-02-28 13:05:05.659521326 +0100
-@@ -15,8 +15,8 @@ use OpenSSL::Test qw/:DEFAULT data_file/
+diff -up openssl-1.1.1c/test/recipes/30-test_evp.t.evp-kdf openssl-1.1.1c/test/recipes/30-test_evp.t
+--- openssl-1.1.1c/test/recipes/30-test_evp.t.evp-kdf	2019-05-29 16:55:38.236960543 +0200
++++ openssl-1.1.1c/test/recipes/30-test_evp.t	2019-05-29 16:57:46.348718012 +0200
+@@ -15,7 +15,7 @@ use OpenSSL::Test qw/:DEFAULT data_file/
  setup("test_evp");
  
  my @files = ( "evpciph.txt", "evpdigest.txt", "evpencod.txt", "evpkdf.txt",
 -    "evpmac.txt", "evppbe.txt", "evppkey.txt", "evppkey_ecc.txt",
--    "evpcase.txt" );
-+    "evppkey_kdf.txt", "evpmac.txt", "evppbe.txt", "evppkey.txt",
-+    "evppkey_ecc.txt", "evpcase.txt" );
++    "evppkey_kdf.txt", "evpmac.txt", "evppbe.txt", "evppkey.txt", "evppkey_ecc.txt",
+     "evpcase.txt", "evpccmcavs.txt" );
  
  plan tests => scalar(@files);
  

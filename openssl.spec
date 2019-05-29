@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1b
-Release: 10%{?dist}
+Version: 1.1.1c
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -454,6 +454,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed May 29 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1c-1
+- update to the 1.1.1c release
+
 * Fri May 10 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1b-10
 - Another attempt at the AES-CCM regression fix
 

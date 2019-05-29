@@ -1,40 +1,38 @@
-diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
---- openssl-1.1.1b/apps/speed.c.curves	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/apps/speed.c	2019-02-28 11:20:42.347170167 +0100
-@@ -489,82 +489,28 @@ static const OPT_PAIR rsa_choices[] = {
- static double rsa_results[RSA_NUM][2];  /* 2 ops: sign then verify */
+diff -up openssl-1.1.1c/apps/speed.c.curves openssl-1.1.1c/apps/speed.c
+--- openssl-1.1.1c/apps/speed.c.curves	2019-05-28 15:12:21.000000000 +0200
++++ openssl-1.1.1c/apps/speed.c	2019-05-29 15:36:53.332224470 +0200
+@@ -490,90 +490,30 @@ static double rsa_results[RSA_NUM][2];
  #endif /* OPENSSL_NO_RSA */
  
--#define R_EC_P160    0
--#define R_EC_P192    1
--#define R_EC_P224    2
--#define R_EC_P256    3
--#define R_EC_P384    4
--#define R_EC_P521    5
--#define R_EC_K163    6
--#define R_EC_K233    7
--#define R_EC_K283    8
--#define R_EC_K409    9
--#define R_EC_K571    10
--#define R_EC_B163    11
--#define R_EC_B233    12
--#define R_EC_B283    13
--#define R_EC_B409    14
--#define R_EC_B571    15
--#define R_EC_BRP256R1  16
--#define R_EC_BRP256T1  17
--#define R_EC_BRP384R1  18
--#define R_EC_BRP384T1  19
--#define R_EC_BRP512R1  20
--#define R_EC_BRP512T1  21
--#define R_EC_X25519  22
--#define R_EC_X448    23
-+#define R_EC_P224    0
-+#define R_EC_P256    1
-+#define R_EC_P384    2
-+#define R_EC_P521    3
-+#define R_EC_X25519  4
-+#define R_EC_X448    5
+ enum {
+-    R_EC_P160,
+-    R_EC_P192,
+     R_EC_P224,
+     R_EC_P256,
+     R_EC_P384,
+     R_EC_P521,
+-#ifndef OPENSSL_NO_EC2M
+-    R_EC_K163,
+-    R_EC_K233,
+-    R_EC_K283,
+-    R_EC_K409,
+-    R_EC_K571,
+-    R_EC_B163,
+-    R_EC_B233,
+-    R_EC_B283,
+-    R_EC_B409,
+-    R_EC_B571,
+-#endif
+-    R_EC_BRP256R1,
+-    R_EC_BRP256T1,
+-    R_EC_BRP384R1,
+-    R_EC_BRP384T1,
+-    R_EC_BRP512R1,
+-    R_EC_BRP512T1,
+     R_EC_X25519,
+     R_EC_X448
+ };
+ 
  #ifndef OPENSSL_NO_EC
  static OPT_PAIR ecdsa_choices[] = {
 -    {"ecdsap160", R_EC_P160},
@@ -43,6 +41,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
      {"ecdsap256", R_EC_P256},
      {"ecdsap384", R_EC_P384},
      {"ecdsap521", R_EC_P521},
+-# ifndef OPENSSL_NO_EC2M
 -    {"ecdsak163", R_EC_K163},
 -    {"ecdsak233", R_EC_K233},
 -    {"ecdsak283", R_EC_K283},
@@ -53,6 +52,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
 -    {"ecdsab283", R_EC_B283},
 -    {"ecdsab409", R_EC_B409},
 -    {"ecdsab571", R_EC_B571},
+-# endif
 -    {"ecdsabrp256r1", R_EC_BRP256R1},
 -    {"ecdsabrp256t1", R_EC_BRP256T1},
 -    {"ecdsabrp384r1", R_EC_BRP384R1},
@@ -71,6 +71,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
      {"ecdhp256", R_EC_P256},
      {"ecdhp384", R_EC_P384},
      {"ecdhp521", R_EC_P521},
+-# ifndef OPENSSL_NO_EC2M
 -    {"ecdhk163", R_EC_K163},
 -    {"ecdhk233", R_EC_K233},
 -    {"ecdhk283", R_EC_K283},
@@ -81,6 +82,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
 -    {"ecdhb283", R_EC_B283},
 -    {"ecdhb409", R_EC_B409},
 -    {"ecdhb571", R_EC_B571},
+-# endif
 -    {"ecdhbrp256r1", R_EC_BRP256R1},
 -    {"ecdhbrp256t1", R_EC_BRP256T1},
 -    {"ecdhbrp384r1", R_EC_BRP384R1},
@@ -90,7 +92,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
      {"ecdhx25519", R_EC_X25519},
      {"ecdhx448", R_EC_X448}
  };
-@@ -1495,29 +1441,10 @@ int speed_main(int argc, char **argv)
+@@ -1504,31 +1444,10 @@ int speed_main(int argc, char **argv)
          unsigned int bits;
      } test_curves[] = {
          /* Prime Curves */
@@ -100,6 +102,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
          {"nistp256", NID_X9_62_prime256v1, 256},
          {"nistp384", NID_secp384r1, 384},
          {"nistp521", NID_secp521r1, 521},
+-# ifndef OPENSSL_NO_EC2M
 -        /* Binary Curves */
 -        {"nistk163", NID_sect163k1, 163},
 -        {"nistk233", NID_sect233k1, 233},
@@ -111,6 +114,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
 -        {"nistb283", NID_sect283r1, 283},
 -        {"nistb409", NID_sect409r1, 409},
 -        {"nistb571", NID_sect571r1, 571},
+-# endif
 -        {"brainpoolP256r1", NID_brainpoolP256r1, 256},
 -        {"brainpoolP256t1", NID_brainpoolP256t1, 256},
 -        {"brainpoolP384r1", NID_brainpoolP384r1, 384},
@@ -120,7 +124,7 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
          /* Other and ECDH only ones */
          {"X25519", NID_X25519, 253},
          {"X448", NID_X448, 448}
-@@ -2017,9 +1944,9 @@ int speed_main(int argc, char **argv)
+@@ -2028,9 +1947,9 @@ int speed_main(int argc, char **argv)
  #  endif
  
  #  ifndef OPENSSL_NO_EC
@@ -133,46 +137,38 @@ diff -up openssl-1.1.1b/apps/speed.c.curves openssl-1.1.1b/apps/speed.c
          ecdsa_c[i][0] = ecdsa_c[i - 1][0] / 2;
          ecdsa_c[i][1] = ecdsa_c[i - 1][1] / 2;
          if (ecdsa_doit[i] <= 1 && ecdsa_c[i][0] == 0)
-@@ -2031,6 +1958,7 @@ int speed_main(int argc, char **argv)
+@@ -2042,7 +1961,7 @@ int speed_main(int argc, char **argv)
              }
          }
      }
-+#if 0
+-#   ifndef OPENSSL_NO_EC2M
++#   if 0
      ecdsa_c[R_EC_K163][0] = count / 1000;
      ecdsa_c[R_EC_K163][1] = count / 1000 / 2;
      for (i = R_EC_K233; i <= R_EC_K571; i++) {
-@@ -2059,9 +1987,9 @@ int speed_main(int argc, char **argv)
-             }
-         }
+@@ -2073,8 +1992,8 @@ int speed_main(int argc, char **argv)
      }
--
+ #   endif
+ 
 -    ecdh_c[R_EC_P160][0] = count / 1000;
 -    for (i = R_EC_P192; i <= R_EC_P521; i++) {
-+#endif
 +    ecdh_c[R_EC_P224][0] = count / 1000;
 +    for (i = R_EC_P256; i <= R_EC_P521; i++) {
          ecdh_c[i][0] = ecdh_c[i - 1][0] / 2;
          if (ecdh_doit[i] <= 1 && ecdh_c[i][0] == 0)
              ecdh_doit[i] = 0;
-@@ -2071,6 +1999,7 @@ int speed_main(int argc, char **argv)
+@@ -2084,7 +2003,7 @@ int speed_main(int argc, char **argv)
              }
          }
      }
-+#if 0
+-#   ifndef OPENSSL_NO_EC2M
++#   if 0
      ecdh_c[R_EC_K163][0] = count / 1000;
      for (i = R_EC_K233; i <= R_EC_K571; i++) {
          ecdh_c[i][0] = ecdh_c[i - 1][0] / 2;
-@@ -2116,6 +2045,7 @@ int speed_main(int argc, char **argv)
-             }
-         }
-     }
-+#endif
-     /* default iteration count for the last two EC Curves */
-     ecdh_c[R_EC_X25519][0] = count / 1800;
-     ecdh_c[R_EC_X448][0] = count / 7200;
-diff -up openssl-1.1.1b/crypto/ec/ecp_smpl.c.curves openssl-1.1.1b/crypto/ec/ecp_smpl.c
---- openssl-1.1.1b/crypto/ec/ecp_smpl.c.curves	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/crypto/ec/ecp_smpl.c	2019-02-28 11:19:30.628479300 +0100
+diff -up openssl-1.1.1c/crypto/ec/ecp_smpl.c.curves openssl-1.1.1c/crypto/ec/ecp_smpl.c
+--- openssl-1.1.1c/crypto/ec/ecp_smpl.c.curves	2019-05-28 15:12:21.000000000 +0200
++++ openssl-1.1.1c/crypto/ec/ecp_smpl.c	2019-05-29 15:30:09.071349520 +0200
 @@ -145,6 +145,11 @@ int ec_GFp_simple_group_set_curve(EC_GRO
          return 0;
      }
@@ -185,22 +181,30 @@ diff -up openssl-1.1.1b/crypto/ec/ecp_smpl.c.curves openssl-1.1.1b/crypto/ec/ecp
      if (ctx == NULL) {
          ctx = new_ctx = BN_CTX_new();
          if (ctx == NULL)
-diff -up openssl-1.1.1b/test/ecdsatest.c.curves openssl-1.1.1b/test/ecdsatest.c
---- openssl-1.1.1b/test/ecdsatest.c.curves	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/test/ecdsatest.c	2019-02-28 11:19:30.628479300 +0100
-@@ -176,6 +176,7 @@ static int x9_62_tests(void)
-     if (!change_rand())
-         goto x962_err;
+diff -up openssl-1.1.1c/test/ecdsatest.h.curves openssl-1.1.1c/test/ecdsatest.h
+--- openssl-1.1.1c/test/ecdsatest.h.curves	2019-05-29 15:30:09.010350595 +0200
++++ openssl-1.1.1c/test/ecdsatest.h	2019-05-29 15:41:24.586444294 +0200
+@@ -32,23 +32,6 @@ typedef struct {
+ } ecdsa_cavs_kat_t;
  
-+#if 0
-     if (!TEST_true(x9_62_test_internal(NID_X9_62_prime192v1,
-                  "3342403536405981729393488334694600415596881826869351677613",
-                  "5735822328888155254683894997897571951568553642892029982342")))
-@@ -186,6 +187,7 @@ static int x9_62_tests(void)
-                  "3238135532097973577080787768312505059318910517550078427819"
-                              "78505179448783")))
-         goto x962_err;
-+#endif
- 
- # ifndef OPENSSL_NO_EC2M
-     if (!TEST_true(x9_62_test_internal(NID_X9_62_c2tnb191v1,
+ static const ecdsa_cavs_kat_t ecdsa_cavs_kats[] = {
+-    /* prime KATs from X9.62 */
+-    {NID_X9_62_prime192v1, NID_sha1,
+-     "616263",                  /* "abc" */
+-     "1a8d598fc15bf0fd89030b5cb1111aeb92ae8baf5ea475fb",
+-     "0462b12d60690cdcf330babab6e69763b471f994dd702d16a563bf5ec08069705ffff65e"
+-     "5ca5c0d69716dfcb3474373902",
+-     "fa6de29746bbeb7f8bb1e761f85f7dfb2983169d82fa2f4e",
+-     "885052380ff147b734c330c43d39b2c4a89f29b0f749fead",
+-     "e9ecc78106def82bf1070cf1d4d804c3cb390046951df686"},
+-    {NID_X9_62_prime239v1, NID_sha1,
+-     "616263",                  /* "abc" */
+-     "7ef7c6fabefffdea864206e80b0b08a9331ed93e698561b64ca0f7777f3d",
+-     "045b6dc53bc61a2548ffb0f671472de6c9521a9d2d2534e65abfcbd5fe0c707fd9f1ed2e"
+-     "65f09f6ce0893baf5e8e31e6ae82ea8c3592335be906d38dee",
+-     "656c7196bf87dcc5d1f1020906df2782360d36b2de7a17ece37d503784af",
+-     "2cb7f36803ebb9c427c58d8265f11fc5084747133078fc279de874fbecb0",
+-     "2eeae988104e9c2234a3c2beb1f53bfa5dc11ff36a875d1e3ccb1f7e45cf"},
+     /* prime KATs from NIST CAVP */
+     {NID_secp224r1, NID_sha224,
+      "699325d6fc8fbbb4981a6ded3c3a54ad2e4e3db8a5669201912064c64e700c139248cdc1"

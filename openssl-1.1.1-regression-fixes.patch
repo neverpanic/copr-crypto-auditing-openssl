@@ -14,24 +14,3 @@ diff -up openssl-1.1.1b/crypto/conf/conf_lib.c.regression openssl-1.1.1b/crypto/
      ret->flags = DEFAULT_CONF_MFLAGS;
  
      return ret;
-diff -up openssl-1.1.1b/crypto/evp/evp_enc.c.regression openssl-1.1.1b/crypto/evp/evp_enc.c
---- openssl-1.1.1b/crypto/evp/evp_enc.c.regression	2019-05-07 11:52:35.982596242 +0200
-+++ openssl-1.1.1b/crypto/evp/evp_enc.c	2019-05-10 14:30:42.269243383 +0200
-@@ -338,7 +338,7 @@ static int evp_EncryptDecryptUpdate(EVP_
- 
-     bl = ctx->cipher->block_size;
- 
--    if (inl <= 0) {
-+    if (out != NULL && in == NULL && inl <= 0) {
-         *outl = 0;
-         return inl == 0;
-     }
-@@ -491,7 +491,7 @@ int EVP_DecryptUpdate(EVP_CIPHER_CTX *ct
-     if (EVP_CIPHER_CTX_test_flags(ctx, EVP_CIPH_FLAG_LENGTH_BITS))
-         cmpl = (cmpl + 7) / 8;
- 
--    if (inl <= 0) {
-+    if (out != NULL && in == NULL && inl <= 0) {
-         *outl = 0;
-         return inl == 0;
-     }
