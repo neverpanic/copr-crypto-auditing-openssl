@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1c
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -454,6 +454,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon Jun  3 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1c-3
+- add upstream patch to defer sending KeyUpdate after
+  pending writes are complete
+
 * Thu May 30 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1c-2
 - fix use of uninitialized memory
 

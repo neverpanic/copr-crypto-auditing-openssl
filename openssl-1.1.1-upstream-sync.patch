@@ -79,3 +79,380 @@ diff -up openssl-1.1.1c/crypto/rand/rand_lib.c.sync openssl-1.1.1c/crypto/rand/r
      pool = rand_pool_new(0, min_len, max_len);
      if (pool == NULL)
          return 0;
+From 6c2f347c78a530407b5310497080810094427920 Mon Sep 17 00:00:00 2001
+From: Matt Caswell <matt@openssl.org>
+Date: Wed, 17 Apr 2019 11:09:05 +0100
+Subject: [PATCH 1/2] Defer sending a KeyUpdate until after pending writes are
+ complete
+
+If we receive a KeyUpdate message (update requested) from the peer while
+we are in the middle of a write, we should defer sending the responding
+KeyUpdate message until after the current write is complete. We do this
+by waiting to send the KeyUpdate until the next time we write and there is
+no pending write data.
+
+This does imply a subtle change in behaviour. Firstly the responding
+KeyUpdate message won't be sent straight away as it is now. Secondly if
+the peer sends multiple KeyUpdates without us doing any writing then we
+will only send one response, as opposed to previously where we sent a
+response for each KeyUpdate received.
+
+Fixes #8677
+
+Reviewed-by: Ben Kaduk <kaduk@mit.edu>
+(Merged from https://github.com/openssl/openssl/pull/8773)
+
+(cherry picked from commit feb9e31c40c49de6384dd0413685e9b5a15adc99)
+---
+ ssl/record/rec_layer_s3.c | 7 +++++++
+ ssl/statem/statem_clnt.c  | 6 ------
+ ssl/statem/statem_lib.c   | 7 ++-----
+ ssl/statem/statem_srvr.c  | 6 ------
+ 4 files changed, 9 insertions(+), 17 deletions(-)
+
+diff --git a/ssl/record/rec_layer_s3.c b/ssl/record/rec_layer_s3.c
+index b2f97ef905..b65137c332 100644
+--- a/ssl/record/rec_layer_s3.c
++++ b/ssl/record/rec_layer_s3.c
+@@ -373,6 +373,13 @@ int ssl3_write_bytes(SSL *s, int type, const void *buf_, size_t len,
+ 
+     s->rlayer.wnum = 0;
+ 
++    /*
++     * If we are supposed to be sending a KeyUpdate then go into init unless we
++     * have writes pending - in which case we should finish doing that first.
++     */
++    if (wb->left == 0 && s->key_update != SSL_KEY_UPDATE_NONE)
++        ossl_statem_set_in_init(s, 1);
++
+     /*
+      * When writing early data on the server side we could be "in_init" in
+      * between receiving the EoED and the CF - but we don't want to handle those
+diff --git a/ssl/statem/statem_clnt.c b/ssl/statem/statem_clnt.c
+index 87800cd835..6410414fb6 100644
+--- a/ssl/statem/statem_clnt.c
++++ b/ssl/statem/statem_clnt.c
+@@ -473,12 +473,6 @@ static WRITE_TRAN ossl_statem_client13_write_transition(SSL *s)
+         return WRITE_TRAN_CONTINUE;
+ 
+     case TLS_ST_CR_KEY_UPDATE:
+-        if (s->key_update != SSL_KEY_UPDATE_NONE) {
+-            st->hand_state = TLS_ST_CW_KEY_UPDATE;
+-            return WRITE_TRAN_CONTINUE;
+-        }
+-        /* Fall through */
+-
+     case TLS_ST_CW_KEY_UPDATE:
+     case TLS_ST_CR_SESSION_TICKET:
+     case TLS_ST_CW_FINISHED:
+diff --git a/ssl/statem/statem_lib.c b/ssl/statem/statem_lib.c
+index c0482b0a90..2960dafa52 100644
+--- a/ssl/statem/statem_lib.c
++++ b/ssl/statem/statem_lib.c
+@@ -645,12 +645,9 @@ MSG_PROCESS_RETURN tls_process_key_update(SSL *s, PACKET *pkt)
+     /*
+      * If we get a request for us to update our sending keys too then, we need
+      * to additionally send a KeyUpdate message. However that message should
+-     * not also request an update (otherwise we get into an infinite loop). We
+-     * ignore a request for us to update our sending keys too if we already
+-     * sent close_notify.
++     * not also request an update (otherwise we get into an infinite loop).
+      */
+-    if (updatetype == SSL_KEY_UPDATE_REQUESTED
+-            && (s->shutdown & SSL_SENT_SHUTDOWN) == 0)
++    if (updatetype == SSL_KEY_UPDATE_REQUESTED)
+         s->key_update = SSL_KEY_UPDATE_NOT_REQUESTED;
+ 
+     if (!tls13_update_key(s, 0)) {
+diff --git a/ssl/statem/statem_srvr.c b/ssl/statem/statem_srvr.c
+index d454326a99..04a23320fc 100644
+--- a/ssl/statem/statem_srvr.c
++++ b/ssl/statem/statem_srvr.c
+@@ -502,12 +502,6 @@ static WRITE_TRAN ossl_statem_server13_write_transition(SSL *s)
+         return WRITE_TRAN_CONTINUE;
+ 
+     case TLS_ST_SR_KEY_UPDATE:
+-        if (s->key_update != SSL_KEY_UPDATE_NONE) {
+-            st->hand_state = TLS_ST_SW_KEY_UPDATE;
+-            return WRITE_TRAN_CONTINUE;
+-        }
+-        /* Fall through */
+-
+     case TLS_ST_SW_KEY_UPDATE:
+         st->hand_state = TLS_ST_OK;
+         return WRITE_TRAN_CONTINUE;
+-- 
+2.20.1
+
+From c8feb1039ccc4cd11e6db084df1446bf863bee1e Mon Sep 17 00:00:00 2001
+From: Matt Caswell <matt@openssl.org>
+Date: Wed, 17 Apr 2019 10:30:53 +0100
+Subject: [PATCH 2/2] Write a test for receiving a KeyUpdate (update requested)
+ while writing
+
+Reviewed-by: Ben Kaduk <kaduk@mit.edu>
+(Merged from https://github.com/openssl/openssl/pull/8773)
+
+(cherry picked from commit a77b4dba237d001073d2d1c5d55c674a196c949f)
+---
+ test/sslapitest.c | 92 +++++++++++++++++++++++++++++++++++++++++++++
+ test/ssltestlib.c | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+ test/ssltestlib.h |  3 ++
+ 3 files changed, 191 insertions(+)
+
+diff --git a/test/sslapitest.c b/test/sslapitest.c
+index 2261fe4a7a..577342644d 100644
+--- a/test/sslapitest.c
++++ b/test/sslapitest.c
+@@ -4290,6 +4290,11 @@ static int test_key_update(void)
+                 || !TEST_int_eq(SSL_read(serverssl, buf, sizeof(buf)),
+                                          strlen(mess)))
+             goto end;
++
++        if (!TEST_int_eq(SSL_write(serverssl, mess, strlen(mess)), strlen(mess))
++                || !TEST_int_eq(SSL_read(clientssl, buf, sizeof(buf)),
++                                         strlen(mess)))
++            goto end;
+     }
+ 
+     testresult = 1;
+@@ -4302,6 +4307,91 @@ static int test_key_update(void)
+ 
+     return testresult;
+ }
++
++/*
++ * Test we can handle a KeyUpdate (update requested) message while write data
++ * is pending.
++ * Test 0: Client sends KeyUpdate while Server is writing
++ * Test 1: Server sends KeyUpdate while Client is writing
++ */
++static int test_key_update_in_write(int tst)
++{
++    SSL_CTX *cctx = NULL, *sctx = NULL;
++    SSL *clientssl = NULL, *serverssl = NULL;
++    int testresult = 0;
++    char buf[20];
++    static char *mess = "A test message";
++    BIO *bretry = BIO_new(bio_s_always_retry());
++    BIO *tmp = NULL;
++    SSL *peerupdate = NULL, *peerwrite = NULL;
++
++    if (!TEST_ptr(bretry)
++            || !TEST_true(create_ssl_ctx_pair(TLS_server_method(),
++                                              TLS_client_method(),
++                                              TLS1_3_VERSION,
++                                              0,
++                                              &sctx, &cctx, cert, privkey))
++            || !TEST_true(create_ssl_objects(sctx, cctx, &serverssl, &clientssl,
++                                             NULL, NULL))
++            || !TEST_true(create_ssl_connection(serverssl, clientssl,
++                                                SSL_ERROR_NONE)))
++        goto end;
++
++    peerupdate = tst == 0 ? clientssl : serverssl;
++    peerwrite = tst == 0 ? serverssl : clientssl;
++
++    if (!TEST_true(SSL_key_update(peerupdate, SSL_KEY_UPDATE_REQUESTED))
++            || !TEST_true(SSL_do_handshake(peerupdate)))
++        goto end;
++
++    /* Swap the writing endpoint's write BIO to force a retry */
++    tmp = SSL_get_wbio(peerwrite);
++    if (!TEST_ptr(tmp) || !TEST_true(BIO_up_ref(tmp))) {
++        tmp = NULL;
++        goto end;
++    }
++    SSL_set0_wbio(peerwrite, bretry);
++    bretry = NULL;
++
++    /* Write data that we know will fail with SSL_ERROR_WANT_WRITE */
++    if (!TEST_int_eq(SSL_write(peerwrite, mess, strlen(mess)), -1)
++            || !TEST_int_eq(SSL_get_error(peerwrite, 0), SSL_ERROR_WANT_WRITE))
++        goto end;
++
++    /* Reinstate the original writing endpoint's write BIO */
++    SSL_set0_wbio(peerwrite, tmp);
++    tmp = NULL;
++
++    /* Now read some data - we will read the key update */
++    if (!TEST_int_eq(SSL_read(peerwrite, buf, sizeof(buf)), -1)
++            || !TEST_int_eq(SSL_get_error(peerwrite, 0), SSL_ERROR_WANT_READ))
++        goto end;
++
++    /*
++     * Complete the write we started previously and read it from the other
++     * endpoint
++     */
++    if (!TEST_int_eq(SSL_write(peerwrite, mess, strlen(mess)), strlen(mess))
++            || !TEST_int_eq(SSL_read(peerupdate, buf, sizeof(buf)), strlen(mess)))
++        goto end;
++
++    /* Write more data to ensure we send the KeyUpdate message back */
++    if (!TEST_int_eq(SSL_write(peerwrite, mess, strlen(mess)), strlen(mess))
++            || !TEST_int_eq(SSL_read(peerupdate, buf, sizeof(buf)), strlen(mess)))
++        goto end;
++
++    testresult = 1;
++
++ end:
++    SSL_free(serverssl);
++    SSL_free(clientssl);
++    SSL_CTX_free(sctx);
++    SSL_CTX_free(cctx);
++    BIO_free(bretry);
++    BIO_free(tmp);
++
++    return testresult;
++}
+ #endif /* OPENSSL_NO_TLS1_3 */
+ 
+ static int test_ssl_clear(int idx)
+@@ -5982,6 +6072,7 @@ int setup_tests(void)
+ #ifndef OPENSSL_NO_TLS1_3
+     ADD_ALL_TESTS(test_export_key_mat_early, 3);
+     ADD_TEST(test_key_update);
++    ADD_ALL_TESTS(test_key_update_in_write, 2);
+ #endif
+     ADD_ALL_TESTS(test_ssl_clear, 2);
+     ADD_ALL_TESTS(test_max_fragment_len_ext, OSSL_NELEM(max_fragment_len_test));
+@@ -6002,4 +6093,5 @@ int setup_tests(void)
+ void cleanup_tests(void)
+ {
+     bio_s_mempacket_test_free();
++    bio_s_always_retry_free();
+ }
+diff --git a/test/ssltestlib.c b/test/ssltestlib.c
+index 05139be750..e1038620ac 100644
+--- a/test/ssltestlib.c
++++ b/test/ssltestlib.c
+@@ -62,9 +62,11 @@ static int tls_dump_puts(BIO *bp, const char *str);
+ /* Choose a sufficiently large type likely to be unused for this custom BIO */
+ #define BIO_TYPE_TLS_DUMP_FILTER  (0x80 | BIO_TYPE_FILTER)
+ #define BIO_TYPE_MEMPACKET_TEST    0x81
++#define BIO_TYPE_ALWAYS_RETRY      0x82
+ 
+ static BIO_METHOD *method_tls_dump = NULL;
+ static BIO_METHOD *meth_mem = NULL;
++static BIO_METHOD *meth_always_retry = NULL;
+ 
+ /* Note: Not thread safe! */
+ const BIO_METHOD *bio_f_tls_dump_filter(void)
+@@ -612,6 +614,100 @@ static int mempacket_test_puts(BIO *bio, const char *str)
+     return mempacket_test_write(bio, str, strlen(str));
+ }
+ 
++static int always_retry_new(BIO *bi);
++static int always_retry_free(BIO *a);
++static int always_retry_read(BIO *b, char *out, int outl);
++static int always_retry_write(BIO *b, const char *in, int inl);
++static long always_retry_ctrl(BIO *b, int cmd, long num, void *ptr);
++static int always_retry_gets(BIO *bp, char *buf, int size);
++static int always_retry_puts(BIO *bp, const char *str);
++
++const BIO_METHOD *bio_s_always_retry(void)
++{
++    if (meth_always_retry == NULL) {
++        if (!TEST_ptr(meth_always_retry = BIO_meth_new(BIO_TYPE_ALWAYS_RETRY,
++                                                       "Always Retry"))
++            || !TEST_true(BIO_meth_set_write(meth_always_retry,
++                                             always_retry_write))
++            || !TEST_true(BIO_meth_set_read(meth_always_retry,
++                                            always_retry_read))
++            || !TEST_true(BIO_meth_set_puts(meth_always_retry,
++                                            always_retry_puts))
++            || !TEST_true(BIO_meth_set_gets(meth_always_retry,
++                                            always_retry_gets))
++            || !TEST_true(BIO_meth_set_ctrl(meth_always_retry,
++                                            always_retry_ctrl))
++            || !TEST_true(BIO_meth_set_create(meth_always_retry,
++                                              always_retry_new))
++            || !TEST_true(BIO_meth_set_destroy(meth_always_retry,
++                                               always_retry_free)))
++            return NULL;
++    }
++    return meth_always_retry;
++}
++
++void bio_s_always_retry_free(void)
++{
++    BIO_meth_free(meth_always_retry);
++}
++
++static int always_retry_new(BIO *bio)
++{
++    BIO_set_init(bio, 1);
++    return 1;
++}
++
++static int always_retry_free(BIO *bio)
++{
++    BIO_set_data(bio, NULL);
++    BIO_set_init(bio, 0);
++    return 1;
++}
++
++static int always_retry_read(BIO *bio, char *out, int outl)
++{
++    BIO_set_retry_read(bio);
++    return -1;
++}
++
++static int always_retry_write(BIO *bio, const char *in, int inl)
++{
++    BIO_set_retry_write(bio);
++    return -1;
++}
++
++static long always_retry_ctrl(BIO *bio, int cmd, long num, void *ptr)
++{
++    long ret = 1;
++
++    switch (cmd) {
++    case BIO_CTRL_FLUSH:
++        BIO_set_retry_write(bio);
++        /* fall through */
++    case BIO_CTRL_EOF:
++    case BIO_CTRL_RESET:
++    case BIO_CTRL_DUP:
++    case BIO_CTRL_PUSH:
++    case BIO_CTRL_POP:
++    default:
++        ret = 0;
++        break;
++    }
++    return ret;
++}
++
++static int always_retry_gets(BIO *bio, char *buf, int size)
++{
++    BIO_set_retry_read(bio);
++    return -1;
++}
++
++static int always_retry_puts(BIO *bio, const char *str)
++{
++    BIO_set_retry_write(bio);
++    return -1;
++}
++
+ int create_ssl_ctx_pair(const SSL_METHOD *sm, const SSL_METHOD *cm,
+                         int min_proto_version, int max_proto_version,
+                         SSL_CTX **sctx, SSL_CTX **cctx, char *certfile,
+diff --git a/test/ssltestlib.h b/test/ssltestlib.h
+index fa19e7d80d..56e323f5bc 100644
+--- a/test/ssltestlib.h
++++ b/test/ssltestlib.h
+@@ -30,6 +30,9 @@ void bio_f_tls_dump_filter_free(void);
+ const BIO_METHOD *bio_s_mempacket_test(void);
+ void bio_s_mempacket_test_free(void);
+ 
++const BIO_METHOD *bio_s_always_retry(void);
++void bio_s_always_retry_free(void);
++
+ /* Packet types - value 0 is reserved */
+ #define INJECT_PACKET                   1
+ #define INJECT_PACKET_IGNORE_REC_SEQ    2
+-- 
+2.20.1
+
