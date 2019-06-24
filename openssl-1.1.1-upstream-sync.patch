@@ -24,7 +24,7 @@ diff -up openssl-1.1.1c/crypto/err/err.c.sync openssl-1.1.1c/crypto/err/err.c
  # define NUM_SYS_STR_REASONS 127
  
  static ERR_STRING_DATA SYS_str_reasons[NUM_SYS_STR_REASONS + 1];
-@@ -219,26 +219,30 @@ static void build_SYS_str_reasons(void)
+@@ -219,21 +219,23 @@ static void build_SYS_str_reasons(void)
          ERR_STRING_DATA *str = &SYS_str_reasons[i - 1];
  
          str->error = ERR_PACK(ERR_LIB_SYS, 0, i);
@@ -35,8 +35,7 @@ diff -up openssl-1.1.1c/crypto/err/err.c.sync openssl-1.1.1c/crypto/err/err.c
 +         */
 +        if (str->string == NULL && cnt < sizeof(strerror_pool)) {
              if (openssl_strerror_r(i, cur, sizeof(strerror_pool) - cnt)) {
--                size_t l = strlen(cur);
-+                size_t l = strlen(cur) + 1;
+                 size_t l = strlen(cur);
  
                  str->string = cur;
                  cnt += l;
@@ -50,21 +49,10 @@ diff -up openssl-1.1.1c/crypto/err/err.c.sync openssl-1.1.1c/crypto/err/err.c
 +                 * some (most? all?) messages. Lets trim them off.
                   */
 -                while (ossl_isspace(cur[-1])) {
--                    cur--;
--                    cnt--;
-+                if (cur > strerror_pool && ossl_isspace(cur[-1])) {
-+                    while (cur > strerror_pool && ossl_isspace(cur[-1])) {
-+                        cur--;
-+                        cnt--;
-+                    }
-+                    *cur++ = '\0';
-+                    cnt++;
++                while (cur > strerror_pool && ossl_isspace(cur[-1])) {
+                     cur--;
+                     cnt--;
                  }
--                *cur++ = '\0';
--                cnt++;
-             }
-         }
-         if (str->string == NULL)
 diff -up openssl-1.1.1c/crypto/rand/rand_lib.c.sync openssl-1.1.1c/crypto/rand/rand_lib.c
 --- openssl-1.1.1c/crypto/rand/rand_lib.c.sync	2019-05-29 17:20:17.175099183 +0200
 +++ openssl-1.1.1c/crypto/rand/rand_lib.c	2019-05-30 11:51:20.784850208 +0200
@@ -456,3 +444,91 @@ index fa19e7d80d..56e323f5bc 100644
 -- 
 2.20.1
 
+diff -up openssl-1.1.1c/include/internal/constant_time_locl.h.valgrind openssl-1.1.1c/include/internal/constant_time_locl.h
+--- openssl-1.1.1c/include/internal/constant_time_locl.h.valgrind	2019-05-28 15:12:21.000000000 +0200
++++ openssl-1.1.1c/include/internal/constant_time_locl.h	2019-06-24 15:02:12.796053536 +0200
+@@ -213,18 +213,66 @@ static ossl_inline unsigned char constan
+     return constant_time_eq_8((unsigned)(a), (unsigned)(b));
+ }
+ 
++/* Returns the value unmodified, but avoids optimizations. */
++static ossl_inline unsigned int value_barrier(unsigned int a)
++{
++#if !defined(OPENSSL_NO_ASM) && defined(__GNUC__)
++    unsigned int r;
++    __asm__("" : "=r"(r) : "0"(a));
++#else
++    volatile unsigned int r = a;
++#endif
++    return r;
++}
++
++/* Convenience method for uint32_t. */
++static ossl_inline uint32_t value_barrier_32(uint32_t a)
++{
++#if !defined(OPENSSL_NO_ASM) && defined(__GNUC__)
++    uint32_t r;
++    __asm__("" : "=r"(r) : "0"(a));
++#else
++    volatile uint32_t r = a;
++#endif
++    return r;
++}
++
++/* Convenience method for uint64_t. */
++static ossl_inline uint64_t value_barrier_64(uint64_t a)
++{
++#if !defined(OPENSSL_NO_ASM) && defined(__GNUC__)
++    uint64_t r;
++    __asm__("" : "=r"(r) : "0"(a));
++#else
++    volatile uint64_t r = a;
++#endif
++    return r;
++}
++
++/* Convenience method for size_t. */
++static ossl_inline size_t value_barrier_s(size_t a)
++{
++#if !defined(OPENSSL_NO_ASM) && defined(__GNUC__)
++    size_t r;
++    __asm__("" : "=r"(r) : "0"(a));
++#else
++    volatile size_t r = a;
++#endif
++    return r;
++}
++
+ static ossl_inline unsigned int constant_time_select(unsigned int mask,
+                                                      unsigned int a,
+                                                      unsigned int b)
+ {
+-    return (mask & a) | (~mask & b);
++    return (value_barrier(mask) & a) | (value_barrier(~mask) & b);
+ }
+ 
+ static ossl_inline size_t constant_time_select_s(size_t mask,
+                                                  size_t a,
+                                                  size_t b)
+ {
+-    return (mask & a) | (~mask & b);
++    return (value_barrier_s(mask) & a) | (value_barrier_s(~mask) & b);
+ }
+ 
+ static ossl_inline unsigned char constant_time_select_8(unsigned char mask,
+@@ -249,13 +297,13 @@ static ossl_inline int constant_time_sel
+ static ossl_inline uint32_t constant_time_select_32(uint32_t mask, uint32_t a,
+                                                     uint32_t b)
+ {
+-    return (mask & a) | (~mask & b);
++    return (value_barrier_32(mask) & a) | (value_barrier_32(~mask) & b);
+ }
+ 
+ static ossl_inline uint64_t constant_time_select_64(uint64_t mask, uint64_t a,
+                                                     uint64_t b)
+ {
+-    return (mask & a) | (~mask & b);
++    return (value_barrier_64(mask) & a) | (value_barrier_64(~mask) & b);
+ }
+ 
+ /*
