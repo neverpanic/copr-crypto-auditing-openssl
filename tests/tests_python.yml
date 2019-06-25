@@ -10,7 +10,7 @@
     tests:
     - python_selftest:
         dir: python/selftest
-        run: VERSION=3.7 X="test_ssl test_hashlib test_ftplib test_httplib test_imaplib test_logging test_nntplib test_poplib test_urllib2_localnet test_urllib test_xmlrpc" ./parallel.sh
+        run: VERSION=3.7 X="test_ssl test_asyncio test_hashlib test_ftplib test_httplib test_imaplib test_logging test_nntplib test_poplib test_urllib2_localnet test_urllib test_xmlrpc" ./parallel.sh
     required_packages:
     - gcc  # for extension building in venv and selftest
     - python3-tkinter  # for selftest
