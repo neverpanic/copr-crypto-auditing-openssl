@@ -454,6 +454,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Sep  6 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1c-6
+- upstream fix for status request extension non-compliance (#1737471)
+
 * Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.1c-5
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
 
