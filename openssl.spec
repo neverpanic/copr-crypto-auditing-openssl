@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1c
-Release: 6%{?dist}
+Version: 1.1.1d
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -40,7 +40,7 @@ Source13: ectest.c
 # Build changes
 Patch1: openssl-1.1.1-build.patch
 Patch2: openssl-1.1.1-defaults.patch
-Patch3: openssl-1.1.0-no-html.patch
+Patch3: openssl-1.1.1-no-html.patch
 Patch4: openssl-1.1.1-man-rename.patch
 # Bug fixes
 Patch21: openssl-1.1.0-issuer-hash.patch
@@ -454,6 +454,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Sep 13 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-1
+- update to the 1.1.1d release
+
 * Fri Sep  6 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1c-6
 - upstream fix for status request extension non-compliance (#1737471)
 

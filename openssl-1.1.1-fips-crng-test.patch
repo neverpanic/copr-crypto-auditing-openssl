@@ -1,7 +1,7 @@
-diff -up openssl-1.1.1b/crypto/include/internal/rand_int.h.crng-test openssl-1.1.1b/crypto/include/internal/rand_int.h
---- openssl-1.1.1b/crypto/include/internal/rand_int.h.crng-test	2019-05-07 08:56:33.242179136 +0200
-+++ openssl-1.1.1b/crypto/include/internal/rand_int.h	2019-05-07 09:54:14.920204875 +0200
-@@ -49,6 +49,14 @@ size_t rand_drbg_get_additional_data(RAN
+diff -up openssl-1.1.1d/crypto/include/internal/rand_int.h.crng-test openssl-1.1.1d/crypto/include/internal/rand_int.h
+--- openssl-1.1.1d/crypto/include/internal/rand_int.h.crng-test	2019-09-13 16:03:54.572238927 +0200
++++ openssl-1.1.1d/crypto/include/internal/rand_int.h	2019-09-13 16:03:54.966232056 +0200
+@@ -48,6 +48,14 @@ size_t rand_drbg_get_additional_data(RAN
  
  void rand_drbg_cleanup_additional_data(RAND_POOL *pool, unsigned char *out);
  
@@ -16,18 +16,18 @@ diff -up openssl-1.1.1b/crypto/include/internal/rand_int.h.crng-test openssl-1.1
  /*
   * RAND_POOL functions
   */
-diff -up openssl-1.1.1b/crypto/rand/build.info.crng-test openssl-1.1.1b/crypto/rand/build.info
---- openssl-1.1.1b/crypto/rand/build.info.crng-test	2019-05-07 09:54:14.921204857 +0200
-+++ openssl-1.1.1b/crypto/rand/build.info	2019-05-07 09:55:22.730014705 +0200
+diff -up openssl-1.1.1d/crypto/rand/build.info.crng-test openssl-1.1.1d/crypto/rand/build.info
+--- openssl-1.1.1d/crypto/rand/build.info.crng-test	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/crypto/rand/build.info	2019-09-13 16:03:54.968232021 +0200
 @@ -1,4 +1,4 @@
  LIBS=../../libcrypto
  SOURCE[../../libcrypto]=\
 -        randfile.c rand_lib.c rand_err.c rand_egd.c \
 +        randfile.c rand_lib.c rand_err.c rand_crng_test.c rand_egd.c \
          rand_win.c rand_unix.c rand_vms.c drbg_lib.c drbg_ctr.c
-diff -up openssl-1.1.1b/crypto/rand/drbg_lib.c.crng-test openssl-1.1.1b/crypto/rand/drbg_lib.c
---- openssl-1.1.1b/crypto/rand/drbg_lib.c.crng-test	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/crypto/rand/drbg_lib.c	2019-05-07 10:04:51.753157224 +0200
+diff -up openssl-1.1.1d/crypto/rand/drbg_lib.c.crng-test openssl-1.1.1d/crypto/rand/drbg_lib.c
+--- openssl-1.1.1d/crypto/rand/drbg_lib.c.crng-test	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/crypto/rand/drbg_lib.c	2019-09-13 16:03:54.969232004 +0200
 @@ -67,7 +67,7 @@ static CRYPTO_THREAD_LOCAL private_drbg;
  
  
@@ -51,9 +51,9 @@ diff -up openssl-1.1.1b/crypto/rand/drbg_lib.c.crng-test openssl-1.1.1b/crypto/r
  #ifndef RAND_DRBG_GET_RANDOM_NONCE
          drbg->get_nonce = rand_drbg_get_nonce;
          drbg->cleanup_nonce = rand_drbg_cleanup_nonce;
-diff -up openssl-1.1.1b/crypto/rand/rand_crng_test.c.crng-test openssl-1.1.1b/crypto/rand/rand_crng_test.c
---- openssl-1.1.1b/crypto/rand/rand_crng_test.c.crng-test	2019-05-07 09:54:14.925204787 +0200
-+++ openssl-1.1.1b/crypto/rand/rand_crng_test.c	2019-05-07 09:54:14.932204664 +0200
+diff -up openssl-1.1.1d/crypto/rand/rand_crng_test.c.crng-test openssl-1.1.1d/crypto/rand/rand_crng_test.c
+--- openssl-1.1.1d/crypto/rand/rand_crng_test.c.crng-test	2019-09-13 16:03:54.969232004 +0200
++++ openssl-1.1.1d/crypto/rand/rand_crng_test.c	2019-09-13 16:15:20.834271063 +0200
 @@ -0,0 +1,118 @@
 +/*
 + * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
@@ -110,7 +110,7 @@ diff -up openssl-1.1.1b/crypto/rand/rand_crng_test.c.crng-test openssl-1.1.1b/cr
 +{
 +    unsigned char buf[CRNGT_BUFSIZ];
 +
-+    if ((crngt_pool = rand_pool_new(0, CRNGT_BUFSIZ, CRNGT_BUFSIZ)) == NULL)
++    if ((crngt_pool = rand_pool_new(0, 1, CRNGT_BUFSIZ, CRNGT_BUFSIZ)) == NULL)
 +        return 0;
 +    if (crngt_get_entropy(buf, crngt_prev, NULL)) {
 +        OPENSSL_cleanse(buf, sizeof(buf));
@@ -147,7 +147,7 @@ diff -up openssl-1.1.1b/crypto/rand/rand_crng_test.c.crng-test openssl-1.1.1b/cr
 +    if (!RUN_ONCE(&rand_crngt_init_flag, do_rand_crngt_init))
 +        return 0;
 +
-+    if ((pool = rand_pool_new(entropy, min_len, max_len)) == NULL)
++    if ((pool = rand_pool_new(entropy, 1, min_len, max_len)) == NULL)
 +        return 0;
 +
 +    while ((q = rand_pool_bytes_needed(pool, 1)) > 0 && attempts-- > 0) {
@@ -173,9 +173,9 @@ diff -up openssl-1.1.1b/crypto/rand/rand_crng_test.c.crng-test openssl-1.1.1b/cr
 +{
 +    OPENSSL_secure_clear_free(out, outlen);
 +}
-diff -up openssl-1.1.1b/crypto/rand/rand_lcl.h.crng-test openssl-1.1.1b/crypto/rand/rand_lcl.h
---- openssl-1.1.1b/crypto/rand/rand_lcl.h.crng-test	2019-05-07 08:56:33.330177674 +0200
-+++ openssl-1.1.1b/crypto/rand/rand_lcl.h	2019-05-07 09:54:14.933204647 +0200
+diff -up openssl-1.1.1d/crypto/rand/rand_lcl.h.crng-test openssl-1.1.1d/crypto/rand/rand_lcl.h
+--- openssl-1.1.1d/crypto/rand/rand_lcl.h.crng-test	2019-09-13 16:03:54.653237514 +0200
++++ openssl-1.1.1d/crypto/rand/rand_lcl.h	2019-09-13 16:03:54.969232004 +0200
 @@ -33,7 +33,15 @@
  # define MASTER_RESEED_TIME_INTERVAL             (60*60)   /* 1 hour */
  # define SLAVE_RESEED_TIME_INTERVAL              (7*60)    /* 7 minutes */
@@ -193,17 +193,16 @@ diff -up openssl-1.1.1b/crypto/rand/rand_lcl.h.crng-test openssl-1.1.1b/crypto/r
  
  /*
   * Maximum input size for the DRBG (entropy, nonce, personalization string)
-@@ -44,7 +52,8 @@
+@@ -44,6 +52,8 @@
   */
  # define DRBG_MAX_LENGTH                         INT32_MAX
  
--
 +/* The default nonce */
 +# define DRBG_DEFAULT_PERS_STRING                "OpenSSL NIST SP 800-90A DRBG"
  
  /*
   * Maximum allocation size for RANDOM_POOL buffers
-@@ -290,4 +299,22 @@ int rand_drbg_enable_locking(RAND_DRBG *
+@@ -296,4 +306,22 @@ int rand_drbg_enable_locking(RAND_DRBG *
  /* initializes the AES-CTR DRBG implementation */
  int drbg_ctr_init(RAND_DRBG *drbg);
  
@@ -226,10 +225,10 @@ diff -up openssl-1.1.1b/crypto/rand/rand_lcl.h.crng-test openssl-1.1.1b/crypto/r
 +int rand_crngt_single_init(void);
 +
  #endif
-diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
---- openssl-1.1.1b/test/drbgtest.c.crng-test	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/test/drbgtest.c	2019-05-07 10:06:24.706551561 +0200
-@@ -143,6 +143,31 @@ static size_t kat_nonce(RAND_DRBG *drbg,
+diff -up openssl-1.1.1d/test/drbgtest.c.crng-test openssl-1.1.1d/test/drbgtest.c
+--- openssl-1.1.1d/test/drbgtest.c.crng-test	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/test/drbgtest.c	2019-09-13 16:03:54.969232004 +0200
+@@ -150,6 +150,31 @@ static size_t kat_nonce(RAND_DRBG *drbg,
      return t->noncelen;
  }
  
@@ -261,7 +260,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
  static int uninstantiate(RAND_DRBG *drbg)
  {
      int ret = drbg == NULL ? 1 : RAND_DRBG_uninstantiate(drbg);
-@@ -168,7 +193,8 @@ static int single_kat(DRBG_SELFTEST_DATA
+@@ -175,7 +200,8 @@ static int single_kat(DRBG_SELFTEST_DATA
      if (!TEST_ptr(drbg = RAND_DRBG_new(td->nid, td->flags, NULL)))
          return 0;
      if (!TEST_true(RAND_DRBG_set_callbacks(drbg, kat_entropy, NULL,
@@ -271,7 +270,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
          failures++;
          goto err;
      }
-@@ -286,7 +312,8 @@ static int error_check(DRBG_SELFTEST_DAT
+@@ -293,7 +319,8 @@ static int error_check(DRBG_SELFTEST_DAT
      unsigned int reseed_counter_tmp;
      int ret = 0;
  
@@ -281,7 +280,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
          goto err;
  
      /*
-@@ -699,6 +726,10 @@ static int test_rand_drbg_reseed(void)
+@@ -740,6 +767,10 @@ static int test_rand_drbg_reseed(void)
          || !TEST_ptr_eq(private->parent, master))
          return 0;
  
@@ -292,7 +291,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
      /* uninstantiate the three global DRBGs */
      RAND_DRBG_uninstantiate(private);
      RAND_DRBG_uninstantiate(public);
-@@ -919,7 +950,8 @@ static int test_rand_seed(void)
+@@ -964,7 +995,8 @@ static int test_rand_seed(void)
      size_t rand_buflen;
      size_t required_seed_buflen = 0;
  
@@ -302,7 +301,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
          return 0;
  
  #ifdef OPENSSL_RAND_SEED_NONE
-@@ -968,6 +1000,95 @@ static int test_rand_add(void)
+@@ -1013,6 +1045,95 @@ static int test_rand_add(void)
      return 1;
  }
  
@@ -398,7 +397,7 @@ diff -up openssl-1.1.1b/test/drbgtest.c.crng-test openssl-1.1.1b/test/drbgtest.c
  int setup_tests(void)
  {
      app_data_index = RAND_DRBG_get_ex_new_index(0L, NULL, NULL, NULL, NULL);
-@@ -980,5 +1101,6 @@ int setup_tests(void)
+@@ -1025,5 +1146,6 @@ int setup_tests(void)
  #if defined(OPENSSL_THREADS)
      ADD_TEST(test_multi_thread);
  #endif

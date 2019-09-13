@@ -1,17 +1,16 @@
-diff -up openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in.no-brainpool openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in
---- openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in.no-brainpool	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in	2019-05-07 11:52:35.885597934 +0200
-@@ -141,22 +141,23 @@ our @tests = (
+diff -up openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.in.no-brainpool openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.in
+--- openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.in.no-brainpool	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.in	2019-09-13 15:11:07.358687169 +0200
+@@ -147,22 +147,22 @@ our @tests = (
      {
          name => "ECDSA with brainpool",
          server =>  {
 -            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
 -            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
 -            "Groups" => "brainpoolP256r1",
-+#            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
-+#            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
++            "Certificate" => test_pem("server-ecdsa-cert.pem"),
++            "PrivateKey" => test_pem("server-ecdsa-key.pem"),
 +#            "Groups" => "brainpoolP256r1",
-+            "CipherString" => "aNULL",
          },
          client => {
              #We don't restrict this to TLSv1.2, although use of brainpool
@@ -32,17 +31,16 @@ diff -up openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in.no-brainpool opens
              "ExpectedResult" => "Success"
          },
      },
-@@ -787,18 +788,19 @@ my @tests_tls_1_3 = (
+@@ -853,18 +853,18 @@ my @tests_tls_1_3 = (
      {
          name => "TLS 1.3 ECDSA with brainpool",
          server =>  {
 -            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
 -            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
 -            "Groups" => "brainpoolP256r1",
-+#            "Certificate" => test_pem("server-ecdsa-brainpoolP256r1-cert.pem"),
-+#            "PrivateKey" => test_pem("server-ecdsa-brainpoolP256r1-key.pem"),
++            "Certificate" => test_pem("server-ecdsa-cert.pem"),
++            "PrivateKey" => test_pem("server-ecdsa-key.pem"),
 +#            "Groups" => "brainpoolP256r1",
-+             "CipherString" => "aNULL",
          },
          client => {
              "RequestCAFile" => test_pem("root-cert.pem"),
@@ -57,20 +55,19 @@ diff -up openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.in.no-brainpool opens
          },
      },
  );
-diff -up openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.no-brainpool openssl-1.1.1b/test/ssl-tests/20-cert-select.conf
---- openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.no-brainpool	2019-02-26 15:15:30.000000000 +0100
-+++ openssl-1.1.1b/test/ssl-tests/20-cert-select.conf	2019-05-07 12:15:12.762907496 +0200
-@@ -233,23 +233,18 @@ server = 5-ECDSA with brainpool-server
+diff -up openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.no-brainpool openssl-1.1.1d/test/ssl-tests/20-cert-select.conf
+--- openssl-1.1.1d/test/ssl-tests/20-cert-select.conf.no-brainpool	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/test/ssl-tests/20-cert-select.conf	2019-09-13 15:12:27.380288469 +0200
+@@ -238,23 +238,18 @@ server = 5-ECDSA with brainpool-server
  client = 5-ECDSA with brainpool-client
  
  [5-ECDSA with brainpool-server]
 -Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
--CipherString = DEFAULT
++Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
+ CipherString = DEFAULT
 -Groups = brainpoolP256r1
 -PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
-+Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
-+CipherString = aNULL
-+PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
  
  [5-ECDSA with brainpool-client]
  CipherString = aECDSA
@@ -87,28 +84,27 @@ diff -up openssl-1.1.1b/test/ssl-tests/20-cert-select.conf.no-brainpool openssl-
  
  
  # ===========================================================
-@@ -1577,14 +1572,12 @@ server = 47-TLS 1.3 ECDSA with brainpool
- client = 47-TLS 1.3 ECDSA with brainpool-client
+@@ -1713,14 +1708,12 @@ server = 52-TLS 1.3 ECDSA with brainpool
+ client = 52-TLS 1.3 ECDSA with brainpool-client
  
- [47-TLS 1.3 ECDSA with brainpool-server]
+ [52-TLS 1.3 ECDSA with brainpool-server]
 -Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
--CipherString = DEFAULT
++Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
+ CipherString = DEFAULT
 -Groups = brainpoolP256r1
 -PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
-+Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
-+CipherString = aNULL
-+PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
  
- [47-TLS 1.3 ECDSA with brainpool-client]
+ [52-TLS 1.3 ECDSA with brainpool-client]
  CipherString = DEFAULT
 -Groups = brainpoolP256r1
  MaxProtocol = TLSv1.3
  MinProtocol = TLSv1.3
  RequestCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
-@@ -1592,7 +1585,7 @@ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/ro
+@@ -1728,7 +1721,7 @@ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/ro
  VerifyMode = Peer
  
- [test-47]
+ [test-52]
 -ExpectedResult = ServerFail
 +ExpectedResult = Success
  
