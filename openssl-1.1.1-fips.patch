@@ -1108,7 +1108,25 @@ diff -up openssl-1.1.1d/crypto/evp/e_aes.c.fips openssl-1.1.1d/crypto/evp/e_aes.
          /* Allocate memory for IV if needed */
          if ((arg > EVP_MAX_IV_LENGTH) && (arg > gctx->ivlen)) {
              if (gctx->iv != c->iv)
-@@ -3380,7 +3385,7 @@ static int aes_xts_init_key(EVP_CIPHER_C
+@@ -3318,11 +3323,14 @@ static int aes_gcm_cipher(EVP_CIPHER_CTX
+                 | EVP_CIPH_CUSTOM_COPY | EVP_CIPH_CUSTOM_IV_LENGTH)
+ 
+ BLOCK_CIPHER_custom(NID_aes, 128, 1, 12, gcm, GCM,
+-                    EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
++                    EVP_CIPH_FLAG_FIPS | EVP_CIPH_FLAG_AEAD_CIPHER |
++                    CUSTOM_FLAGS)
+     BLOCK_CIPHER_custom(NID_aes, 192, 1, 12, gcm, GCM,
+-                    EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
++                    EVP_CIPH_FLAG_FIPS | EVP_CIPH_FLAG_AEAD_CIPHER |
++                    CUSTOM_FLAGS)
+     BLOCK_CIPHER_custom(NID_aes, 256, 1, 12, gcm, GCM,
+-                    EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
++                    EVP_CIPH_FLAG_FIPS | EVP_CIPH_FLAG_AEAD_CIPHER |
++                    CUSTOM_FLAGS)
+ 
+ static int aes_xts_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
+ {
+@@ -3380,7 +3388,7 @@ static int aes_xts_init_key(EVP_CIPHER_C
               *       BEFORE using the keys in the XTS-AES algorithm to process
               *       data with them."
               */
@@ -1117,7 +1135,7 @@ diff -up openssl-1.1.1d/crypto/evp/e_aes.c.fips openssl-1.1.1d/crypto/evp/e_aes.
                  EVPerr(EVP_F_AES_XTS_INIT_KEY, EVP_R_XTS_DUPLICATED_KEYS);
                  return 0;
              }
-@@ -3484,6 +3489,14 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
+@@ -3484,6 +3492,14 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
          return 0;
      if (!out || !in || len < AES_BLOCK_SIZE)
          return 0;
@@ -1132,7 +1150,7 @@ diff -up openssl-1.1.1d/crypto/evp/e_aes.c.fips openssl-1.1.1d/crypto/evp/e_aes.
      if (xctx->stream)
          (*xctx->stream) (in, out, len,
                           xctx->xts.key1, xctx->xts.key2,
-@@ -3501,8 +3514,10 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
+@@ -3501,8 +3517,10 @@ static int aes_xts_cipher(EVP_CIPHER_CTX
                           | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT \
                           | EVP_CIPH_CUSTOM_COPY)
  
@@ -1145,7 +1163,7 @@ diff -up openssl-1.1.1d/crypto/evp/e_aes.c.fips openssl-1.1.1d/crypto/evp/e_aes.
  
  static int aes_ccm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
  {
-@@ -3772,11 +3787,11 @@ static int aes_ccm_cipher(EVP_CIPHER_CTX
+@@ -3772,11 +3790,11 @@ static int aes_ccm_cipher(EVP_CIPHER_CTX
  #define aes_ccm_cleanup NULL
  
  BLOCK_CIPHER_custom(NID_aes, 128, 1, 12, ccm, CCM,
@@ -1160,7 +1178,7 @@ diff -up openssl-1.1.1d/crypto/evp/e_aes.c.fips openssl-1.1.1d/crypto/evp/e_aes.
  
  typedef struct {
      union {
-@@ -3869,7 +3884,7 @@ static int aes_wrap_cipher(EVP_CIPHER_CT
+@@ -3869,7 +3887,7 @@ static int aes_wrap_cipher(EVP_CIPHER_CT
      return rv ? (int)rv : -1;
  }
  
