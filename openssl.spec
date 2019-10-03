@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1d
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -67,6 +67,7 @@ Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
 Patch54: openssl-1.1.1-regression-fixes.patch
+Patch55: openssl-1.1.1-aes-asm.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -168,6 +169,7 @@ cp %{SOURCE13} test/
 %patch52 -p1 -b .s390x-update
 %patch53 -p1 -b .crng-test
 %patch54 -p1 -b .regression
+%patch55 -p1 -b .aes-asm
 
 
 %build
@@ -454,6 +456,12 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Oct  3 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-2
+- re-enable the stitched AES-CBC-SHA implementations
+- make AES-GCM work in FIPS mode again
+- enable TLS-1.2 AES-CCM ciphers in FIPS mode
+- fix openssl speed errors in FIPS mode
+
 * Fri Sep 13 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-1
 - update to the 1.1.1d release
 

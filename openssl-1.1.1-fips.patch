@@ -11,8 +11,8 @@ diff -up openssl-1.1.1d/apps/pkcs12.c.fips openssl-1.1.1d/apps/pkcs12.c
      int cert_pbe = NID_pbe_WithSHA1And3_Key_TripleDES_CBC;
  # endif
 diff -up openssl-1.1.1d/apps/speed.c.fips openssl-1.1.1d/apps/speed.c
---- openssl-1.1.1d/apps/speed.c.fips	2019-09-13 15:13:11.008525884 +0200
-+++ openssl-1.1.1d/apps/speed.c	2019-09-13 15:13:11.022525640 +0200
+--- openssl-1.1.1d/apps/speed.c.fips	2019-10-03 16:51:22.019915908 +0200
++++ openssl-1.1.1d/apps/speed.c	2019-10-03 17:40:09.909994582 +0200
 @@ -1595,7 +1595,8 @@ int speed_main(int argc, char **argv)
              continue;
          if (strcmp(*argv, "rsa") == 0) {
@@ -60,7 +60,7 @@ diff -up openssl-1.1.1d/apps/speed.c.fips openssl-1.1.1d/apps/speed.c
              eddsa_doit[i] = 2;
              continue;
          }
-@@ -1737,23 +1742,30 @@ int speed_main(int argc, char **argv)
+@@ -1737,23 +1742,31 @@ int speed_main(int argc, char **argv)
      /* No parameters; turn on everything. */
      if ((argc == 0) && !doit[D_EVP]) {
          for (i = 0; i < ALGOR_NUM; i++)
@@ -87,16 +87,18 @@ diff -up openssl-1.1.1d/apps/speed.c.fips openssl-1.1.1d/apps/speed.c
          for (loop = 0; loop < OSSL_NELEM(ecdsa_doit); loop++)
              ecdsa_doit[loop] = 1;
          for (loop = 0; loop < OSSL_NELEM(ecdh_doit); loop++)
-             ecdh_doit[loop] = 1;
+-            ecdh_doit[loop] = 1;
 -        for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
 -            eddsa_doit[loop] = 1;
++            if(!FIPS_mode() || (loop != R_EC_X25519 && loop != R_EC_X448))
++                ecdh_doit[loop] = 1;
 +        if (!FIPS_mode())
 +            for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
 +                eddsa_doit[loop] = 1;
  #endif
      }
      for (i = 0; i < ALGOR_NUM; i++)
-@@ -1801,30 +1813,46 @@ int speed_main(int argc, char **argv)
+@@ -1801,30 +1814,46 @@ int speed_main(int argc, char **argv)
      AES_set_encrypt_key(key24, 192, &aes_ks2);
      AES_set_encrypt_key(key32, 256, &aes_ks3);
  #ifndef OPENSSL_NO_CAMELLIA
@@ -153,7 +155,7 @@ diff -up openssl-1.1.1d/apps/speed.c.fips openssl-1.1.1d/apps/speed.c
  #endif
  #ifndef SIGALRM
  # ifndef OPENSSL_NO_DES
-@@ -2122,6 +2150,7 @@ int speed_main(int argc, char **argv)
+@@ -2122,6 +2151,7 @@ int speed_main(int argc, char **argv)
  
          for (i = 0; i < loopargs_len; i++) {
              loopargs[i].hctx = HMAC_CTX_new();
@@ -461,7 +463,7 @@ diff -up openssl-1.1.1d/crypto/dsa/dsa_gen.c.fips openssl-1.1.1d/crypto/dsa/dsa_
 +        goto err;
 +    }
 +
-+    if (FIPS_mode() && (L != 1024 || N != 160) &&
++    if (FIPS_mode() &&
 +        (L != 2048 || N != 224) && (L != 2048 || N != 256) &&
 +        (L != 3072 || N != 256)) {
 +        DSAerr(DSA_F_DSA_BUILTIN_PARAMGEN2, DSA_R_KEY_SIZE_INVALID);
@@ -11368,6 +11370,108 @@ diff -up openssl-1.1.1d/include/openssl/rsaerr.h.fips openssl-1.1.1d/include/ope
  # define RSA_R_UNSUPPORTED_SIGNATURE_TYPE                 155
  # define RSA_R_VALUE_MISSING                              147
  # define RSA_R_WRONG_SIGNATURE_LENGTH                     119
+diff -up openssl-1.1.1d/ssl/s3_lib.c.fips openssl-1.1.1d/ssl/s3_lib.c
+--- openssl-1.1.1d/ssl/s3_lib.c.fips	2019-09-10 15:13:07.000000000 +0200
++++ openssl-1.1.1d/ssl/s3_lib.c	2019-10-03 16:53:51.140362311 +0200
+@@ -43,7 +43,7 @@ static SSL_CIPHER tls13_ciphers[] = {
+         SSL_AEAD,
+         TLS1_3_VERSION, TLS1_3_VERSION,
+         0, 0,
+-        SSL_HIGH,
++        SSL_HIGH | SSL_FIPS,
+         SSL_HANDSHAKE_MAC_SHA256,
+         128,
+         128,
+@@ -58,7 +58,7 @@ static SSL_CIPHER tls13_ciphers[] = {
+         SSL_AEAD,
+         TLS1_3_VERSION, TLS1_3_VERSION,
+         0, 0,
+-        SSL_HIGH,
++        SSL_HIGH | SSL_FIPS,
+         SSL_HANDSHAKE_MAC_SHA384,
+         256,
+         256,
+@@ -92,7 +92,7 @@ static SSL_CIPHER tls13_ciphers[] = {
+         SSL_AEAD,
+         TLS1_3_VERSION, TLS1_3_VERSION,
+         0, 0,
+-        SSL_NOT_DEFAULT | SSL_HIGH,
++        SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+         SSL_HANDSHAKE_MAC_SHA256,
+         128,
+         128,
+@@ -634,7 +634,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      128,
+      128,
+@@ -650,7 +650,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      256,
+      256,
+@@ -666,7 +666,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      128,
+      128,
+@@ -682,7 +682,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      256,
+      256,
+@@ -794,7 +794,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      128,
+      128,
+@@ -810,7 +810,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      256,
+      256,
+@@ -890,7 +890,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      128,
+      128,
+@@ -906,7 +906,7 @@ static SSL_CIPHER ssl3_ciphers[] = {
+      SSL_AEAD,
+      TLS1_2_VERSION, TLS1_2_VERSION,
+      DTLS1_2_VERSION, DTLS1_2_VERSION,
+-     SSL_NOT_DEFAULT | SSL_HIGH,
++     SSL_NOT_DEFAULT | SSL_HIGH | SSL_FIPS,
+      SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256,
+      256,
+      256,
 diff -up openssl-1.1.1d/ssl/ssl_ciph.c.fips openssl-1.1.1d/ssl/ssl_ciph.c
 --- openssl-1.1.1d/ssl/ssl_ciph.c.fips	2019-09-13 15:13:11.019525692 +0200
 +++ openssl-1.1.1d/ssl/ssl_ciph.c	2019-09-13 15:13:11.068524836 +0200
