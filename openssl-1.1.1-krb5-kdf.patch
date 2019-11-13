@@ -1,6 +1,6 @@
 diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/err/openssl.txt
---- openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf	2019-11-12 13:30:36.261748973 +0100
-+++ openssl-1.1.1d/crypto/err/openssl.txt	2019-11-12 13:30:36.283748577 +0100
+--- openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
++++ openssl-1.1.1d/crypto/err/openssl.txt	2019-11-13 12:11:34.728655841 +0100
 @@ -821,6 +821,11 @@ EVP_F_S390X_AES_GCM_CTRL:201:s390x_aes_g
  EVP_F_SCRYPT_ALG:228:scrypt_alg
  EVP_F_UPDATE:173:update
@@ -13,49 +13,73 @@ diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/er
  KDF_F_KDF_HKDF_DERIVE:113:kdf_hkdf_derive
  KDF_F_KDF_HKDF_NEW:114:kdf_hkdf_new
  KDF_F_KDF_HKDF_SIZE:115:kdf_hkdf_size
-@@ -2326,6 +2331,8 @@ EVP_R_WRAP_MODE_NOT_ALLOWED:170:wrap mod
+@@ -840,6 +845,8 @@ KDF_F_KDF_SSHKDF_NEW:133:kdf_sshkdf_new
+ KDF_F_KDF_TLS1_PRF_CTRL_STR:125:kdf_tls1_prf_ctrl_str
+ KDF_F_KDF_TLS1_PRF_DERIVE:126:kdf_tls1_prf_derive
+ KDF_F_KDF_TLS1_PRF_NEW:127:kdf_tls1_prf_new
++KDF_F_KRB5KDF:139:KRB5KDF
++KDF_F_KRB5KDF_DERIVE:140:krb5kdf_derive
+ KDF_F_PBKDF2_SET_MEMBUF:128:pbkdf2_set_membuf
+ KDF_F_PKEY_HKDF_CTRL_STR:103:pkey_hkdf_ctrl_str
+ KDF_F_PKEY_HKDF_DERIVE:102:pkey_hkdf_derive
+@@ -2325,7 +2332,13 @@ EVP_R_UNSUPPORTED_SALT_TYPE:126:unsuppor
+ EVP_R_WRAP_MODE_NOT_ALLOWED:170:wrap mode not allowed
  EVP_R_WRONG_FINAL_BLOCK_LENGTH:109:wrong final block length
  EVP_R_XTS_DUPLICATED_KEYS:183:xts duplicated keys
++KDF_R_FAILED_TO_GENERATE_KEY:118:failed to generate key
++KDF_R_INVALID_CIPHER:116:invalid cipher
++KDF_R_INVALID_CONSTANT_LENGTH:119:invalid constant length
  KDF_R_INVALID_DIGEST:100:invalid digest
-+KDF_R_INVALID_SEED_LENGTH:116:invalid seed length
-+KDF_R_MISSING_CIPHER:117:missing cipher
++KDF_R_INVALID_SEED_LENGTH:117:invalid seed length
++KDF_R_MISSING_CIPHER:120:missing cipher
++KDF_R_MISSING_CONSTANT:121:missing constant
  KDF_R_MISSING_ITERATION_COUNT:109:missing iteration count
  KDF_R_MISSING_KEY:104:missing key
  KDF_R_MISSING_MESSAGE_DIGEST:105:missing message digest
+@@ -2340,6 +2353,7 @@ KDF_R_MISSING_XCGHASH:115:missing xcghas
+ KDF_R_UNKNOWN_PARAMETER_TYPE:103:unknown parameter type
+ KDF_R_VALUE_ERROR:108:value error
+ KDF_R_VALUE_MISSING:102:value missing
++KDF_R_WRONG_FINAL_BLOCK_LENGTH:120:wrong final block length
+ KDF_R_WRONG_OUTPUT_BUFFER_SIZE:112:wrong output buffer size
+ OBJ_R_OID_EXISTS:102:oid exists
+ OBJ_R_UNKNOWN_NID:101:unknown nid
 diff -up openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf openssl-1.1.1d/crypto/evp/kdf_lib.c
---- openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf	2019-11-12 13:30:36.261748973 +0100
-+++ openssl-1.1.1d/crypto/evp/kdf_lib.c	2019-11-12 13:44:04.435282854 +0100
-@@ -31,6 +31,7 @@ static const EVP_KDF_METHOD *standard_me
+--- openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
++++ openssl-1.1.1d/crypto/evp/kdf_lib.c	2019-11-13 12:11:34.729655823 +0100
+@@ -31,6 +31,8 @@ static const EVP_KDF_METHOD *standard_me
      &tls1_prf_kdf_meth,
      &hkdf_kdf_meth,
      &sshkdf_kdf_meth,
 +    &kb_kdf_meth,
++    &krb5kdf_kdf_meth,
  };
  
  DECLARE_OBJ_BSEARCH_CMP_FN(const EVP_KDF_METHOD *, const EVP_KDF_METHOD *,
 diff -up openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf openssl-1.1.1d/crypto/include/internal/evp_int.h
---- openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf	2019-11-12 13:30:36.261748973 +0100
-+++ openssl-1.1.1d/crypto/include/internal/evp_int.h	2019-11-12 13:30:36.283748577 +0100
-@@ -130,6 +130,7 @@ extern const EVP_KDF_METHOD scrypt_kdf_m
+--- openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
++++ openssl-1.1.1d/crypto/include/internal/evp_int.h	2019-11-13 12:11:34.729655823 +0100
+@@ -130,6 +130,8 @@ extern const EVP_KDF_METHOD scrypt_kdf_m
  extern const EVP_KDF_METHOD tls1_prf_kdf_meth;
  extern const EVP_KDF_METHOD hkdf_kdf_meth;
  extern const EVP_KDF_METHOD sshkdf_kdf_meth;
 +extern const EVP_KDF_METHOD kb_kdf_meth;
++extern const EVP_KDF_METHOD krb5kdf_kdf_meth;
  
  struct evp_md_st {
      int type;
 diff -up openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf openssl-1.1.1d/crypto/kdf/build.info
---- openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf	2019-11-12 13:30:36.261748973 +0100
-+++ openssl-1.1.1d/crypto/kdf/build.info	2019-11-12 13:30:36.284748559 +0100
+--- openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
++++ openssl-1.1.1d/crypto/kdf/build.info	2019-11-13 12:11:34.729655823 +0100
 @@ -1,3 +1,3 @@
  LIBS=../../libcrypto
  SOURCE[../../libcrypto]=\
 -        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c
-+        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c kbkdf.c
++        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c kbkdf.c krb5kdf.c
 diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kbkdf.c
---- openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf	2019-11-12 13:30:36.284748559 +0100
-+++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-12 16:09:32.828238926 +0100
-@@ -0,0 +1,530 @@
+--- openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf	2019-11-13 12:11:34.729655823 +0100
++++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-13 12:11:34.729655823 +0100
+@@ -0,0 +1,529 @@
 +/*
 + * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
 + * Copyright 2019 Red Hat, Inc.
@@ -574,7 +598,6 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +    return -2;
 +}
 +
-+
 +const EVP_KDF_METHOD kb_kdf_meth = {
 +    EVP_KDF_KB,
 +    kbkdf_new,
@@ -587,8 +610,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +};
 +
 diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_err.c
---- openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf	2019-11-12 13:30:36.262748955 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_err.c	2019-11-12 13:30:36.284748559 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_err.c	2019-11-13 12:11:34.730655805 +0100
 @@ -15,6 +15,11 @@
  
  static const ERR_STRING_DATA KDF_str_functs[] = {
@@ -601,19 +624,42 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
      {ERR_PACK(ERR_LIB_KDF, KDF_F_KDF_HKDF_DERIVE, 0), "kdf_hkdf_derive"},
      {ERR_PACK(ERR_LIB_KDF, KDF_F_KDF_HKDF_NEW, 0), "kdf_hkdf_new"},
      {ERR_PACK(ERR_LIB_KDF, KDF_F_KDF_HKDF_SIZE, 0), "kdf_hkdf_size"},
-@@ -64,7 +69,9 @@ static const ERR_STRING_DATA KDF_str_fun
+@@ -41,6 +46,8 @@ static const ERR_STRING_DATA KDF_str_fun
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_KDF_TLS1_PRF_DERIVE, 0),
+      "kdf_tls1_prf_derive"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_KDF_TLS1_PRF_NEW, 0), "kdf_tls1_prf_new"},
++    {ERR_PACK(ERR_LIB_KDF, KDF_F_KRB5KDF, 0), "KRB5KDF"},
++    {ERR_PACK(ERR_LIB_KDF, KDF_F_KRB5KDF_DERIVE, 0), "krb5kdf_derive"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_PBKDF2_SET_MEMBUF, 0), "pbkdf2_set_membuf"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_PKEY_HKDF_CTRL_STR, 0), "pkey_hkdf_ctrl_str"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_PKEY_HKDF_DERIVE, 0), "pkey_hkdf_derive"},
+@@ -64,7 +71,14 @@ static const ERR_STRING_DATA KDF_str_fun
  };
  
  static const ERR_STRING_DATA KDF_str_reasons[] = {
++    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_FAILED_TO_GENERATE_KEY),
++    "failed to generate key"},
 +    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_INVALID_CIPHER), "invalid cipher"},
++    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_INVALID_CONSTANT_LENGTH), "invalid constant length"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_INVALID_DIGEST), "invalid digest"},
 +    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_INVALID_SEED_LENGTH), "invalid seed length"},
++    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_CIPHER), "missing cipher"},
++    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_CONSTANT), "missing constant"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_ITERATION_COUNT),
      "missing iteration count"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_KEY), "missing key"},
+@@ -82,6 +96,8 @@ static const ERR_STRING_DATA KDF_str_rea
+     "unknown parameter type"},
+     {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_VALUE_ERROR), "value error"},
+     {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_VALUE_MISSING), "value missing"},
++    {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_WRONG_FINAL_BLOCK_LENGTH),
++    "wrong final block length"},
+     {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_WRONG_OUTPUT_BUFFER_SIZE),
+     "wrong output buffer size"},
+     {0, NULL}
 diff -up openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_local.h
---- openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf	2019-11-12 13:30:36.253749117 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_local.h	2019-11-12 13:30:36.284748559 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf	2019-11-13 12:11:34.697656393 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_local.h	2019-11-13 12:11:34.730655805 +0100
 @@ -19,4 +19,6 @@ int kdf_hex2ctrl(EVP_KDF_IMPL *impl,
  int kdf_md2ctrl(EVP_KDF_IMPL *impl,
                  int (*ctrl)(EVP_KDF_IMPL *impl, int cmd, va_list args),
@@ -623,8 +669,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf openssl-1.1.1d/crypto/kd
 +                    int (*ctrl)(EVP_KDF_IMPL *impl, int cmd, va_list args),
 +                    int cmd, const char *cipher_name);
 diff -up openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_util.c
---- openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf	2019-11-12 13:30:36.253749117 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_util.c	2019-11-12 13:30:36.284748559 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf	2019-11-13 12:11:34.697656393 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_util.c	2019-11-13 12:11:34.730655805 +0100
 @@ -71,3 +71,16 @@ int kdf_md2ctrl(EVP_KDF_IMPL *impl,
      return call_ctrl(ctrl, impl, cmd, md);
  }
@@ -642,79 +688,510 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf openssl-1.1.1d/crypto/kdf
 +    }
 +    return call_ctrl(ctrl, impl, cmd, cipher);
 +}
+diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/krb5kdf.c
+--- openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf	2019-11-13 12:11:34.730655805 +0100
++++ openssl-1.1.1d/crypto/kdf/krb5kdf.c	2019-11-13 12:25:50.519417362 +0100
+@@ -0,0 +1,417 @@
++/*
++ * Copyright 2018-2019 The OpenSSL Project Authors. All Rights Reserved.
++ *
++ * Licensed under the OpenSSL license (the "License").  You may not use
++ * this file except in compliance with the License.  You can obtain a copy
++ * in the file LICENSE in the source distribution or at
++ * https://www.openssl.org/source/license.html
++ */
++
++#include <stdlib.h>
++#include <stdarg.h>
++#include <string.h>
++
++#include <openssl/des.h>
++#include <openssl/evp.h>
++#include <openssl/kdf.h>
++
++#include "internal/cryptlib.h"
++#include "internal/evp_int.h"
++#include "kdf_local.h"
++
++/* KRB5 KDF defined in RFC 3961, Section 5.1 */
++
++static int KRB5KDF(const EVP_CIPHER *cipher,
++                   const unsigned char *key, size_t key_len,
++                   const unsigned char *constant, size_t constant_len,
++                   unsigned char *okey, size_t okey_len);
++
++struct evp_kdf_impl_st {
++    const EVP_CIPHER *cipher;
++    unsigned char *key;
++    size_t key_len;
++    unsigned char *constant;
++    size_t constant_len;
++};
++
++static void krb5kdf_reset(EVP_KDF_IMPL *ctx);
++
++static EVP_KDF_IMPL *krb5kdf_new(void)
++{
++    EVP_KDF_IMPL *ctx;
++
++    if ((ctx = OPENSSL_zalloc(sizeof(*ctx))) == NULL)
++        KDFerr(KDF_F_KBKDF_NEW, ERR_R_MALLOC_FAILURE);
++    return ctx;
++}
++
++static void krb5kdf_free(EVP_KDF_IMPL *ctx)
++{
++    krb5kdf_reset(ctx);
++    OPENSSL_free(ctx);
++}
++
++static void krb5kdf_reset(EVP_KDF_IMPL *ctx)
++{
++    OPENSSL_clear_free(ctx->key, ctx->key_len);
++    OPENSSL_clear_free(ctx->constant, ctx->constant_len);
++    memset(ctx, 0, sizeof(*ctx));
++}
++
++static int krb5kdf_derive(EVP_KDF_IMPL *ctx, unsigned char *key,
++                              size_t keylen)
++{
++    if (ctx->cipher == NULL) {
++        KDFerr(KDF_F_KRB5KDF_DERIVE, KDF_R_MISSING_CIPHER);
++        return 0;
++    }
++    if (ctx->key == NULL) {
++        KDFerr(KDF_F_KRB5KDF_DERIVE, KDF_R_MISSING_KEY);
++        return 0;
++    }
++    if (ctx->constant == NULL) {
++        KDFerr(KDF_F_KRB5KDF_DERIVE, KDF_R_MISSING_CONSTANT);
++        return 0;
++    }
++    return KRB5KDF(ctx->cipher, ctx->key, ctx->key_len,
++                   ctx->constant, ctx->constant_len,
++                   key, keylen);
++}
++
++static size_t krb5kdf_size(EVP_KDF_IMPL *ctx)
++{
++    if (ctx->cipher != NULL)
++        return EVP_CIPHER_key_length(ctx->cipher);
++    else
++        return EVP_MAX_KEY_LENGTH;
++}
++
++
++static int krb5kdf_parse_buffer_arg(unsigned char **dst, size_t *dst_len,
++                                       va_list args)
++{
++    const unsigned char *p;
++    size_t len;
++
++    p = va_arg(args, const unsigned char *);
++    len = va_arg(args, size_t);
++    OPENSSL_clear_free(*dst, *dst_len);
++    *dst = OPENSSL_memdup(p, len);
++    if (*dst == NULL)
++        return 0;
++
++    *dst_len = len;
++    return 1;
++}
++
++static int krb5kdf_ctrl(EVP_KDF_IMPL *ctx, int cmd, va_list args)
++{
++    switch (cmd) {
++    case EVP_KDF_CTRL_SET_CIPHER:
++        ctx->cipher = va_arg(args, const EVP_CIPHER *);
++        if (ctx->cipher == NULL)
++            return 0;
++
++        return 1;
++
++    case EVP_KDF_CTRL_SET_KEY:
++        return krb5kdf_parse_buffer_arg(&ctx->key,
++                                      &ctx->key_len, args);
++
++    case EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT:
++        return krb5kdf_parse_buffer_arg(&ctx->constant,
++                                           &ctx->constant_len, args);
++    default:
++        return -2;
++
++    }
++}
++
++static int krb5kdf_ctrl_str(EVP_KDF_IMPL *ctx, const char *type,
++                               const char *value)
++{
++    if (value == NULL) {
++        KDFerr(KDF_F_KDF_SSHKDF_CTRL_STR, KDF_R_VALUE_MISSING);
++        return 0;
++    }
++
++    if (strcmp(type, "cipher") == 0)
++        return kdf_cipher2ctrl(ctx, krb5kdf_ctrl, EVP_KDF_CTRL_SET_CIPHER, value);
++
++    if (strcmp(type, "key") == 0)
++        return kdf_str2ctrl(ctx, krb5kdf_ctrl,
++                            EVP_KDF_CTRL_SET_KEY, value);
++
++    if (strcmp(type, "hexkey") == 0)
++        return kdf_hex2ctrl(ctx, krb5kdf_ctrl,
++                            EVP_KDF_CTRL_SET_KEY, value);
++
++    if (strcmp(type, "constant") == 0)
++        return kdf_str2ctrl(ctx, krb5kdf_ctrl,
++                            EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT, value);
++
++    if (strcmp(type, "hexconstant") == 0)
++        return kdf_hex2ctrl(ctx, krb5kdf_ctrl,
++                            EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT, value);
++
++    KDFerr(KDF_F_KBKDF_CTRL_STR, KDF_R_UNKNOWN_PARAMETER_TYPE);
++    return -2;
++}
++
++
++#ifndef OPENSSL_NO_DES
++/*
++ * DES3 is a special case, it requires a random-to-key function and its
++ * input truncated to 21 bytes of the 24 produced by the cipher.
++ * See RFC3961 6.3.1
++ */
++static int fixup_des3_key(unsigned char *key)
++{
++    unsigned char *cblock;
++    int i, j;
++
++    for (i = 2; i >= 0; i--) {
++        cblock = &key[i * 8];
++        memmove(cblock, &key[i * 7], 7);
++        cblock[7] = 0;
++        for (j = 0; j < 7; j++)
++            cblock[7] |= (cblock[j] & 1) << (j + 1);
++        DES_set_odd_parity((DES_cblock *)cblock);
++    }
++
++    /* fail if keys are such that triple des degrades to single des */
++    if (CRYPTO_memcmp(&key[0], &key[8], 8) == 0 ||
++        CRYPTO_memcmp(&key[8], &key[16], 8) == 0) {
++        return 0;
++    }
++
++    return 1;
++}
++#endif
++
++/*
++ * N-fold(K) where blocksize is N, and constant_len is K
++ * Note: Here |= denotes concatenation
++ *
++ * L = lcm(N,K)
++ * R = L/K
++ *
++ * for r: 1 -> R
++ *   s |= constant rot 13*(r-1))
++ *
++ * block = 0
++ * for k: 1 -> K
++ *   block += s[N(k-1)..(N-1)k] (one's complement addition)
++ *
++ * Optimizing for space we compute:
++ * for each l in L-1 -> 0:
++ *   s[l] = (constant rot 13*(l/K))[l%k]
++ *   block[l % N] += s[l] (with carry)
++ * finally add carry if any
++ */
++static void n_fold(unsigned char *block, unsigned int blocksize,
++                   const unsigned char *constant, size_t constant_len)
++{
++    unsigned int tmp, gcd, remainder, lcm, carry;
++    int b, l;
++
++    if (constant_len == blocksize) {
++        memcpy(block, constant, constant_len);
++        return;
++    }
++
++    /* Least Common Multiple of lengths: LCM(a,b)*/
++    gcd = blocksize;
++    remainder = constant_len;
++    /* Calculate Great Common Divisor first GCD(a,b) */
++    while (remainder != 0) {
++        tmp = gcd % remainder;
++        gcd = remainder;
++        remainder = tmp;
++    }
++    /* resulting a is the GCD, LCM(a,b) = |a*b|/GCD(a,b) */
++    lcm = blocksize * constant_len / gcd;
++
++    /* now spread out the bits */
++    memset(block, 0, blocksize);
++
++    /* last to first to be able to bring carry forward */
++    carry = 0;
++    for (l = lcm - 1; l >= 0; l--) {
++        unsigned int rotbits, rshift, rbyte;
++
++        /* destination byte in block is l % N */
++        b = l % blocksize;
++        /* Our virtual s buffer is R = L/K long (K = constant_len) */
++        /* So we rotate backwards from R-1 to 0 (none) rotations */
++        rotbits = 13 * (l / constant_len);
++        /* find the byte on s where rotbits falls onto */
++        rbyte = l - (rotbits / 8);
++        /* calculate how much shift on that byte */
++        rshift = rotbits & 0x07;
++        /* rbyte % constant_len gives us the unrotated byte in the
++         * constant buffer, get also the previous byte then
++         * appropriately shift them to get the rotated byte we need */
++        tmp = (constant[(rbyte-1) % constant_len] << (8 - rshift)
++               | constant[rbyte % constant_len] >> rshift)
++              & 0xff;
++        /* add with carry to any value placed by previous passes */
++        tmp += carry + block[b];
++        block[b] = tmp & 0xff;
++        /* save any carry that may be left */
++        carry = tmp >> 8;
++    }
++
++    /* if any carry is left at the end, add it through the number */
++    for (b = blocksize - 1; b >= 0 && carry != 0; b--) {
++        carry += block[b];
++        block[b] = carry & 0xff;
++        carry >>= 8;
++    }
++}
++
++static int cipher_init(EVP_CIPHER_CTX *ctx,
++                       const EVP_CIPHER *cipher,
++                       const unsigned char *key, size_t key_len)
++{
++    int klen, ret;
++
++    ret = EVP_EncryptInit_ex(ctx, cipher, NULL, key, NULL);
++    if (!ret)
++        goto out;
++    /* set the key len for the odd variable key len cipher */
++    klen = EVP_CIPHER_CTX_key_length(ctx);
++    if (key_len != (size_t)klen) {
++        ret = EVP_CIPHER_CTX_set_key_length(ctx, key_len);
++        if (!ret)
++            goto out;
++    }
++    /* we never want padding, either the length requested is a multiple of
++     * the cipher block size or we are passed a cipher that can cope with
++     * partial blocks via techniques like cipher text stealing */
++    ret = EVP_CIPHER_CTX_set_padding(ctx, 0);
++    if (!ret)
++        goto out;
++
++out:
++    return ret;
++}
++
++static int KRB5KDF(const EVP_CIPHER *cipher,
++                   const unsigned char *key, size_t key_len,
++                   const unsigned char *constant, size_t constant_len,
++                   unsigned char *okey, size_t okey_len)
++{
++    EVP_CIPHER_CTX *ctx = NULL;
++    unsigned char block[EVP_MAX_BLOCK_LENGTH * 2];
++    unsigned char *plainblock, *cipherblock;
++    size_t blocksize;
++    size_t cipherlen;
++    size_t osize;
++    int des3_no_fixup = 0;
++    int ret;
++
++    if (key_len != okey_len) {
++        /* special case for 3des, where the caller may be requesting
++         * the random raw key, instead of the fixed up key  */
++        if (EVP_CIPHER_nid(cipher) == NID_des_ede3_cbc &&
++            key_len == 24 && okey_len == 21) {
++                des3_no_fixup = 1;
++        } else {
++            KDFerr(KDF_F_KRB5KDF, KDF_R_WRONG_OUTPUT_BUFFER_SIZE);
++            return 0;
++        }
++    }
++
++    ctx = EVP_CIPHER_CTX_new();
++    if (ctx == NULL)
++        return 0;
++
++    ret = cipher_init(ctx, cipher, key, key_len);
++    if (!ret)
++        goto out;
++
++    /* Initialize input block */
++    blocksize = EVP_CIPHER_CTX_block_size(ctx);
++
++    if (constant_len > blocksize) {
++        KDFerr(KDF_F_KRB5KDF, KDF_R_INVALID_CONSTANT_LENGTH);
++        ret = 0;
++        goto out;
++    }
++
++    n_fold(block, blocksize, constant, constant_len);
++    plainblock = block;
++    cipherblock = block + EVP_MAX_BLOCK_LENGTH;
++
++    for (osize = 0; osize < okey_len; osize += cipherlen) {
++        int olen;
++
++        ret = EVP_EncryptUpdate(ctx, cipherblock, &olen,
++                                plainblock, blocksize);
++        if (!ret)
++            goto out;
++        cipherlen = olen;
++        ret = EVP_EncryptFinal_ex(ctx, cipherblock, &olen);
++        if (!ret)
++            goto out;
++        if (olen != 0) {
++            KDFerr(KDF_F_KRB5KDF, KDF_R_WRONG_FINAL_BLOCK_LENGTH);
++            ret = 0;
++            goto out;
++        }
++
++        /* write cipherblock out */
++        if (cipherlen > okey_len - osize)
++            cipherlen = okey_len - osize;
++        memcpy(okey + osize, cipherblock, cipherlen);
++
++        if (okey_len > osize + cipherlen) {
++            /* we need to reinitialize cipher context per spec */
++            ret = EVP_CIPHER_CTX_reset(ctx);
++            if (!ret)
++                goto out;
++            ret = cipher_init(ctx, cipher, key, key_len);
++            if (!ret)
++                goto out;
++
++            /* also swap block offsets so last ciphertext becomes new
++             * plaintext */
++            plainblock = cipherblock;
++            if (cipherblock == block) {
++                cipherblock += EVP_MAX_BLOCK_LENGTH;
++            } else {
++                cipherblock = block;
++            }
++        }
++    }
++
++#ifndef OPENSSL_NO_DES
++    if (EVP_CIPHER_nid(cipher) == NID_des_ede3_cbc && !des3_no_fixup) {
++        ret = fixup_des3_key(okey);
++        if (!ret) {
++            KDFerr(KDF_F_KRB5KDF, KDF_R_FAILED_TO_GENERATE_KEY);
++            goto out;
++        }
++    }
++#endif
++
++    ret = 1;
++
++out:
++    EVP_CIPHER_CTX_free(ctx);
++    OPENSSL_cleanse(block, EVP_MAX_BLOCK_LENGTH * 2);
++    return ret;
++}
++
++const EVP_KDF_METHOD krb5kdf_kdf_meth = {
++    EVP_KDF_KRB5KDF,
++    krb5kdf_new,
++    krb5kdf_free,
++    krb5kdf_reset,
++    krb5kdf_ctrl,
++    krb5kdf_ctrl_str,
++    krb5kdf_size,
++    krb5kdf_derive,
++};
++
 diff -up openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf openssl-1.1.1d/crypto/objects/obj_dat.h
---- openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf	2019-11-12 13:30:36.263748937 +0100
-+++ openssl-1.1.1d/crypto/objects/obj_dat.h	2019-11-12 13:30:36.285748541 +0100
+--- openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf	2019-11-13 12:11:34.706656232 +0100
++++ openssl-1.1.1d/crypto/objects/obj_dat.h	2019-11-13 12:11:34.731655787 +0100
 @@ -1078,7 +1078,7 @@ static const unsigned char so[7762] = {
      0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x0D,       /* [ 7753] OBJ_hmacWithSHA512_256 */
  };
  
 -#define NUM_NID 1196
-+#define NUM_NID 1197
++#define NUM_NID 1198
  static const ASN1_OBJECT nid_objs[NUM_NID] = {
      {"UNDEF", "undefined", NID_undef},
      {"rsadsi", "RSA Data Security, Inc.", NID_rsadsi, 6, &so[0]},
-@@ -2276,9 +2276,10 @@ static const ASN1_OBJECT nid_objs[NUM_NI
+@@ -2276,9 +2276,11 @@ static const ASN1_OBJECT nid_objs[NUM_NI
      {"hmacWithSHA512-224", "hmacWithSHA512-224", NID_hmacWithSHA512_224, 8, &so[7745]},
      {"hmacWithSHA512-256", "hmacWithSHA512-256", NID_hmacWithSHA512_256, 8, &so[7753]},
      {"SSHKDF", "sshkdf", NID_sshkdf},
 +    {"KBKDF", "kbkdf", NID_kbkdf},
++    {"KRB5KDF", "krb5kdf", NID_krb5kdf},
  };
  
 -#define NUM_SN 1187
-+#define NUM_SN 1188
++#define NUM_SN 1189
  static const unsigned int sn_objs[NUM_SN] = {
       364,    /* "AD_DVCS" */
       419,    /* "AES-128-CBC" */
-@@ -2442,6 +2443,7 @@ static const unsigned int sn_objs[NUM_SN
+@@ -2442,7 +2444,9 @@ static const unsigned int sn_objs[NUM_SN
       183,    /* "ISO-US" */
       645,    /* "ITU-T" */
       646,    /* "JOINT-ISO-ITU-T" */
 +    1196,    /* "KBKDF" */
       773,    /* "KISA" */
++    1197,    /* "KRB5KDF" */
      1063,    /* "KxANY" */
      1039,    /* "KxDHE" */
-@@ -3469,7 +3471,7 @@ static const unsigned int sn_objs[NUM_SN
+     1041,    /* "KxDHE-PSK" */
+@@ -3469,7 +3473,7 @@ static const unsigned int sn_objs[NUM_SN
      1093,    /* "x509ExtAdmission" */
  };
  
 -#define NUM_LN 1187
-+#define NUM_LN 1188
++#define NUM_LN 1189
  static const unsigned int ln_objs[NUM_LN] = {
       363,    /* "AD Time Stamping" */
       405,    /* "ANSI X9.62" */
-@@ -4262,6 +4264,7 @@ static const unsigned int ln_objs[NUM_LN
+@@ -4262,8 +4266,10 @@ static const unsigned int ln_objs[NUM_LN
       957,    /* "jurisdictionCountryName" */
       955,    /* "jurisdictionLocalityName" */
       956,    /* "jurisdictionStateOrProvinceName" */
 +    1196,    /* "kbkdf" */
       150,    /* "keyBag" */
       773,    /* "kisa" */
++    1197,    /* "krb5kdf" */
      1063,    /* "kx-any" */
+     1039,    /* "kx-dhe" */
+     1041,    /* "kx-dhe-psk" */
 diff -up openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf openssl-1.1.1d/crypto/objects/objects.txt
---- openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf	2019-11-12 13:30:36.263748937 +0100
-+++ openssl-1.1.1d/crypto/objects/objects.txt	2019-11-12 13:30:36.286748523 +0100
-@@ -1603,6 +1603,9 @@ secg-scheme 14 3 : dhSinglePass-cofactor
+--- openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf	2019-11-13 12:11:34.707656215 +0100
++++ openssl-1.1.1d/crypto/objects/objects.txt	2019-11-13 12:11:34.731655787 +0100
+@@ -1603,6 +1603,12 @@ secg-scheme 14 3 : dhSinglePass-cofactor
  # NID for SSHKDF
                              : SSHKDF            : sshkdf
  
 +# NID for KBKDF
 +                            : KBKDF             : kbkdf
 +
++# NID for KRB5KDF
++                            : KRB5KDF           : krb5kdf
++
  # RFC 4556
  1 3 6 1 5 2 3 : id-pkinit
  id-pkinit 4                     : pkInitClientAuth      : PKINIT Client Auth
 diff -up openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf openssl-1.1.1d/crypto/objects/obj_mac.num
---- openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf	2019-11-12 13:30:36.263748937 +0100
-+++ openssl-1.1.1d/crypto/objects/obj_mac.num	2019-11-12 13:30:36.286748523 +0100
-@@ -1193,3 +1193,4 @@ magma_mac		1192
+--- openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf	2019-11-13 12:11:34.707656215 +0100
++++ openssl-1.1.1d/crypto/objects/obj_mac.num	2019-11-13 12:11:34.732655769 +0100
+@@ -1193,3 +1193,5 @@ magma_mac		1192
  hmacWithSHA512_224		1193
  hmacWithSHA512_256		1194
  sshkdf		1195
 +kbkdf		1196
++krb5kdf		1197
 diff -up openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod
---- openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf	2019-11-12 13:30:36.254749099 +0100
-+++ openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod	2019-11-12 13:30:36.286748523 +0100
+--- openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf	2019-11-13 12:11:34.698656375 +0100
++++ openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod	2019-11-13 12:11:34.732655769 +0100
 @@ -140,7 +140,14 @@ The value string is expected to be a dec
  This control expects one argument: C<EVP_MD *md>
  
@@ -732,9 +1209,9 @@ diff -up openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf openssl-1.1.1d/doc/man
  EVP_KDF_ctrl_str() type string: "md"
  
 diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod
---- openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf	2019-11-12 13:30:36.286748523 +0100
-+++ openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod	2019-11-12 13:30:36.286748523 +0100
-@@ -0,0 +1,177 @@
+--- openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf	2019-11-13 12:11:34.732655769 +0100
++++ openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod	2019-11-13 12:11:34.732655769 +0100
+@@ -0,0 +1,173 @@
 +=pod
 +
 +=head1 NAME
@@ -865,13 +1342,9 @@ diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf openssl-1.1.1d/doc/man7
 + unsigned char out[10];
 + unsigned char *iv = "sixteen bytes iv";
 +
-+ kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
-+ kctx = EVP_KDF_CTX_new(kdf);
-+ EVP_KDF_free(kdf);
-+
 + kctx = EVP_KDF_CTX_new_id(EVP_KDF_KB);
 +
-+ EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_CIPHER, EVP_aes_256_ecb());
++ EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_CIPHER, EVP_aes_256_cbc());
 + EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KB_MAC_TYPE, EVP_KDF_KB_MAC_TYPE_CMAC);
 + EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KB_MODE, EVP_KDF_KB_MODE_FEEDBACK);
 + EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, "secret", strlen("secret"));
@@ -912,9 +1385,120 @@ diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf openssl-1.1.1d/doc/man7
 +L<https://www.openssl.org/source/license.html>.
 +
 +=cut
+diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod
+--- openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf	2019-11-13 12:11:34.732655769 +0100
++++ openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod	2019-11-13 12:11:34.732655769 +0100
+@@ -0,0 +1,107 @@
++=pod
++
++=head1 NAME
++
++EVP_KDF_KRB5KDF - The RFC3961 Krb5 KDF EVP_KDF implementation
++
++=head1 DESCRIPTION
++
++Support for computing the B<KRB5KDF> KDF through the B<EVP_KDF> API.
++
++The B<EVP_KDF_KRB5KDF> algorithm implements the key derivation function defined
++in RFC 3961, section 5.1 and is used by Krb5 to derive session keys.
++Three inputs are required to perform key derivation: a cipher, (for example
++AES-128-CBC), the initial key, and a constant.
++
++=head2 Numeric identity
++
++B<EVP_KDF_KRB5KDF> is the numeric identity for this implementation; it can be used with the
++EVP_KDF_CTX_new_id() function.
++
++=head2 Supported controls
++
++The supported controls are:
++
++=over 4
++
++=item B<EVP_KDF_CTRL_SET_CIPHER>
++
++=item B<EVP_KDF_CTRL_SET_KEY>
++
++These controls work as described in L<EVP_KDF_CTX(3)/CONTROLS>.
++
++=item B<EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT>
++
++This control expects two arguments: C<unsigned char *constant>, C<size_t constantlen>
++
++This control sets the I<constant> value for the KDF.
++If a value is already set, the contents are replaced.
++
++=back
++
++
++=head1 NOTES
++
++A context for KRB5KDF can be obtained by calling:
++
++ EVP_KDF_CTX *kctx = EVP_KDF_CTX_new_id(EVP_KDF_KRB5KDF);
++
++The output length of the KRB5KDF derivation is specified via the I<keylen>
++parameter to the L<EVP_KDF_derive(3)> function, and MUST match the key
++length for the chosen cipher or an error is returned. Moreover the
++I<constant>'s length must not exceed the block size of the cipher.
++Since the KRB5KDF output length depends on the chosen cipher, calling
++L<EVP_KDF_size()> to obtain the requisite length returns the correct length
++only after the cipher is set. Prior to that B<EVP_MAX_KEY_LENGTH> is returned.
++The caller must allocate a buffer of the correct length for the chosen
++cipher, and pass that buffer to the L<EVP_KDF_derive(3)> function along
++with that length.
++
++=head1 EXAMPLES
++
++This example derives a key using the AES-128-CBC cipher:
++
++ EVP_KDF_CTX *kctx;
++ unsigned char key[16] = "01234...";
++ unsigned char constant[] = "I'm a constant";
++ unsigned char out[16];
++ size_t outlen = sizeof(out);
++
++ kctx = EVP_KDF_CTX_new_id(EVP_KDF_KRB5KDF);
++
++ EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_CIPHER, EVP_aes_128_cbc());
++ EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, key, (size_t)16);
++ EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT, constant, strlen(constant));
++ if (EVP_KDF_derive(kctx, out, outlen) <= 0)
++     /* Error */
++ EVP_KDF_CTX_free(kctx);
++
++=head1 CONFORMING TO
++
++RFC 3961
++
++=head1 SEE ALSO
++
++L<EVP_KDF_CTX(3)>,
++L<EVP_KDF_CTX_new_id(3)>,
++L<EVP_KDF_CTX_free(3)>,
++L<EVP_KDF_ctrl(3)>,
++L<EVP_KDF_size(3)>,
++L<EVP_KDF_derive(3)>,
++L<EVP_KDF_CTX(3)/CONTROLS>
++
++=head1 HISTORY
++
++This functionality was added to OpenSSL 3.0.
++
++=head1 COPYRIGHT
++
++Copyright 2016-2019 The OpenSSL Project Authors. All Rights Reserved.
++
++Licensed under the OpenSSL license (the "License").  You may not use
++this file except in compliance with the License.  You can obtain a copy
++in the file LICENSE in the source distribution or at
++L<https://www.openssl.org/source/license.html>.
++
++=cut
++
 diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include/openssl/kdferr.h
---- openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf	2019-11-12 13:30:36.264748919 +0100
-+++ openssl-1.1.1d/include/openssl/kdferr.h	2019-11-12 13:30:36.286748523 +0100
+--- openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
++++ openssl-1.1.1d/include/openssl/kdferr.h	2019-11-13 12:11:34.732655769 +0100
 @@ -24,6 +24,11 @@ int ERR_load_KDF_strings(void);
   * KDF function codes.
   */
@@ -927,28 +1511,50 @@ diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include
  # define KDF_F_KDF_HKDF_DERIVE                            113
  # define KDF_F_KDF_HKDF_NEW                               114
  # define KDF_F_KDF_HKDF_SIZE                              115
-@@ -61,7 +66,9 @@ int ERR_load_KDF_strings(void);
+@@ -43,6 +48,8 @@ int ERR_load_KDF_strings(void);
+ # define KDF_F_KDF_TLS1_PRF_CTRL_STR                      125
+ # define KDF_F_KDF_TLS1_PRF_DERIVE                        126
+ # define KDF_F_KDF_TLS1_PRF_NEW                           127
++# define KDF_F_KRB5KDF                                    139
++# define KDF_F_KRB5KDF_DERIVE                             140
+ # define KDF_F_PBKDF2_SET_MEMBUF                          128
+ # define KDF_F_PKEY_HKDF_CTRL_STR                         103
+ # define KDF_F_PKEY_HKDF_DERIVE                           102
+@@ -61,7 +68,13 @@ int ERR_load_KDF_strings(void);
  /*
   * KDF reason codes.
   */
++# define KDF_R_FAILED_TO_GENERATE_KEY                     118
 +# define KDF_R_INVALID_CIPHER                             116
++# define KDF_R_INVALID_CONSTANT_LENGTH                    119
  # define KDF_R_INVALID_DIGEST                             100
 +# define KDF_R_INVALID_SEED_LENGTH                        117
++# define KDF_R_MISSING_CIPHER                             120
++# define KDF_R_MISSING_CONSTANT                           121
  # define KDF_R_MISSING_ITERATION_COUNT                    109
  # define KDF_R_MISSING_KEY                                104
  # define KDF_R_MISSING_MESSAGE_DIGEST                     105
+@@ -76,6 +89,7 @@ int ERR_load_KDF_strings(void);
+ # define KDF_R_UNKNOWN_PARAMETER_TYPE                     103
+ # define KDF_R_VALUE_ERROR                                108
+ # define KDF_R_VALUE_MISSING                              102
++# define KDF_R_WRONG_FINAL_BLOCK_LENGTH                   122
+ # define KDF_R_WRONG_OUTPUT_BUFFER_SIZE                   112
+ 
+ #endif
 diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/openssl/kdf.h
---- openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf	2019-11-12 13:30:36.263748937 +0100
-+++ openssl-1.1.1d/include/openssl/kdf.h	2019-11-12 13:30:36.287748505 +0100
-@@ -21,6 +21,7 @@ extern "C" {
+--- openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
++++ openssl-1.1.1d/include/openssl/kdf.h	2019-11-13 12:11:34.733655752 +0100
+@@ -21,6 +21,8 @@ extern "C" {
  # define EVP_KDF_TLS1_PRF   NID_tls1_prf
  # define EVP_KDF_HKDF       NID_hkdf
  # define EVP_KDF_SSHKDF     NID_sshkdf
 +# define EVP_KDF_KB         NID_kbkdf
++# define EVP_KDF_KRB5KDF    NID_krb5kdf
  
  EVP_KDF_CTX *EVP_KDF_CTX_new_id(int id);
  void EVP_KDF_CTX_free(EVP_KDF_CTX *ctx);
-@@ -51,6 +52,11 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
+@@ -51,6 +53,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
  # define EVP_KDF_CTRL_SET_SSHKDF_XCGHASH    0x10 /* unsigned char *, size_t */
  # define EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID 0x11 /* unsigned char *, size_t */
  # define EVP_KDF_CTRL_SET_SSHKDF_TYPE       0x12 /* int */
@@ -957,10 +1563,11 @@ diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/op
 +# define EVP_KDF_CTRL_SET_CIPHER        0x15 /* EVP_CIPHER * */
 +# define EVP_KDF_CTRL_SET_KB_INFO       0x16 /* unsigned char *, size_t */
 +# define EVP_KDF_CTRL_SET_KB_SEED       0x17 /* unsigned char *, size_t */
++# define EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT  0x18 /* unsigned char *, size_t */
  
  # define EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND  0
  # define EVP_KDF_HKDF_MODE_EXTRACT_ONLY        1
-@@ -63,6 +69,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
+@@ -63,6 +71,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
  #define EVP_KDF_SSHKDF_TYPE_INTEGRITY_KEY_CLI_TO_SRV 69
  #define EVP_KDF_SSHKDF_TYPE_INTEGRITY_KEY_SRV_TO_CLI 70
  
@@ -974,9 +1581,9 @@ diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/op
  
  # define EVP_PKEY_CTRL_TLS_MD                   (EVP_PKEY_ALG_CTRL)
 diff -up openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf openssl-1.1.1d/include/openssl/obj_mac.h
---- openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf	2019-11-12 13:30:36.264748919 +0100
-+++ openssl-1.1.1d/include/openssl/obj_mac.h	2019-11-12 13:30:36.287748505 +0100
-@@ -4974,6 +4974,10 @@
+--- openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
++++ openssl-1.1.1d/include/openssl/obj_mac.h	2019-11-13 12:11:34.733655752 +0100
+@@ -4974,6 +4974,14 @@
  #define LN_sshkdf               "sshkdf"
  #define NID_sshkdf              1203
  
@@ -984,13 +1591,17 @@ diff -up openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf openssl-1.1.1d/includ
 +#define LN_kbkdf               "kbkdf"
 +#define NID_kbkdf              1204
 +
++#define SN_krb5kdf             "KRB5KDF"
++#define LN_krb5kdf             "krb5kdf"
++#define NID_krb5kdf            1205
++
  #define SN_id_pkinit            "id-pkinit"
  #define NID_id_pkinit           1031
  #define OBJ_id_pkinit           1L,3L,6L,1L,5L,2L,3L
 diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf_test.c
---- openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf	2019-11-12 13:30:36.257749045 +0100
-+++ openssl-1.1.1d/test/evp_kdf_test.c	2019-11-12 16:35:19.265237664 +0100
-@@ -225,8 +225,261 @@ err:
+--- openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf	2019-11-13 12:11:34.700656339 +0100
++++ openssl-1.1.1d/test/evp_kdf_test.c	2019-11-13 12:28:33.933507568 +0100
+@@ -225,13 +225,311 @@ err:
  }
  #endif
  
@@ -1243,6 +1854,50 @@ diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf
 +    return ret;
 +}
 +
++static int test_kdf_krb5kdf(void)
++{
++    int ret = 0;
++    EVP_KDF_CTX *kctx;
++    unsigned char out[16];
++    static unsigned char key[] = {
++        0x42, 0x26, 0x3C, 0x6E, 0x89, 0xF4, 0xFC, 0x28,
++        0xB8, 0xDF, 0x68, 0xEE, 0x09, 0x79, 0x9F, 0x15
++    };
++    static unsigned char constant[] = {
++        0x00, 0x00, 0x00, 0x02, 0x99
++    };
++    static const unsigned char expected[sizeof(out)] = {
++        0x34, 0x28, 0x0A, 0x38, 0x2B, 0xC9, 0x27, 0x69,
++        0xB2, 0xDA, 0x2F, 0x9E, 0xF0, 0x66, 0x85, 0x4B
++    };
++
++    if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_KRB5KDF)) == NULL) {
++        TEST_error("EVP_KDF_KRB5KDF");
++        goto err;
++    }
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_CIPHER, EVP_aes_128_cbc()) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_CIPHER");
++        goto err;
++    }
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, key, sizeof(key)) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_KEY");
++        goto err;
++    }
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT, constant, sizeof(constant)) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT");
++        goto err;
++    }
++
++    ret =
++        TEST_int_gt(EVP_KDF_derive(kctx, out, sizeof(out)), 0)
++        && TEST_mem_eq(out, sizeof(out), expected, sizeof(expected));
++
++err:
++    EVP_KDF_CTX_free(kctx);
++    return ret;
++}
++
++
  int setup_tests(void)
  {
 +    ADD_TEST(test_kdf_kbkdf_6803_128);
@@ -1252,3 +1907,136 @@ diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf
      ADD_TEST(test_kdf_tls1_prf);
      ADD_TEST(test_kdf_hkdf);
      ADD_TEST(test_kdf_pbkdf2);
+ #ifndef OPENSSL_NO_SCRYPT
+     ADD_TEST(test_kdf_scrypt);
+ #endif
++    ADD_TEST(test_kdf_krb5kdf);
+     return 1;
+ }
+diff -up openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt
+--- openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf	2019-11-13 12:11:34.711656143 +0100
++++ openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt	2019-11-13 13:24:12.927064479 +0100
+@@ -5286,3 +5286,123 @@ Ctrl.hexsession_id = hexsession_id:a4ebd
+ Ctrl.type = type:A
+ Output = FF
+ Result = KDF_MISMATCH
++
++Title = KRB5KDF tests (from RFC 3961 test vectors and krb5 sources)
++
++#RFC3961
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:dce06b1f64c857a11c3db57c51899b2cc1791008ce973b92
++Ctrl.hexconstant = hexconstant:0000000155
++Output = 925179d04591a79b5d3192c4a7e9c289b049c71f6ee604cd
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:5e13d31c70ef765746578531cb51c15bf11ca82c97cee9f2
++Ctrl.hexconstant = hexconstant:00000001aa
++Output = 9e58e5a146d9942a101c469845d67a20e3c4259ed913f207
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:98e6fd8a04a4b6859b75a176540b9752bad3ecd610a252bc
++Ctrl.hexconstant = hexconstant:0000000155
++Output = 13fef80d763e94ec6d13fd2ca1d085070249dad39808eabf
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:622aec25a2fe2cad7094680b7c64940280084c1a7cec92b5
++Ctrl.hexconstant = hexconstant:00000001aa
++Output = f8dfbf04b097e6d9dc0702686bcb3489d91fd9a4516b703e
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:d3f8298ccb166438dcb9b93ee5a7629286a491f838f802fb
++Ctrl.hexconstant = hexconstant:6b65726265726f73
++Output = 2370da575d2a3da864cebfdc5204d56df779a7df43d9da43
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:c1081649ada74362e6a1459d01dfd30d67c2234c940704da
++Ctrl.hexconstant = hexconstant:0000000155
++Output = 348057ec98fdc48016161c2a4c7a943e92ae492c989175f7
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:5d154af238f46713155719d55e2f1f790dd661f279a7917c
++Ctrl.hexconstant = hexconstant:00000001aa
++Output = a8808ac267dada3dcbe9a7c84626fbc761c294b01315e5c1
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:798562e049852f57dc8c343ba17f2ca1d97394efc8adc443
++Ctrl.hexconstant = hexconstant:0000000155
++Output = c813f88a3be3b334f75425ce9175fbe3c8493b89c8703b49
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:26dce334b545292f2feab9a8701a89a4b99eb9942cecd016
++Ctrl.hexconstant = hexconstant:00000001aa
++Output = f48ffd6e83f83e7354e694fd252cf83bfe58f7d5ba37ec5d
++
++#Krb5 sources
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:850BB51358548CD05E86768C313E3BFEF7511937DCF72C3E
++Ctrl.hexconstant = hexconstant:0000000299
++Output = F78C496D16E6C2DAE0E0B6C24057A84C0426AEEF26FD6DCE
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:850BB51358548CD05E86768C313E3BFEF7511937DCF72C3E
++Ctrl.hexconstant = hexconstant:00000002AA
++Output = 5B5723D0B634CB684C3EBA5264E9A70D52E683231AD3C4CE
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:850BB51358548CD05E86768C313E3BFEF7511937DCF72C3E
++Ctrl.hexconstant = hexconstant:0000000255
++Output = A77C94980E9B7345A81525C423A737CE67F4CD91B6B3DA45
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-128-CBC
++Ctrl.hexkey = hexkey:42263C6E89F4FC28B8DF68EE09799F15
++Ctrl.hexconstant = hexconstant:0000000299
++Output = 34280A382BC92769B2DA2F9EF066854B
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-128-CBC
++Ctrl.hexkey = hexkey:42263C6E89F4FC28B8DF68EE09799F15
++Ctrl.hexconstant = hexconstant:00000002AA
++Output = 5B14FC4E250E14DDF9DCCF1AF6674F53
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-128-CBC
++Ctrl.hexkey = hexkey:42263C6E89F4FC28B8DF68EE09799F15
++Ctrl.hexconstant = hexconstant:0000000255
++Output = 4ED31063621684F09AE8D89991AF3E8F
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-256-CBC
++Ctrl.hexkey = hexkey:FE697B52BC0D3CE14432BA036A92E65BBB52280990A2FA27883998D72AF30161
++Ctrl.hexconstant = hexconstant:0000000299
++Output = BFAB388BDCB238E9F9C98D6A878304F04D30C82556375AC507A7A852790F4674
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-256-CBC
++Ctrl.hexkey = hexkey:FE697B52BC0D3CE14432BA036A92E65BBB52280990A2FA27883998D72AF30161
++Ctrl.hexconstant = hexconstant:00000002AA
++Output = C7CFD9CD75FE793A586A542D87E0D1396F1134A104BB1A9190B8C90ADA3DDF37
++
++KDF = KRB5KDF
++Ctrl.cipher = cipher:AES-256-CBC
++Ctrl.hexkey = hexkey:FE697B52BC0D3CE14432BA036A92E65BBB52280990A2FA27883998D72AF30161
++Ctrl.hexconstant = hexconstant:0000000255
++Output = 97151B4C76945063E2EB0529DC067D97D7BBA90776D8126D91F34F3101AEA8BA
++
++#Same as the first but with no "fixup"
++KDF = KRB5KDF
++Ctrl.cipher = cipher:DES-EDE3-CBC
++Ctrl.hexkey = hexkey:dce06b1f64c857a11c3db57c51899b2cc1791008ce973b92
++Ctrl.hexconstant = hexconstant:0000000155
++Output = 935079d14490a75c3093c4a6e8c3b049c71e6ee705
++

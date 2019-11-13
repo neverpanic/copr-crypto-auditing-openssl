@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1d
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -62,6 +62,7 @@ Patch47: openssl-1.1.1-ts-sha256-default.patch
 Patch48: openssl-1.1.1-fips-post-rand.patch
 Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
+Patch60: openssl-1.1.1-krb5-kdf.patch
 # Backported fixes including security fixes
 Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
@@ -170,6 +171,7 @@ cp %{SOURCE13} test/
 %patch53 -p1 -b .crng-test
 %patch54 -p1 -b .regression
 %patch55 -p1 -b .aes-asm
+%patch60 -p1 -b .krb5-kdf
 
 
 %build
@@ -456,6 +458,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Nov 13 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-3
+- backport of KBKDF and KRB5KDF from master
+
 * Thu Oct  3 2019 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-2
 - re-enable the stitched AES-CBC-SHA implementations
 - make AES-GCM work in FIPS mode again
