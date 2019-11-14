@@ -1,6 +1,6 @@
 diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/err/openssl.txt
---- openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
-+++ openssl-1.1.1d/crypto/err/openssl.txt	2019-11-13 12:11:34.728655841 +0100
+--- openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf	2019-11-14 15:07:05.320094521 +0100
++++ openssl-1.1.1d/crypto/err/openssl.txt	2019-11-14 15:07:05.342094129 +0100
 @@ -821,6 +821,11 @@ EVP_F_S390X_AES_GCM_CTRL:201:s390x_aes_g
  EVP_F_SCRYPT_ALG:228:scrypt_alg
  EVP_F_UPDATE:173:update
@@ -22,7 +22,17 @@ diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/er
  KDF_F_PBKDF2_SET_MEMBUF:128:pbkdf2_set_membuf
  KDF_F_PKEY_HKDF_CTRL_STR:103:pkey_hkdf_ctrl_str
  KDF_F_PKEY_HKDF_DERIVE:102:pkey_hkdf_derive
-@@ -2325,7 +2332,13 @@ EVP_R_UNSUPPORTED_SALT_TYPE:126:unsuppor
+@@ -853,6 +860,9 @@ KDF_F_PKEY_TLS1_PRF_CTRL_STR:100:pkey_tl
+ KDF_F_PKEY_TLS1_PRF_DERIVE:101:pkey_tls1_prf_derive
+ KDF_F_PKEY_TLS1_PRF_INIT:110:pkey_tls1_prf_init
+ KDF_F_SCRYPT_SET_MEMBUF:129:scrypt_set_membuf
++KDF_F_SSKDF_DERIVE:141:sskdf_derive
++KDF_F_SSKDF_NEW:142:sskdf_new
++KDF_F_SSKDF_SIZE:143:sskdf_size
+ KDF_F_TLS1_PRF_ALG:111:tls1_prf_alg
+ OBJ_F_OBJ_ADD_OBJECT:105:OBJ_add_object
+ OBJ_F_OBJ_ADD_SIGID:107:OBJ_add_sigid
+@@ -2325,7 +2335,13 @@ EVP_R_UNSUPPORTED_SALT_TYPE:126:unsuppor
  EVP_R_WRAP_MODE_NOT_ALLOWED:170:wrap mode not allowed
  EVP_R_WRONG_FINAL_BLOCK_LENGTH:109:wrong final block length
  EVP_R_XTS_DUPLICATED_KEYS:183:xts duplicated keys
@@ -36,7 +46,7 @@ diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/er
  KDF_R_MISSING_ITERATION_COUNT:109:missing iteration count
  KDF_R_MISSING_KEY:104:missing key
  KDF_R_MISSING_MESSAGE_DIGEST:105:missing message digest
-@@ -2340,6 +2353,7 @@ KDF_R_MISSING_XCGHASH:115:missing xcghas
+@@ -2340,6 +2356,7 @@ KDF_R_MISSING_XCGHASH:115:missing xcghas
  KDF_R_UNKNOWN_PARAMETER_TYPE:103:unknown parameter type
  KDF_R_VALUE_ERROR:108:value error
  KDF_R_VALUE_MISSING:102:value missing
@@ -45,41 +55,43 @@ diff -up openssl-1.1.1d/crypto/err/openssl.txt.krb5-kdf openssl-1.1.1d/crypto/er
  OBJ_R_OID_EXISTS:102:oid exists
  OBJ_R_UNKNOWN_NID:101:unknown nid
 diff -up openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf openssl-1.1.1d/crypto/evp/kdf_lib.c
---- openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
-+++ openssl-1.1.1d/crypto/evp/kdf_lib.c	2019-11-13 12:11:34.729655823 +0100
-@@ -31,6 +31,8 @@ static const EVP_KDF_METHOD *standard_me
+--- openssl-1.1.1d/crypto/evp/kdf_lib.c.krb5-kdf	2019-11-14 15:07:05.320094521 +0100
++++ openssl-1.1.1d/crypto/evp/kdf_lib.c	2019-11-14 15:07:05.342094129 +0100
+@@ -31,6 +31,9 @@ static const EVP_KDF_METHOD *standard_me
      &tls1_prf_kdf_meth,
      &hkdf_kdf_meth,
      &sshkdf_kdf_meth,
 +    &kb_kdf_meth,
 +    &krb5kdf_kdf_meth,
++    &ss_kdf_meth
  };
  
  DECLARE_OBJ_BSEARCH_CMP_FN(const EVP_KDF_METHOD *, const EVP_KDF_METHOD *,
 diff -up openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf openssl-1.1.1d/crypto/include/internal/evp_int.h
---- openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
-+++ openssl-1.1.1d/crypto/include/internal/evp_int.h	2019-11-13 12:11:34.729655823 +0100
-@@ -130,6 +130,8 @@ extern const EVP_KDF_METHOD scrypt_kdf_m
+--- openssl-1.1.1d/crypto/include/internal/evp_int.h.krb5-kdf	2019-11-14 15:07:05.320094521 +0100
++++ openssl-1.1.1d/crypto/include/internal/evp_int.h	2019-11-14 15:07:05.342094129 +0100
+@@ -130,6 +130,9 @@ extern const EVP_KDF_METHOD scrypt_kdf_m
  extern const EVP_KDF_METHOD tls1_prf_kdf_meth;
  extern const EVP_KDF_METHOD hkdf_kdf_meth;
  extern const EVP_KDF_METHOD sshkdf_kdf_meth;
 +extern const EVP_KDF_METHOD kb_kdf_meth;
 +extern const EVP_KDF_METHOD krb5kdf_kdf_meth;
++extern const EVP_KDF_METHOD ss_kdf_meth;
  
  struct evp_md_st {
      int type;
 diff -up openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf openssl-1.1.1d/crypto/kdf/build.info
---- openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
-+++ openssl-1.1.1d/crypto/kdf/build.info	2019-11-13 12:11:34.729655823 +0100
+--- openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf	2019-11-14 15:07:05.320094521 +0100
++++ openssl-1.1.1d/crypto/kdf/build.info	2019-11-14 15:07:05.342094129 +0100
 @@ -1,3 +1,3 @@
  LIBS=../../libcrypto
  SOURCE[../../libcrypto]=\
 -        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c
-+        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c kbkdf.c krb5kdf.c
++        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c kbkdf.c krb5kdf.c sskdf.c
 diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kbkdf.c
---- openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf	2019-11-13 12:11:34.729655823 +0100
-+++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-13 12:11:34.729655823 +0100
-@@ -0,0 +1,529 @@
+--- openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf	2019-11-14 15:07:05.343094112 +0100
++++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-14 16:07:15.385324361 +0100
+@@ -0,0 +1,530 @@
 +/*
 + * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
 + * Copyright 2019 Red Hat, Inc.
@@ -183,6 +195,7 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +        HMAC_CTX_free(ctx->m.hmac);
 +    else
 +        CMAC_CTX_free(ctx->m.cmac);
++    OPENSSL_free(ctx);
 +}
 +
 +static MAC_CTX *EVP_MAC_CTX_dup(MAC_CTX *sctx)
@@ -610,8 +623,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +};
 +
 diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_err.c
---- openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf	2019-11-13 12:11:34.705656250 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_err.c	2019-11-13 12:11:34.730655805 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf	2019-11-14 15:07:05.320094521 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_err.c	2019-11-14 15:07:05.343094112 +0100
 @@ -15,6 +15,11 @@
  
  static const ERR_STRING_DATA KDF_str_functs[] = {
@@ -633,7 +646,15 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
      {ERR_PACK(ERR_LIB_KDF, KDF_F_PBKDF2_SET_MEMBUF, 0), "pbkdf2_set_membuf"},
      {ERR_PACK(ERR_LIB_KDF, KDF_F_PKEY_HKDF_CTRL_STR, 0), "pkey_hkdf_ctrl_str"},
      {ERR_PACK(ERR_LIB_KDF, KDF_F_PKEY_HKDF_DERIVE, 0), "pkey_hkdf_derive"},
-@@ -64,7 +71,14 @@ static const ERR_STRING_DATA KDF_str_fun
+@@ -59,12 +66,22 @@ static const ERR_STRING_DATA KDF_str_fun
+      "pkey_tls1_prf_derive"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_PKEY_TLS1_PRF_INIT, 0), "pkey_tls1_prf_init"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_SCRYPT_SET_MEMBUF, 0), "scrypt_set_membuf"},
++    {ERR_PACK(ERR_LIB_KDF, KDF_F_SSKDF_DERIVE, 0), "sskdf_derive"},
++    {ERR_PACK(ERR_LIB_KDF, KDF_F_SSKDF_NEW, 0), "sskdf_new"},
++    {ERR_PACK(ERR_LIB_KDF, KDF_F_SSKDF_SIZE, 0), "sskdf_size"},
+     {ERR_PACK(ERR_LIB_KDF, KDF_F_TLS1_PRF_ALG, 0), "tls1_prf_alg"},
+     {0, NULL}
  };
  
  static const ERR_STRING_DATA KDF_str_reasons[] = {
@@ -648,7 +669,7 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_ITERATION_COUNT),
      "missing iteration count"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_MISSING_KEY), "missing key"},
-@@ -82,6 +96,8 @@ static const ERR_STRING_DATA KDF_str_rea
+@@ -82,6 +99,8 @@ static const ERR_STRING_DATA KDF_str_rea
      "unknown parameter type"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_VALUE_ERROR), "value error"},
      {ERR_PACK(ERR_LIB_KDF, 0, KDF_R_VALUE_MISSING), "value missing"},
@@ -658,8 +679,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_err.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
      "wrong output buffer size"},
      {0, NULL}
 diff -up openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_local.h
---- openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf	2019-11-13 12:11:34.697656393 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_local.h	2019-11-13 12:11:34.730655805 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf	2019-11-14 15:07:05.313094646 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_local.h	2019-11-14 15:07:05.344094093 +0100
 @@ -19,4 +19,6 @@ int kdf_hex2ctrl(EVP_KDF_IMPL *impl,
  int kdf_md2ctrl(EVP_KDF_IMPL *impl,
                  int (*ctrl)(EVP_KDF_IMPL *impl, int cmd, va_list args),
@@ -669,8 +690,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_local.h.krb5-kdf openssl-1.1.1d/crypto/kd
 +                    int (*ctrl)(EVP_KDF_IMPL *impl, int cmd, va_list args),
 +                    int cmd, const char *cipher_name);
 diff -up openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kdf_util.c
---- openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf	2019-11-13 12:11:34.697656393 +0100
-+++ openssl-1.1.1d/crypto/kdf/kdf_util.c	2019-11-13 12:11:34.730655805 +0100
+--- openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf	2019-11-14 15:07:05.313094646 +0100
++++ openssl-1.1.1d/crypto/kdf/kdf_util.c	2019-11-14 15:07:05.344094093 +0100
 @@ -71,3 +71,16 @@ int kdf_md2ctrl(EVP_KDF_IMPL *impl,
      return call_ctrl(ctrl, impl, cmd, md);
  }
@@ -689,8 +710,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf openssl-1.1.1d/crypto/kdf
 +    return call_ctrl(ctrl, impl, cmd, cipher);
 +}
 diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/krb5kdf.c
---- openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf	2019-11-13 12:11:34.730655805 +0100
-+++ openssl-1.1.1d/crypto/kdf/krb5kdf.c	2019-11-13 12:25:50.519417362 +0100
+--- openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf	2019-11-14 15:07:05.344094093 +0100
++++ openssl-1.1.1d/crypto/kdf/krb5kdf.c	2019-11-14 16:11:17.761978261 +0100
 @@ -0,0 +1,417 @@
 +/*
 + * Copyright 2018-2019 The OpenSSL Project Authors. All Rights Reserved.
@@ -1028,7 +1049,7 @@ diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
 +    /* Initialize input block */
 +    blocksize = EVP_CIPHER_CTX_block_size(ctx);
 +
-+    if (constant_len > blocksize) {
++    if (constant_len == 0 || constant_len > blocksize) {
 +        KDFerr(KDF_F_KRB5KDF, KDF_R_INVALID_CONSTANT_LENGTH);
 +        ret = 0;
 +        goto out;
@@ -1109,32 +1130,289 @@ diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
 +    krb5kdf_derive,
 +};
 +
+diff -up openssl-1.1.1d/crypto/kdf/sskdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/sskdf.c
+--- openssl-1.1.1d/crypto/kdf/sskdf.c.krb5-kdf	2019-11-14 15:07:05.344094093 +0100
++++ openssl-1.1.1d/crypto/kdf/sskdf.c	2019-11-14 15:43:17.603150203 +0100
+@@ -0,0 +1,252 @@
++/*
++ * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
++ * Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
++ *
++ * Licensed under the Apache License 2.0 (the "License").  You may not use
++ * this file except in compliance with the License.  You can obtain a copy
++ * in the file LICENSE in the source distribution or at
++ * https://www.openssl.org/source/license.html
++ */
++
++/*
++ * Refer to https://csrc.nist.gov/publications/detail/sp/800-56c/rev-1/final
++ * Section 4.1.
++ *
++ * The Single Step KDF algorithm is given by:
++ *
++ * Result(0) = empty bit string (i.e., the null string).
++ * For i = 1 to reps, do the following:
++ *   Increment counter by 1.
++ *   Result(i) = Result(i – 1) || H(counter || Z || FixedInfo).
++ * DKM = LeftmostBits(Result(reps), L))
++ *
++ * NOTES:
++ *   Z is a shared secret required to produce the derived key material.
++ *   counter is a 4 byte buffer.
++ *   FixedInfo is a bit string containing context specific data.
++ *   DKM is the output derived key material.
++ *   L is the required size of the DKM.
++ *   reps = [L / H_outputBits]
++ *   H(x) is the auxiliary function that can be either a hash, HMAC or KMAC.
++ *   This backported version supports only a hash.
++ *   H_outputBits is the length of the output of the auxiliary function H(x).
++ *
++ * Currently there is not a comprehensive list of test vectors for this
++ * algorithm, especially for H(x) = HMAC and H(x) = KMAC.
++ * Test vectors for H(x) = Hash are indirectly used by CAVS KAS tests.
++ */
++#include <stdlib.h>
++#include <stdarg.h>
++#include <string.h>
++#include <openssl/hmac.h>
++#include <openssl/evp.h>
++#include <openssl/kdf.h>
++#include "internal/cryptlib.h"
++#include "internal/evp_int.h"
++#include "kdf_local.h"
++
++struct evp_kdf_impl_st {
++    const EVP_MD *md;   /* H(x) = hash */
++    unsigned char *secret;
++    size_t secret_len;
++    unsigned char *info;
++    size_t info_len;
++};
++
++#define SSKDF_MAX_INLEN (1<<30)
++
++/*
++ * Refer to https://csrc.nist.gov/publications/detail/sp/800-56c/rev-1/final
++ * Section 4. One-Step Key Derivation using H(x) = hash(x)
++ */
++static int SSKDF_hash_kdm(const EVP_MD *kdf_md,
++                          const unsigned char *z, size_t z_len,
++                          const unsigned char *info, size_t info_len,
++                          unsigned char *derived_key, size_t derived_key_len)
++{
++    int ret = 0, hlen;
++    size_t counter, out_len, len = derived_key_len;
++    unsigned char c[4];
++    unsigned char mac[EVP_MAX_MD_SIZE];
++    unsigned char *out = derived_key;
++    EVP_MD_CTX *ctx = NULL, *ctx_init = NULL;
++
++    if (z_len > SSKDF_MAX_INLEN || info_len > SSKDF_MAX_INLEN
++            || derived_key_len > SSKDF_MAX_INLEN
++            || derived_key_len == 0)
++        return 0;
++
++    hlen = EVP_MD_size(kdf_md);
++    if (hlen <= 0)
++        return 0;
++    out_len = (size_t)hlen;
++
++    ctx = EVP_MD_CTX_create();
++    ctx_init = EVP_MD_CTX_create();
++    if (ctx == NULL || ctx_init == NULL)
++        goto end;
++
++    if (!EVP_DigestInit(ctx_init, kdf_md))
++        goto end;
++
++    for (counter = 1;; counter++) {
++        c[0] = (unsigned char)((counter >> 24) & 0xff);
++        c[1] = (unsigned char)((counter >> 16) & 0xff);
++        c[2] = (unsigned char)((counter >> 8) & 0xff);
++        c[3] = (unsigned char)(counter & 0xff);
++
++        if (!(EVP_MD_CTX_copy_ex(ctx, ctx_init)
++                && EVP_DigestUpdate(ctx, c, sizeof(c))
++                && EVP_DigestUpdate(ctx, z, z_len)
++                && EVP_DigestUpdate(ctx, info, info_len)))
++            goto end;
++        if (len >= out_len) {
++            if (!EVP_DigestFinal_ex(ctx, out, NULL))
++                goto end;
++            out += out_len;
++            len -= out_len;
++            if (len == 0)
++                break;
++        } else {
++            if (!EVP_DigestFinal_ex(ctx, mac, NULL))
++                goto end;
++            memcpy(out, mac, len);
++            break;
++        }
++    }
++    ret = 1;
++end:
++    EVP_MD_CTX_destroy(ctx);
++    EVP_MD_CTX_destroy(ctx_init);
++    OPENSSL_cleanse(mac, sizeof(mac));
++    return ret;
++}
++
++static EVP_KDF_IMPL *sskdf_new(void)
++{
++    EVP_KDF_IMPL *impl;
++
++    if ((impl = OPENSSL_zalloc(sizeof(*impl))) == NULL)
++        KDFerr(KDF_F_SSKDF_NEW, ERR_R_MALLOC_FAILURE);
++    return impl;
++}
++
++static void sskdf_reset(EVP_KDF_IMPL *impl)
++{
++    OPENSSL_clear_free(impl->secret, impl->secret_len);
++    OPENSSL_clear_free(impl->info, impl->info_len);
++    memset(impl, 0, sizeof(*impl));
++}
++
++static void sskdf_free(EVP_KDF_IMPL *impl)
++{
++    sskdf_reset(impl);
++    OPENSSL_free(impl);
++}
++
++static int sskdf_set_buffer(va_list args, unsigned char **out, size_t *out_len)
++{
++    const unsigned char *p;
++    size_t len;
++
++    p = va_arg(args, const unsigned char *);
++    len = va_arg(args, size_t);
++    if (len == 0 || p == NULL)
++        return 1;
++
++    OPENSSL_free(*out);
++    *out = OPENSSL_memdup(p, len);
++    if (*out == NULL)
++        return 0;
++
++    *out_len = len;
++    return 1;
++}
++
++static int sskdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
++{
++    const EVP_MD *md;
++
++    switch (cmd) {
++    case EVP_KDF_CTRL_SET_KEY:
++        return sskdf_set_buffer(args, &impl->secret, &impl->secret_len);
++
++    case EVP_KDF_CTRL_SET_SSKDF_INFO:
++        return sskdf_set_buffer(args, &impl->info, &impl->info_len);
++
++    case EVP_KDF_CTRL_SET_MD:
++        md = va_arg(args, const EVP_MD *);
++        if (md == NULL)
++            return 0;
++
++        impl->md = md;
++        return 1;
++
++    default:
++        return -2;
++    }
++}
++
++static int sskdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type,
++                          const char *value)
++{
++    if (strcmp(type, "secret") == 0 || strcmp(type, "key") == 0)
++         return kdf_str2ctrl(impl, sskdf_ctrl, EVP_KDF_CTRL_SET_KEY,
++                             value);
++
++    if (strcmp(type, "hexsecret") == 0 || strcmp(type, "hexkey") == 0)
++        return kdf_hex2ctrl(impl, sskdf_ctrl, EVP_KDF_CTRL_SET_KEY,
++                            value);
++
++    if (strcmp(type, "info") == 0)
++        return kdf_str2ctrl(impl, sskdf_ctrl, EVP_KDF_CTRL_SET_SSKDF_INFO,
++                            value);
++
++    if (strcmp(type, "hexinfo") == 0)
++        return kdf_hex2ctrl(impl, sskdf_ctrl, EVP_KDF_CTRL_SET_SSKDF_INFO,
++                            value);
++
++    if (strcmp(type, "digest") == 0)
++        return kdf_md2ctrl(impl, sskdf_ctrl, EVP_KDF_CTRL_SET_MD, value);
++
++    return -2;
++}
++
++static size_t sskdf_size(EVP_KDF_IMPL *impl)
++{
++    int len;
++
++    if (impl->md == NULL) {
++        KDFerr(KDF_F_SSKDF_SIZE, KDF_R_MISSING_MESSAGE_DIGEST);
++        return 0;
++    }
++    len = EVP_MD_size(impl->md);
++    return (len <= 0) ? 0 : (size_t)len;
++}
++
++static int sskdf_derive(EVP_KDF_IMPL *impl, unsigned char *key, size_t keylen)
++{
++    if (impl->secret == NULL) {
++        KDFerr(KDF_F_SSKDF_DERIVE, KDF_R_MISSING_SECRET);
++        return 0;
++    }
++
++    /* H(x) = hash */
++    if (impl->md == NULL) {
++        KDFerr(KDF_F_SSKDF_DERIVE, KDF_R_MISSING_MESSAGE_DIGEST);
++        return 0;
++    }
++    return SSKDF_hash_kdm(impl->md, impl->secret, impl->secret_len,
++                          impl->info, impl->info_len, key, keylen);
++}
++
++const EVP_KDF_METHOD ss_kdf_meth = {
++    EVP_KDF_SS,
++    sskdf_new,
++    sskdf_free,
++    sskdf_reset,
++    sskdf_ctrl,
++    sskdf_ctrl_str,
++    sskdf_size,
++    sskdf_derive
++};
 diff -up openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf openssl-1.1.1d/crypto/objects/obj_dat.h
---- openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf	2019-11-13 12:11:34.706656232 +0100
-+++ openssl-1.1.1d/crypto/objects/obj_dat.h	2019-11-13 12:11:34.731655787 +0100
+--- openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf	2019-11-14 15:07:05.322094485 +0100
++++ openssl-1.1.1d/crypto/objects/obj_dat.h	2019-11-14 15:07:05.345094076 +0100
 @@ -1078,7 +1078,7 @@ static const unsigned char so[7762] = {
      0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x0D,       /* [ 7753] OBJ_hmacWithSHA512_256 */
  };
  
 -#define NUM_NID 1196
-+#define NUM_NID 1198
++#define NUM_NID 1199
  static const ASN1_OBJECT nid_objs[NUM_NID] = {
      {"UNDEF", "undefined", NID_undef},
      {"rsadsi", "RSA Data Security, Inc.", NID_rsadsi, 6, &so[0]},
-@@ -2276,9 +2276,11 @@ static const ASN1_OBJECT nid_objs[NUM_NI
+@@ -2276,9 +2276,12 @@ static const ASN1_OBJECT nid_objs[NUM_NI
      {"hmacWithSHA512-224", "hmacWithSHA512-224", NID_hmacWithSHA512_224, 8, &so[7745]},
      {"hmacWithSHA512-256", "hmacWithSHA512-256", NID_hmacWithSHA512_256, 8, &so[7753]},
      {"SSHKDF", "sshkdf", NID_sshkdf},
 +    {"KBKDF", "kbkdf", NID_kbkdf},
 +    {"KRB5KDF", "krb5kdf", NID_krb5kdf},
++    {"SSKDF", "sskdf", NID_sskdf},
  };
  
 -#define NUM_SN 1187
-+#define NUM_SN 1189
++#define NUM_SN 1190
  static const unsigned int sn_objs[NUM_SN] = {
       364,    /* "AD_DVCS" */
       419,    /* "AES-128-CBC" */
-@@ -2442,7 +2444,9 @@ static const unsigned int sn_objs[NUM_SN
+@@ -2442,7 +2445,9 @@ static const unsigned int sn_objs[NUM_SN
       183,    /* "ISO-US" */
       645,    /* "ITU-T" */
       646,    /* "JOINT-ISO-ITU-T" */
@@ -1144,16 +1422,24 @@ diff -up openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf openssl-1.1.1d/crypto/
      1063,    /* "KxANY" */
      1039,    /* "KxDHE" */
      1041,    /* "KxDHE-PSK" */
-@@ -3469,7 +3473,7 @@ static const unsigned int sn_objs[NUM_SN
+@@ -2557,6 +2562,7 @@ static const unsigned int sn_objs[NUM_SN
+      100,    /* "SN" */
+     1006,    /* "SNILS" */
+     1195,    /* "SSHKDF" */
++    1198,    /* "SSKDF" */
+       16,    /* "ST" */
+      143,    /* "SXNetID" */
+     1062,    /* "SipHash" */
+@@ -3469,7 +3475,7 @@ static const unsigned int sn_objs[NUM_SN
      1093,    /* "x509ExtAdmission" */
  };
  
 -#define NUM_LN 1187
-+#define NUM_LN 1189
++#define NUM_LN 1190
  static const unsigned int ln_objs[NUM_LN] = {
       363,    /* "AD Time Stamping" */
       405,    /* "ANSI X9.62" */
-@@ -4262,8 +4266,10 @@ static const unsigned int ln_objs[NUM_LN
+@@ -4262,8 +4268,10 @@ static const unsigned int ln_objs[NUM_LN
       957,    /* "jurisdictionCountryName" */
       955,    /* "jurisdictionLocalityName" */
       956,    /* "jurisdictionStateOrProvinceName" */
@@ -1164,10 +1450,18 @@ diff -up openssl-1.1.1d/crypto/objects/obj_dat.h.krb5-kdf openssl-1.1.1d/crypto/
      1063,    /* "kx-any" */
      1039,    /* "kx-dhe" */
      1041,    /* "kx-dhe-psk" */
+@@ -4612,6 +4620,7 @@ static const unsigned int ln_objs[NUM_LN
+     1133,    /* "sm4-ecb" */
+     1135,    /* "sm4-ofb" */
+     1195,    /* "sshkdf" */
++    1198,    /* "sskdf" */
+       16,    /* "stateOrProvinceName" */
+      660,    /* "streetAddress" */
+      498,    /* "subtreeMaximumQuality" */
 diff -up openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf openssl-1.1.1d/crypto/objects/objects.txt
---- openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf	2019-11-13 12:11:34.707656215 +0100
-+++ openssl-1.1.1d/crypto/objects/objects.txt	2019-11-13 12:11:34.731655787 +0100
-@@ -1603,6 +1603,12 @@ secg-scheme 14 3 : dhSinglePass-cofactor
+--- openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf	2019-11-14 15:07:05.322094485 +0100
++++ openssl-1.1.1d/crypto/objects/objects.txt	2019-11-14 15:07:05.345094076 +0100
+@@ -1603,6 +1603,15 @@ secg-scheme 14 3 : dhSinglePass-cofactor
  # NID for SSHKDF
                              : SSHKDF            : sshkdf
  
@@ -1177,21 +1471,25 @@ diff -up openssl-1.1.1d/crypto/objects/objects.txt.krb5-kdf openssl-1.1.1d/crypt
 +# NID for KRB5KDF
 +                            : KRB5KDF           : krb5kdf
 +
++# NID for SSKDF
++                            : SSKDF              : sskdf
++
  # RFC 4556
  1 3 6 1 5 2 3 : id-pkinit
  id-pkinit 4                     : pkInitClientAuth      : PKINIT Client Auth
 diff -up openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf openssl-1.1.1d/crypto/objects/obj_mac.num
---- openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf	2019-11-13 12:11:34.707656215 +0100
-+++ openssl-1.1.1d/crypto/objects/obj_mac.num	2019-11-13 12:11:34.732655769 +0100
-@@ -1193,3 +1193,5 @@ magma_mac		1192
+--- openssl-1.1.1d/crypto/objects/obj_mac.num.krb5-kdf	2019-11-14 15:07:05.322094485 +0100
++++ openssl-1.1.1d/crypto/objects/obj_mac.num	2019-11-14 15:07:05.346094058 +0100
+@@ -1193,3 +1193,6 @@ magma_mac		1192
  hmacWithSHA512_224		1193
  hmacWithSHA512_256		1194
  sshkdf		1195
 +kbkdf		1196
 +krb5kdf		1197
++sskdf		1198
 diff -up openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod
---- openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf	2019-11-13 12:11:34.698656375 +0100
-+++ openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod	2019-11-13 12:11:34.732655769 +0100
+--- openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf	2019-11-14 15:07:05.314094628 +0100
++++ openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod	2019-11-14 15:07:05.346094058 +0100
 @@ -140,7 +140,14 @@ The value string is expected to be a dec
  This control expects one argument: C<EVP_MD *md>
  
@@ -1209,8 +1507,8 @@ diff -up openssl-1.1.1d/doc/man3/EVP_KDF_CTX.pod.krb5-kdf openssl-1.1.1d/doc/man
  EVP_KDF_ctrl_str() type string: "md"
  
 diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod
---- openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf	2019-11-13 12:11:34.732655769 +0100
-+++ openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod	2019-11-13 12:11:34.732655769 +0100
+--- openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf	2019-11-14 15:07:05.346094058 +0100
++++ openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod	2019-11-14 15:07:05.346094058 +0100
 @@ -0,0 +1,173 @@
 +=pod
 +
@@ -1386,8 +1684,8 @@ diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KB.pod.krb5-kdf openssl-1.1.1d/doc/man7
 +
 +=cut
 diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod
---- openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf	2019-11-13 12:11:34.732655769 +0100
-+++ openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod	2019-11-13 12:11:34.732655769 +0100
+--- openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf	2019-11-14 15:07:05.346094058 +0100
++++ openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod	2019-11-14 15:07:05.346094058 +0100
 @@ -0,0 +1,107 @@
 +=pod
 +
@@ -1496,9 +1794,159 @@ diff -up openssl-1.1.1d/doc/man7/EVP_KDF_KRB5KDF.pod.krb5-kdf openssl-1.1.1d/doc
 +
 +=cut
 +
+diff -up openssl-1.1.1d/doc/man7/EVP_KDF_SS.pod.krb5-kdf openssl-1.1.1d/doc/man7/EVP_KDF_SS.pod
+--- openssl-1.1.1d/doc/man7/EVP_KDF_SS.pod.krb5-kdf	2019-11-14 15:07:05.346094058 +0100
++++ openssl-1.1.1d/doc/man7/EVP_KDF_SS.pod	2019-11-14 15:07:05.346094058 +0100
+@@ -0,0 +1,146 @@
++=pod
++
++=head1 NAME
++
++EVP_KDF_SS - The Single Step / One Step EVP_KDF implementation
++
++=head1 DESCRIPTION
++
++The EVP_KDF_SS algorithm implements the Single Step key derivation function (SSKDF).
++SSKDF derives a key using input such as a shared secret key (that was generated
++during the execution of a key establishment scheme) and fixedinfo.
++SSKDF is also informally referred to as 'Concat KDF'.
++
++=head2 Auxilary function
++
++The implementation uses a selectable auxiliary function H, which can be in the
++backported version only a:
++
++=over 4
++
++=item B<H(x) = hash(x, digest=md)>
++
++=back
++
++=head2 Numeric identity
++
++B<EVP_KDF_SS> is the numeric identity for this implementation; it
++can be used with the EVP_KDF_CTX_new_id() function.
++
++=head2 Supported controls
++
++The supported controls are:
++
++=over 4
++
++=item B<EVP_KDF_CTRL_SET_MD>
++
++This control works as described in L<EVP_KDF_CTX(3)/CONTROLS>.
++
++=item B<EVP_KDF_CTRL_SET_KEY>
++
++This control expects two arguments: C<unsigned char *secret>, C<size_t secretlen>
++
++The shared secret used for key derivation.  This control sets the secret.
++
++EVP_KDF_ctrl_str() takes two type strings for this control:
++
++=over 4
++
++=item "secret"
++
++The value string is used as is.
++
++=item "hexsecret"
++
++The value string is expected to be a hexadecimal number, which will be
++decoded before being passed on as the control value.
++
++=back
++
++=item B<EVP_KDF_CTRL_SET_SSKDF_INFO>
++
++This control expects two arguments: C<unsigned char *info>, C<size_t infolen>
++
++An optional value for fixedinfo, also known as otherinfo. This control sets the fixedinfo.
++
++EVP_KDF_ctrl_str() takes two type strings for this control:
++
++=over 4
++
++=item "info"
++
++The value string is used as is.
++
++=item "hexinfo"
++
++The value string is expected to be a hexadecimal number, which will be
++decoded before being passed on as the control value.
++
++=back
++
++=back
++
++=head1 NOTES
++
++A context for SSKDF can be obtained by calling:
++
++EVP_KDF_CTX *kctx = EVP_KDF_CTX_new_id(EVP_KDF_SS);
++
++The output length of an SSKDF is specified via the C<keylen>
++parameter to the L<EVP_KDF_derive(3)> function.
++
++=head1 EXAMPLE
++
++This example derives 10 bytes using H(x) = SHA-256, with the secret key "secret"
++and fixedinfo value "label":
++
++  EVP_KDF_CTX *kctx;
++  unsigned char out[10];
++
++  kctx = EVP_KDF_CTX_new_id(EVP_KDF_SS);
++
++  if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_MD, EVP_sha256()) <= 0) {
++      error("EVP_KDF_CTRL_SET_MD");
++  }
++  if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, "secret", (size_t)6) <= 0) {
++      error("EVP_KDF_CTRL_SET_KEY");
++  }
++  if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_SSKDF_INFO, "label", (size_t)5) <= 0) {
++      error("EVP_KDF_CTRL_SET_SSKDF_INFO");
++  }
++  if (EVP_KDF_derive(kctx, out, sizeof(out)) <= 0) {
++      error("EVP_KDF_derive");
++  }
++
++  EVP_KDF_CTX_free(kctx);
++
++=head1 CONFORMING TO
++
++NIST SP800-56Cr1.
++
++=head1 SEE ALSO
++
++L<EVP_KDF_CTX>,
++L<EVP_KDF_CTX_new_id(3)>,
++L<EVP_KDF_CTX_free(3)>,
++L<EVP_KDF_ctrl(3)>,
++L<EVP_KDF_size(3)>,
++L<EVP_KDF_derive(3)>,
++L<EVP_KDF_CTX(3)/CONTROLS>
++
++=head1 HISTORY
++
++This functionality was added to OpenSSL 3.0.0.
++
++=head1 COPYRIGHT
++
++Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.  Copyright
++(c) 2019, Oracle and/or its affiliates.  All rights reserved.
++
++Licensed under the Apache License 2.0 (the "License").  You may not use
++this file except in compliance with the License.  You can obtain a copy
++in the file LICENSE in the source distribution or at
++L<https://www.openssl.org/source/license.html>.
++
++=cut
 diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include/openssl/kdferr.h
---- openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
-+++ openssl-1.1.1d/include/openssl/kdferr.h	2019-11-13 12:11:34.732655769 +0100
+--- openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf	2019-11-14 15:07:05.323094468 +0100
++++ openssl-1.1.1d/include/openssl/kdferr.h	2019-11-14 15:07:05.347094040 +0100
 @@ -24,6 +24,11 @@ int ERR_load_KDF_strings(void);
   * KDF function codes.
   */
@@ -1520,7 +1968,15 @@ diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include
  # define KDF_F_PBKDF2_SET_MEMBUF                          128
  # define KDF_F_PKEY_HKDF_CTRL_STR                         103
  # define KDF_F_PKEY_HKDF_DERIVE                           102
-@@ -61,7 +68,13 @@ int ERR_load_KDF_strings(void);
+@@ -56,12 +63,21 @@ int ERR_load_KDF_strings(void);
+ # define KDF_F_PKEY_TLS1_PRF_DERIVE                       101
+ # define KDF_F_PKEY_TLS1_PRF_INIT                         110
+ # define KDF_F_SCRYPT_SET_MEMBUF                          129
++# define KDF_F_SSKDF_DERIVE                               141
++# define KDF_F_SSKDF_NEW                                  142
++# define KDF_F_SSKDF_SIZE                                 143
+ # define KDF_F_TLS1_PRF_ALG                               111
+ 
  /*
   * KDF reason codes.
   */
@@ -1534,7 +1990,7 @@ diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include
  # define KDF_R_MISSING_ITERATION_COUNT                    109
  # define KDF_R_MISSING_KEY                                104
  # define KDF_R_MISSING_MESSAGE_DIGEST                     105
-@@ -76,6 +89,7 @@ int ERR_load_KDF_strings(void);
+@@ -76,6 +92,7 @@ int ERR_load_KDF_strings(void);
  # define KDF_R_UNKNOWN_PARAMETER_TYPE                     103
  # define KDF_R_VALUE_ERROR                                108
  # define KDF_R_VALUE_MISSING                              102
@@ -1543,18 +1999,19 @@ diff -up openssl-1.1.1d/include/openssl/kdferr.h.krb5-kdf openssl-1.1.1d/include
  
  #endif
 diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/openssl/kdf.h
---- openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
-+++ openssl-1.1.1d/include/openssl/kdf.h	2019-11-13 12:11:34.733655752 +0100
-@@ -21,6 +21,8 @@ extern "C" {
+--- openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf	2019-11-14 15:07:05.323094468 +0100
++++ openssl-1.1.1d/include/openssl/kdf.h	2019-11-14 15:07:05.347094040 +0100
+@@ -21,6 +21,9 @@ extern "C" {
  # define EVP_KDF_TLS1_PRF   NID_tls1_prf
  # define EVP_KDF_HKDF       NID_hkdf
  # define EVP_KDF_SSHKDF     NID_sshkdf
 +# define EVP_KDF_KB         NID_kbkdf
 +# define EVP_KDF_KRB5KDF    NID_krb5kdf
++# define EVP_KDF_SS         NID_sskdf
  
  EVP_KDF_CTX *EVP_KDF_CTX_new_id(int id);
  void EVP_KDF_CTX_free(EVP_KDF_CTX *ctx);
-@@ -51,6 +53,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
+@@ -51,6 +54,13 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
  # define EVP_KDF_CTRL_SET_SSHKDF_XCGHASH    0x10 /* unsigned char *, size_t */
  # define EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID 0x11 /* unsigned char *, size_t */
  # define EVP_KDF_CTRL_SET_SSHKDF_TYPE       0x12 /* int */
@@ -1564,10 +2021,11 @@ diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/op
 +# define EVP_KDF_CTRL_SET_KB_INFO       0x16 /* unsigned char *, size_t */
 +# define EVP_KDF_CTRL_SET_KB_SEED       0x17 /* unsigned char *, size_t */
 +# define EVP_KDF_CTRL_SET_KRB5KDF_CONSTANT  0x18 /* unsigned char *, size_t */
++# define EVP_KDF_CTRL_SET_SSKDF_INFO    0x19 /* unsigned char *, size_t */
  
  # define EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND  0
  # define EVP_KDF_HKDF_MODE_EXTRACT_ONLY        1
-@@ -63,6 +71,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
+@@ -63,6 +73,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, uns
  #define EVP_KDF_SSHKDF_TYPE_INTEGRITY_KEY_CLI_TO_SRV 69
  #define EVP_KDF_SSHKDF_TYPE_INTEGRITY_KEY_SRV_TO_CLI 70
  
@@ -1581,9 +2039,9 @@ diff -up openssl-1.1.1d/include/openssl/kdf.h.krb5-kdf openssl-1.1.1d/include/op
  
  # define EVP_PKEY_CTRL_TLS_MD                   (EVP_PKEY_ALG_CTRL)
 diff -up openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf openssl-1.1.1d/include/openssl/obj_mac.h
---- openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf	2019-11-13 12:11:34.708656197 +0100
-+++ openssl-1.1.1d/include/openssl/obj_mac.h	2019-11-13 12:11:34.733655752 +0100
-@@ -4974,6 +4974,14 @@
+--- openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf	2019-11-14 15:07:05.323094468 +0100
++++ openssl-1.1.1d/include/openssl/obj_mac.h	2019-11-14 15:07:05.347094040 +0100
+@@ -4974,6 +4974,18 @@
  #define LN_sshkdf               "sshkdf"
  #define NID_sshkdf              1203
  
@@ -1595,13 +2053,17 @@ diff -up openssl-1.1.1d/include/openssl/obj_mac.h.krb5-kdf openssl-1.1.1d/includ
 +#define LN_krb5kdf             "krb5kdf"
 +#define NID_krb5kdf            1205
 +
++#define SN_sskdf                "SSKDF"
++#define LN_sskdf                "sskdf"
++#define NID_sskdf               1206
++
  #define SN_id_pkinit            "id-pkinit"
  #define NID_id_pkinit           1031
  #define OBJ_id_pkinit           1L,3L,6L,1L,5L,2L,3L
 diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf_test.c
---- openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf	2019-11-13 12:11:34.700656339 +0100
-+++ openssl-1.1.1d/test/evp_kdf_test.c	2019-11-13 12:28:33.933507568 +0100
-@@ -225,13 +225,311 @@ err:
+--- openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf	2019-11-14 15:07:05.315094610 +0100
++++ openssl-1.1.1d/test/evp_kdf_test.c	2019-11-14 15:07:05.348094022 +0100
+@@ -225,13 +225,358 @@ err:
  }
  #endif
  
@@ -1897,6 +2359,52 @@ diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf
 +    return ret;
 +}
 +
++static int test_kdf_ss_hash(void)
++{
++    EVP_KDF_CTX *kctx;
++    const unsigned char z[] = {
++        0x6d,0xbd,0xc2,0x3f,0x04,0x54,0x88,0xe4,0x06,0x27,0x57,0xb0,0x6b,0x9e,
++        0xba,0xe1,0x83,0xfc,0x5a,0x59,0x46,0xd8,0x0d,0xb9,0x3f,0xec,0x6f,0x62,
++        0xec,0x07,0xe3,0x72,0x7f,0x01,0x26,0xae,0xd1,0x2c,0xe4,0xb2,0x62,0xf4,
++        0x7d,0x48,0xd5,0x42,0x87,0xf8,0x1d,0x47,0x4c,0x7c,0x3b,0x18,0x50,0xe9
++    };
++    const unsigned char other[] = {
++        0xa1,0xb2,0xc3,0xd4,0xe5,0x43,0x41,0x56,0x53,0x69,0x64,0x3c,0x83,0x2e,
++        0x98,0x49,0xdc,0xdb,0xa7,0x1e,0x9a,0x31,0x39,0xe6,0x06,0xe0,0x95,0xde,
++        0x3c,0x26,0x4a,0x66,0xe9,0x8a,0x16,0x58,0x54,0xcd,0x07,0x98,0x9b,0x1e,
++        0xe0,0xec,0x3f,0x8d,0xbe
++    };
++    const unsigned char expected[] = {
++        0xa4,0x62,0xde,0x16,0xa8,0x9d,0xe8,0x46,0x6e,0xf5,0x46,0x0b,0x47,0xb8
++    };
++    unsigned char out[14];
++
++    kctx = EVP_KDF_CTX_new_id(EVP_KDF_SS);
++
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_MD, EVP_sha224()) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_MD");
++        return 0;
++    }
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, z, sizeof(z)) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_KEY");
++        return 0;
++    }
++    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_SSKDF_INFO, other,
++                     sizeof(other)) <= 0) {
++        TEST_error("EVP_KDF_CTRL_SET_SSKDF_INFO");
++        return 0;
++    }
++    if (EVP_KDF_derive(kctx, out, sizeof(out)) <= 0) {
++        TEST_error("EVP_KDF_derive");
++        return 0;
++    }
++
++    if (!TEST_mem_eq(out, sizeof(out), expected, sizeof(expected)))
++        return 0;
++
++    EVP_KDF_CTX_free(kctx);
++    return 1;
++}
 +
  int setup_tests(void)
  {
@@ -1911,12 +2419,13 @@ diff -up openssl-1.1.1d/test/evp_kdf_test.c.krb5-kdf openssl-1.1.1d/test/evp_kdf
      ADD_TEST(test_kdf_scrypt);
  #endif
 +    ADD_TEST(test_kdf_krb5kdf);
++    ADD_TEST(test_kdf_ss_hash);
      return 1;
  }
 diff -up openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt
---- openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf	2019-11-13 12:11:34.711656143 +0100
-+++ openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt	2019-11-13 13:24:12.927064479 +0100
-@@ -5286,3 +5286,123 @@ Ctrl.hexsession_id = hexsession_id:a4ebd
+--- openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf	2019-11-14 15:07:05.327094396 +0100
++++ openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt	2019-11-14 15:07:05.349094005 +0100
+@@ -5286,3 +5286,559 @@ Ctrl.hexsession_id = hexsession_id:a4ebd
  Ctrl.type = type:A
  Output = FF
  Result = KDF_MISMATCH
@@ -2040,3 +2549,439 @@ diff -up openssl-1.1.1d/test/recipes/30-test_evp_data/evpkdf.txt.krb5-kdf openss
 +Ctrl.hexconstant = hexconstant:0000000155
 +Output = 935079d14490a75c3093c4a6e8c3b049c71e6ee705
 +
++#There are currently no official test vectors for Single Step KDF
++#https://github.com/patrickfav/singlestep-kdf/wiki/NIST-SP-800-56C-Rev1:-Non-Official-Test-Vectors
++Title = Single Step KDF tests
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:d09a6b1a472f930db4f5e6b967900744
++Ctrl.hexinfo = hexinfo:b117255ab5f1b6b96fc434b0
++Output = b5a3c52e97ae6e8c5069954354eab3c7
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:343666c0dd34b756e70f759f14c304f5
++Ctrl.hexinfo = hexinfo:722b28448d7eab85491bce09
++Output = 1003b650ddd3f0891a15166db5ec881d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:b84acf03ab08652dd7f82fa956933261
++Ctrl.hexinfo = hexinfo:3d8773ec068c86053a918565
++Output = 1635dcd1ce698f736831b4badb68ab2b
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:8cc24ca3f1d1a8b34783780b79890430
++Ctrl.hexinfo = hexinfo:f08d4f2d9a8e6d7105c0bc16
++Output = b8e716fb84a420aed4812cd76d9700ee
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:b616905a6f7562cd2689142ce21e42a3
++Ctrl.hexinfo = hexinfo:ead310159a909da87e7b4b40
++Output = 1b9201358c50fe5d5d42907c4a9fce78
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:3f57fd3fd56199b3eb33890f7ee28180
++Ctrl.hexinfo = hexinfo:7a5056ba4fdb034c7cb6c4fe
++Output = e51ebd30a8c4b8449b0fb29d9adc11af
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:fb9fb108d104e9f662d6593fc84cde69
++Ctrl.hexinfo = hexinfo:5faf29211c1bdbf1b2696a7c
++Output = 7a3a7e670656e48c390cdd7c51e167e0
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:237a39981794f4516dccffc3dda28396
++Ctrl.hexinfo = hexinfo:62ed9528d104c241e0f66275
++Output = 0c26fc9e90e1c5c5f943428301682045
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:b9b6c45f7279218fa09894e06366a3a1
++Ctrl.hexinfo = hexinfo:0f384339670aaed4b89ecb7e
++Output = ee5fad414e32fad5d52a2bf61a7f6c72
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:08b7140e2cd0a4abd79171e4d5a71cad
++Ctrl.hexinfo = hexinfo:099211f0d8a2e02dbb5958c0
++Output = 6162f5142e057efafd2c4f2bad5985a1
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a2
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f4853
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759a
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac704
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbe
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf1050
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f3
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8b
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f22
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f227688
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abf
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abfbc3e
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abfbc3e811a
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abfbc3e811a568d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abfbc3e811a568d480d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:ebe28edbae5a410b87a479243db3f690
++Ctrl.hexinfo = hexinfo:e60dd8b28228ce5b9be74d3b
++Output = b4a23963e07f485382cb358a493daec1759ac7043dbeac37152c6ddf105031f0f239f270b7f30616166f10e5d2b4cb11ba8bf4ba3f2276885abfbc3e811a568d480d9192
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:d7e6
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 31e798e9931b612a3ad1b9b1008faa8c
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:4646779d
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 139f68bcca879b490e268e569087d04d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:d9811c81d4c6
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 914dc4f09cb633a76e6c389e04c64485
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:8838f9d99ec46f09
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 4f07dfb6f7a5bf348689e08b2e29c948
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:3e0939b33f34e779f30e
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = b42c7a98c23be19d1187ff960e87557f
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:f36230cacca4d245d303058c
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 50f2068d8010d355d56c5e34aaffbc67
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:7005d32c3d4284c73c3aefc70438
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 66fd712ccf5462bbd41e89041ea7ea26
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:c01c83150b7734f8dbd6efd6f54d7365
++Ctrl.hexinfo = hexinfo:0bbe1fa8722023d7c3da4fff
++Output = 5c5edb0ceda9cd0c7f1f3d9e239c67d5
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:9949
++Output = 33c83f54ed00fb1bccd2113e88550941
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:17144da6
++Output = a999c28961424cab35ec06015e8c376a
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:dffdee1062eb
++Output = 4101ad50e626ed6f957bff926dfbb7db
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:9f365043e23b4648
++Output = 4d3e4b971b88771f229df9f564984832
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:a885a0c4567ddc4f96da
++Output = bebbc30f5a83df5e9c9b57db33c0c879
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:c9d86183295bfe4c3d85f0fd
++Output = 87c947e45407db63eb94cbaa02d14e94
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:825fadce46964236a486732c5dad
++Output = 192370a85ff78e3c0245129d9b398558
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:da69f1dbbebc837480af692e7e9ee6b9
++Ctrl.hexinfo = hexinfo:5c0b5eb3ac9f342347d73d7a521723aa
++Output = c7b7634fd809383e87c4b1b3e728be56
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:8d7a4e7d5cf34b3f74873b862aeb33b7
++Output = 6a5594f402f74f69
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:9b208e7ee1e641fac1dff48fc1beb2d2
++Output = 556ed67e24ac0c7c46cc432da8bdb23c
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:4d2572539fed433211da28c8a0eebac3
++Output = 5a4054c59c5b92814025578f43c1b79fe84968fc284e240b
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:4e1e70c9886819a31bc29a537911add9
++Output = ddbfc440449aab4131c6d8aec08ce1496f2702241d0e27cc155c5c7c3cda75b5
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:68f144c952528e540c686dc353b766f2
++Output = 59ed66bb6f54a9688a0b891d0b2ea6743621d9e1b5cc098cf3a55e6f864f9af8a95e4d945d2f987f
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:b66c9d507c9f837fbe60b6675fdbf38b
++Output = c282787ddf421a72fc88811be81b08d0d6ab66c92d1011974aa58335a6bbbd62e9e982bfae5929865ea1d517247089d2
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:34e730b49e46c7ed2fb25975a4cccd2d
++Output = 39e76e6571cb00740260b9070accbdcc4a492c295cbef33d9e37dac21e5e9d07e0f12dc7063d2172641475d4e08b8e3712fb26a10c8376b8
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:e340d87e2d7adbc1b95ec2dbdc3b82be
++Output = a660c0037a53f76f1e7667043f5869348ad07ac0e272e615ce31f16d4ab90d4b35fe5c370c0010ce79aff45682c6fb8b97f9a05b7d40b5af3c62999a10df9c6d
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA256
++Ctrl.hexsecret = hexsecret:afc4e154498d4770aa8365f6903dc83b
++Ctrl.hexinfo = hexinfo:662af20379b29d5ef813e655
++Output = f0b80d6ae4c1e19e2105a37024e35dc6
++
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA512
++Ctrl.hexsecret = hexsecret:108cf63318555c787fa578731dd4f037
++Ctrl.hexinfo = hexinfo:53191b1dd3f94d83084d61d6
++Output = 0ad475c1826da3007637970c8b92b993
++
++Title = SSKDF Test vectors from RFC 8636 Section 8 (With precoumputed ASN.1 info)
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA1
++Ctrl.hexsecret = hexsecret:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
++Ctrl.hexinfo = hexinfo:307e300a06082b06010502030601a01f041d301ba0071b0553552e5345a110300ea003020101a10730051b036c6861a12904273025a0071b0553552e5345a11a3018a003020101a111300f1b066b72627467741b0553552e5345a22404223020a003020112a10c040aaaaaaaaaaaaaaaaaaaaaa20b0409bbbbbbbbbbbbbbbbbb
++Output = e6ab38c9413e035bb079201ed0b6b73d8d49a814a737c04ee6649614206f73ad
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA256
++Ctrl.hexsecret = hexsecret:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
++Ctrl.hexinfo = hexinfo:307e300a06082b06010502030602a01f041d301ba0071b0553552e5345a110300ea003020101a10730051b036c6861a12904273025a0071b0553552e5345a11a3018a003020101a111300f1b066b72627467741b0553552e5345a22404223020a003020112a10c040aaaaaaaaaaaaaaaaaaaaaa20b0409bbbbbbbbbbbbbbbbbb
++Output = 77ef4e48c420ae3fec75109d7981697eed5d295c90c62564f7bfd101fa9bc1d5
++
++KDF = SSKDF
++Ctrl.digest = digest:SHA512
++Ctrl.hexsecret = hexsecret:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
++Ctrl.hexinfo = hexinfo:307e300a06082b06010502030603a01f041d301ba0071b0553552e5345a110300ea003020101a10730051b036c6861a12904273025a0071b0553552e5345a11a3018a003020101a111300f1b066b72627467741b0553552e5345a22404223020a003020110a10c040aaaaaaaaaaaaaaaaaaaaaa20b0409bbbbbbbbbbbbbbbbbb
++Output = d3c78b78d75313e9a926f75dfb012363fa17fa01db
