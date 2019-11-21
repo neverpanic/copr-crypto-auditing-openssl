@@ -90,8 +90,8 @@ diff -up openssl-1.1.1d/crypto/kdf/build.info.krb5-kdf openssl-1.1.1d/crypto/kdf
 +        tls1_prf.c kdf_err.c kdf_util.c hkdf.c scrypt.c pbkdf2.c sshkdf.c kbkdf.c krb5kdf.c sskdf.c
 diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kbkdf.c
 --- openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf	2019-11-14 15:07:05.343094112 +0100
-+++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-14 16:07:15.385324361 +0100
-@@ -0,0 +1,530 @@
++++ openssl-1.1.1d/crypto/kdf/kbkdf.c	2019-11-18 17:21:58.326635901 +0100
+@@ -0,0 +1,540 @@
 +/*
 + * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
 + * Copyright 2019 Red Hat, Inc.
@@ -127,12 +127,16 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +#include <openssl/cmac.h>
 +#include <openssl/kdf.h>
 +
++#include "internal/numbers.h"
 +#include "internal/cryptlib.h"
 +#include "internal/evp_int.h"
 +#include "kdf_local.h"
 +
 +#include "e_os.h"
 +
++#ifdef MIN
++# undef MIN
++#endif
 +#define MIN(a, b) ((a) < (b)) ? (a) : (b)
 +
 +typedef struct {
@@ -451,6 +455,12 @@ diff -up openssl-1.1.1d/crypto/kdf/kbkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/kb
 +    p = va_arg(args, const unsigned char *);
 +    len = va_arg(args, size_t);
 +    OPENSSL_clear_free(*dst, *dst_len);
++    if (len == 0) {
++        *dst = NULL;
++        *dst_len = 0;
++        return 1;
++    }
++
 +    *dst = OPENSSL_memdup(p, len);
 +    if (*dst == NULL)
 +        return 0;
@@ -711,8 +721,8 @@ diff -up openssl-1.1.1d/crypto/kdf/kdf_util.c.krb5-kdf openssl-1.1.1d/crypto/kdf
 +}
 diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/krb5kdf.c
 --- openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf	2019-11-14 15:07:05.344094093 +0100
-+++ openssl-1.1.1d/crypto/kdf/krb5kdf.c	2019-11-14 16:11:17.761978261 +0100
-@@ -0,0 +1,417 @@
++++ openssl-1.1.1d/crypto/kdf/krb5kdf.c	2019-11-18 17:18:13.056604404 +0100
+@@ -0,0 +1,423 @@
 +/*
 + * Copyright 2018-2019 The OpenSSL Project Authors. All Rights Reserved.
 + *
@@ -811,6 +821,12 @@ diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
 +    p = va_arg(args, const unsigned char *);
 +    len = va_arg(args, size_t);
 +    OPENSSL_clear_free(*dst, *dst_len);
++    if (len == 0) {
++        *dst = NULL;
++        *dst_len = 0;
++        return 1;
++    }
++
 +    *dst = OPENSSL_memdup(p, len);
 +    if (*dst == NULL)
 +        return 0;
@@ -1130,10 +1146,34 @@ diff -up openssl-1.1.1d/crypto/kdf/krb5kdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/
 +    krb5kdf_derive,
 +};
 +
+diff -up openssl-1.1.1d/crypto/kdf/sshkdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/sshkdf.c
+--- openssl-1.1.1d/crypto/kdf/sshkdf.c.krb5-kdf	2019-11-14 15:07:05.327094396 +0100
++++ openssl-1.1.1d/crypto/kdf/sshkdf.c	2019-11-18 17:18:25.343388314 +0100
+@@ -12,6 +12,7 @@
+ #include <string.h>
+ #include <openssl/evp.h>
+ #include <openssl/kdf.h>
++#include "internal/numbers.h"
+ #include "internal/cryptlib.h"
+ #include "internal/evp_int.h"
+ #include "kdf_local.h"
+@@ -68,6 +69,12 @@ static int kdf_sshkdf_parse_buffer_arg(u
+     p = va_arg(args, const unsigned char *);
+     len = va_arg(args, size_t);
+     OPENSSL_clear_free(*dst, *dst_len);
++    if (len == 0) {
++        *dst = NULL;
++        *dst_len = 0;
++        return 1;
++    }
++
+     *dst = OPENSSL_memdup(p, len);
+     if (*dst == NULL)
+         return 0;
 diff -up openssl-1.1.1d/crypto/kdf/sskdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/sskdf.c
 --- openssl-1.1.1d/crypto/kdf/sskdf.c.krb5-kdf	2019-11-14 15:07:05.344094093 +0100
-+++ openssl-1.1.1d/crypto/kdf/sskdf.c	2019-11-14 15:43:17.603150203 +0100
-@@ -0,0 +1,252 @@
++++ openssl-1.1.1d/crypto/kdf/sskdf.c	2019-11-18 17:21:40.349952802 +0100
+@@ -0,0 +1,255 @@
 +/*
 + * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
 + * Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
@@ -1287,10 +1327,13 @@ diff -up openssl-1.1.1d/crypto/kdf/sskdf.c.krb5-kdf openssl-1.1.1d/crypto/kdf/ss
 +
 +    p = va_arg(args, const unsigned char *);
 +    len = va_arg(args, size_t);
-+    if (len == 0 || p == NULL)
++    OPENSSL_clear_free(*out, *out_len);
++    if (len == 0) {
++        *out = NULL;
++        *out_len = 0;
 +        return 1;
++    }
 +
-+    OPENSSL_free(*out);
 +    *out = OPENSSL_memdup(p, len);
 +    if (*out == NULL)
 +        return 0;
