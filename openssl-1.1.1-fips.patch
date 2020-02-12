@@ -7444,7 +7444,7 @@ diff -up openssl-1.1.1d/crypto/fips/fips_dsa_selftest.c.fips openssl-1.1.1d/cryp
 +{
 +    DSA *dsa = NULL;
 +    EVP_PKEY *pk = NULL;
-+    int ret = -1;
++    int ret = 0;
 +    BIGNUM *p = NULL, *q = NULL, *g = NULL, *pub_key = NULL, *priv_key = NULL;
 +
 +    fips_load_key_component(p, dsa_test_2048);
