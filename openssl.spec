@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1d
-Release: 6%{?dist}
+Release: 7%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -63,6 +63,7 @@ Patch48: openssl-1.1.1-fips-post-rand.patch
 Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
 Patch60: openssl-1.1.1-krb5-kdf.patch
+Patch61: openssl-1.1.1-intel-cet.patch
 # Backported fixes including security fixes
 Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
@@ -172,6 +173,7 @@ cp %{SOURCE13} test/
 %patch54 -p1 -b .regression
 %patch55 -p1 -b .aes-asm
 %patch60 -p1 -b .krb5-kdf
+%patch61 -p1 -b .intel-cet
 
 
 %build
@@ -458,6 +460,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon Feb 17 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-7
+- apply Intel CET support patches by hjl (#1788699)
+
 * Wed Jan 29 2020 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.1d-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
 
