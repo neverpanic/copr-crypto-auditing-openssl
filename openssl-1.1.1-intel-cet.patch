@@ -1,6 +1,6 @@
-diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl
---- openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl	2020-02-17 12:00:19.011235601 +0100
+diff -up openssl-1.1.1e/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1e/crypto/aes/asm/aesni-x86_64.pl
+--- openssl-1.1.1e/crypto/aes/asm/aesni-x86_64.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/aes/asm/aesni-x86_64.pl	2020-03-19 17:07:02.626522694 +0100
 @@ -275,6 +275,7 @@ $code.=<<___;
  .align	16
  ${PREFIX}_encrypt:
@@ -25,41 +25,23 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  ___
  $code.=<<___ if ($win64);
  	lea	-0x58(%rsp),%rsp
-@@ -984,6 +987,8 @@ $code.=<<___;
- .type	aesni_ccm64_encrypt_blocks,\@function,6
+@@ -985,6 +988,7 @@ $code.=<<___;
  .align	16
  aesni_ccm64_encrypt_blocks:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  ___
  $code.=<<___ if ($win64);
  	lea	-0x58(%rsp),%rsp
-@@ -1066,6 +1071,7 @@ $code.=<<___ if ($win64);
- ___
- $code.=<<___;
- 	ret
-+.cfi_endproc
- .size	aesni_ccm64_encrypt_blocks,.-aesni_ccm64_encrypt_blocks
- ___
- ######################################################################
-@@ -1074,6 +1080,8 @@ $code.=<<___;
- .type	aesni_ccm64_decrypt_blocks,\@function,6
+@@ -1077,6 +1081,7 @@ $code.=<<___;
  .align	16
  aesni_ccm64_decrypt_blocks:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  ___
  $code.=<<___ if ($win64);
  	lea	-0x58(%rsp),%rsp
-@@ -1173,6 +1181,7 @@ $code.=<<___ if ($win64);
- ___
- $code.=<<___;
- 	ret
-+.cfi_endproc
- .size	aesni_ccm64_decrypt_blocks,.-aesni_ccm64_decrypt_blocks
- ___
- }
-@@ -1199,6 +1208,7 @@ $code.=<<___;
+@@ -1203,6 +1208,7 @@ $code.=<<___;
  .align	16
  aesni_ctr32_encrypt_blocks:
  .cfi_startproc
@@ -67,7 +49,7 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	cmp	\$1,$len
  	jne	.Lctr32_bulk
  
-@@ -1771,6 +1781,7 @@ $code.=<<___;
+@@ -1775,6 +1781,7 @@ $code.=<<___;
  .align	16
  aesni_xts_encrypt:
  .cfi_startproc
@@ -75,7 +57,7 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	lea	(%rsp),%r11			# frame pointer
  .cfi_def_cfa_register	%r11
  	push	%rbp
-@@ -2254,6 +2265,7 @@ $code.=<<___;
+@@ -2258,6 +2265,7 @@ $code.=<<___;
  .align	16
  aesni_xts_decrypt:
  .cfi_startproc
@@ -83,7 +65,7 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	lea	(%rsp),%r11			# frame pointer
  .cfi_def_cfa_register	%r11
  	push	%rbp
-@@ -2779,6 +2791,7 @@ $code.=<<___;
+@@ -2783,6 +2791,7 @@ $code.=<<___;
  .align	32
  aesni_ocb_encrypt:
  .cfi_startproc
@@ -91,51 +73,7 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	lea	(%rsp),%rax
  	push	%rbx
  .cfi_push	%rbx
-@@ -3031,6 +3044,7 @@ $code.=<<___;
- .type	__ocb_encrypt6,\@abi-omnipotent
- .align	32
- __ocb_encrypt6:
-+.cfi_startproc
- 	 pxor		$rndkey0l,@offset[5]	# offset_i ^ round[0]
- 	 movdqu		($L_p,$i1),@offset[1]
- 	 movdqa		@offset[0],@offset[2]
-@@ -3128,11 +3142,13 @@ __ocb_encrypt6:
- 	aesenclast	@offset[4],$inout4
- 	aesenclast	@offset[5],$inout5
- 	ret
-+.cfi_endproc
- .size	__ocb_encrypt6,.-__ocb_encrypt6
- 
- .type	__ocb_encrypt4,\@abi-omnipotent
- .align	32
- __ocb_encrypt4:
-+.cfi_startproc
- 	 pxor		$rndkey0l,@offset[5]	# offset_i ^ round[0]
- 	 movdqu		($L_p,$i1),@offset[1]
- 	 movdqa		@offset[0],@offset[2]
-@@ -3197,11 +3213,13 @@ __ocb_encrypt4:
- 	aesenclast	@offset[2],$inout2
- 	aesenclast	@offset[3],$inout3
- 	ret
-+.cfi_endproc
- .size	__ocb_encrypt4,.-__ocb_encrypt4
- 
- .type	__ocb_encrypt1,\@abi-omnipotent
- .align	32
- __ocb_encrypt1:
-+.cfi_startproc
- 	 pxor		@offset[5],$inout5	# offset_i
- 	 pxor		$rndkey0l,$inout5	# offset_i ^ round[0]
- 	pxor		$inout0,$checksum	# accumulate checksum
-@@ -3232,6 +3250,7 @@ __ocb_encrypt1:
- 
- 	aesenclast	$inout5,$inout0
- 	ret
-+.cfi_endproc
- .size	__ocb_encrypt1,.-__ocb_encrypt1
- 
- .globl	aesni_ocb_decrypt
-@@ -3239,6 +3258,7 @@ __ocb_encrypt1:
+@@ -3249,6 +3258,7 @@ __ocb_encrypt1:
  .align	32
  aesni_ocb_decrypt:
  .cfi_startproc
@@ -143,51 +81,7 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	lea	(%rsp),%rax
  	push	%rbx
  .cfi_push	%rbx
-@@ -3513,6 +3533,7 @@ $code.=<<___;
- .type	__ocb_decrypt6,\@abi-omnipotent
- .align	32
- __ocb_decrypt6:
-+.cfi_startproc
- 	 pxor		$rndkey0l,@offset[5]	# offset_i ^ round[0]
- 	 movdqu		($L_p,$i1),@offset[1]
- 	 movdqa		@offset[0],@offset[2]
-@@ -3604,11 +3625,13 @@ __ocb_decrypt6:
- 	aesdeclast	@offset[4],$inout4
- 	aesdeclast	@offset[5],$inout5
- 	ret
-+.cfi_endproc
- .size	__ocb_decrypt6,.-__ocb_decrypt6
- 
- .type	__ocb_decrypt4,\@abi-omnipotent
- .align	32
- __ocb_decrypt4:
-+.cfi_startproc
- 	 pxor		$rndkey0l,@offset[5]	# offset_i ^ round[0]
- 	 movdqu		($L_p,$i1),@offset[1]
- 	 movdqa		@offset[0],@offset[2]
-@@ -3669,11 +3692,13 @@ __ocb_decrypt4:
- 	aesdeclast	@offset[2],$inout2
- 	aesdeclast	@offset[3],$inout3
- 	ret
-+.cfi_endproc
- .size	__ocb_decrypt4,.-__ocb_decrypt4
- 
- .type	__ocb_decrypt1,\@abi-omnipotent
- .align	32
- __ocb_decrypt1:
-+.cfi_startproc
- 	 pxor		@offset[5],$inout5	# offset_i
- 	 pxor		$rndkey0l,$inout5	# offset_i ^ round[0]
- 	pxor		$inout5,$inout0		# input ^ round[0] ^ offset_i
-@@ -3703,6 +3728,7 @@ __ocb_decrypt1:
- 
- 	aesdeclast	$inout5,$inout0
- 	ret
-+.cfi_endproc
- .size	__ocb_decrypt1,.-__ocb_decrypt1
- ___
- } }}
-@@ -3721,6 +3747,7 @@ $code.=<<___;
+@@ -3737,6 +3747,7 @@ $code.=<<___;
  .align	16
  ${PREFIX}_cbc_encrypt:
  .cfi_startproc
@@ -195,25 +89,9 @@ diff -up openssl-1.1.1d/crypto/aes/asm/aesni-x86_64.pl.intel-cet openssl-1.1.1d/
  	test	$len,$len		# check length
  	jz	.Lcbc_ret
  
-@@ -4637,7 +4664,6 @@ __aesni_set_encrypt_key:
- 	add	\$8,%rsp
- .cfi_adjust_cfa_offset	-8
- 	ret
--.cfi_endproc
- .LSEH_end_set_encrypt_key:
- 
- .align	16
-@@ -4708,6 +4734,7 @@ __aesni_set_encrypt_key:
- 	shufps	\$0b10101010,%xmm1,%xmm1	# critical path
- 	xorps	%xmm1,%xmm2
- 	ret
-+.cfi_endproc
- .size	${PREFIX}_set_encrypt_key,.-${PREFIX}_set_encrypt_key
- .size	__aesni_set_encrypt_key,.-__aesni_set_encrypt_key
- ___
-diff -up openssl-1.1.1d/crypto/aes/asm/vpaes-x86_64.pl.intel-cet openssl-1.1.1d/crypto/aes/asm/vpaes-x86_64.pl
---- openssl-1.1.1d/crypto/aes/asm/vpaes-x86_64.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/aes/asm/vpaes-x86_64.pl	2020-02-17 11:55:07.374557249 +0100
+diff -up openssl-1.1.1e/crypto/aes/asm/vpaes-x86_64.pl.intel-cet openssl-1.1.1e/crypto/aes/asm/vpaes-x86_64.pl
+--- openssl-1.1.1e/crypto/aes/asm/vpaes-x86_64.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/aes/asm/vpaes-x86_64.pl	2020-03-19 17:00:15.974621757 +0100
 @@ -696,6 +696,7 @@ _vpaes_schedule_mangle:
  .align	16
  ${PREFIX}_set_encrypt_key:
@@ -254,9 +132,9 @@ diff -up openssl-1.1.1d/crypto/aes/asm/vpaes-x86_64.pl.intel-cet openssl-1.1.1d/
  	xchg	$key,$len
  ___
  ($len,$key)=($key,$len);
-diff -up openssl-1.1.1d/crypto/async/arch/async_posix.c.intel-cet openssl-1.1.1d/crypto/async/arch/async_posix.c
---- openssl-1.1.1d/crypto/async/arch/async_posix.c.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/async/arch/async_posix.c	2020-02-17 11:55:07.374557249 +0100
+diff -up openssl-1.1.1e/crypto/async/arch/async_posix.c.intel-cet openssl-1.1.1e/crypto/async/arch/async_posix.c
+--- openssl-1.1.1e/crypto/async/arch/async_posix.c.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/async/arch/async_posix.c	2020-03-19 17:00:15.974621757 +0100
 @@ -34,7 +34,9 @@ void async_local_cleanup(void)
  
  int async_fibre_makecontext(async_fibre *fibre)
@@ -267,9 +145,9 @@ diff -up openssl-1.1.1d/crypto/async/arch/async_posix.c.intel-cet openssl-1.1.1d
      if (getcontext(&fibre->fibre) == 0) {
          fibre->fibre.uc_stack.ss_sp = OPENSSL_malloc(STACKSIZE);
          if (fibre->fibre.uc_stack.ss_sp != NULL) {
-diff -up openssl-1.1.1d/crypto/async/arch/async_posix.h.intel-cet openssl-1.1.1d/crypto/async/arch/async_posix.h
---- openssl-1.1.1d/crypto/async/arch/async_posix.h.intel-cet	2020-02-17 11:55:06.600570492 +0100
-+++ openssl-1.1.1d/crypto/async/arch/async_posix.h	2020-02-17 11:55:07.374557249 +0100
+diff -up openssl-1.1.1e/crypto/async/arch/async_posix.h.intel-cet openssl-1.1.1e/crypto/async/arch/async_posix.h
+--- openssl-1.1.1e/crypto/async/arch/async_posix.h.intel-cet	2020-03-19 17:00:15.435631166 +0100
++++ openssl-1.1.1e/crypto/async/arch/async_posix.h	2020-03-19 17:00:15.975621739 +0100
 @@ -25,17 +25,33 @@
  #  define ASYNC_POSIX
  #  define ASYNC_ARCH
@@ -313,10 +191,10 @@ diff -up openssl-1.1.1d/crypto/async/arch/async_posix.h.intel-cet openssl-1.1.1d
  
      return 1;
  }
-diff -up openssl-1.1.1d/crypto/camellia/asm/cmll-x86_64.pl.intel-cet openssl-1.1.1d/crypto/camellia/asm/cmll-x86_64.pl
---- openssl-1.1.1d/crypto/camellia/asm/cmll-x86_64.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/camellia/asm/cmll-x86_64.pl	2020-02-17 11:55:07.375557232 +0100
-@@ -677,6 +677,7 @@ $code.=<<___;
+diff -up openssl-1.1.1e/crypto/camellia/asm/cmll-x86_64.pl.intel-cet openssl-1.1.1e/crypto/camellia/asm/cmll-x86_64.pl
+--- openssl-1.1.1e/crypto/camellia/asm/cmll-x86_64.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/camellia/asm/cmll-x86_64.pl	2020-03-19 17:00:15.975621739 +0100
+@@ -685,6 +685,7 @@ $code.=<<___;
  .align	16
  Camellia_cbc_encrypt:
  .cfi_startproc
@@ -324,9 +202,9 @@ diff -up openssl-1.1.1d/crypto/camellia/asm/cmll-x86_64.pl.intel-cet openssl-1.1
  	cmp	\$0,%rdx
  	je	.Lcbc_abort
  	push	%rbx
-diff -up openssl-1.1.1d/crypto/modes/asm/ghash-x86_64.pl.intel-cet openssl-1.1.1d/crypto/modes/asm/ghash-x86_64.pl
---- openssl-1.1.1d/crypto/modes/asm/ghash-x86_64.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/modes/asm/ghash-x86_64.pl	2020-02-17 11:55:07.375557232 +0100
+diff -up openssl-1.1.1e/crypto/modes/asm/ghash-x86_64.pl.intel-cet openssl-1.1.1e/crypto/modes/asm/ghash-x86_64.pl
+--- openssl-1.1.1e/crypto/modes/asm/ghash-x86_64.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/modes/asm/ghash-x86_64.pl	2020-03-19 17:00:15.975621739 +0100
 @@ -239,6 +239,7 @@ $code=<<___;
  .align	16
  gcm_gmult_4bit:
@@ -375,9 +253,9 @@ diff -up openssl-1.1.1d/crypto/modes/asm/ghash-x86_64.pl.intel-cet openssl-1.1.1
  ___
  if ($avx) {
  my ($Xip,$Htbl,$inp,$len)=@_4args;
-diff -up openssl-1.1.1d/crypto/perlasm/cbc.pl.intel-cet openssl-1.1.1d/crypto/perlasm/cbc.pl
---- openssl-1.1.1d/crypto/perlasm/cbc.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/perlasm/cbc.pl	2020-02-17 11:55:07.375557232 +0100
+diff -up openssl-1.1.1e/crypto/perlasm/cbc.pl.intel-cet openssl-1.1.1e/crypto/perlasm/cbc.pl
+--- openssl-1.1.1e/crypto/perlasm/cbc.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/perlasm/cbc.pl	2020-03-19 17:00:15.976621722 +0100
 @@ -165,21 +165,28 @@ sub cbc
  	&jmp_ptr($count);
  
@@ -407,9 +285,9 @@ diff -up openssl-1.1.1d/crypto/perlasm/cbc.pl.intel-cet openssl-1.1.1d/crypto/pe
  	&movb(&LB("ecx"),	&BP(0,$in,"",0));
  &set_label("ejend");
  
-diff -up openssl-1.1.1d/crypto/perlasm/x86_64-xlate.pl.intel-cet openssl-1.1.1d/crypto/perlasm/x86_64-xlate.pl
---- openssl-1.1.1d/crypto/perlasm/x86_64-xlate.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/perlasm/x86_64-xlate.pl	2020-02-17 11:55:07.375557232 +0100
+diff -up openssl-1.1.1e/crypto/perlasm/x86_64-xlate.pl.intel-cet openssl-1.1.1e/crypto/perlasm/x86_64-xlate.pl
+--- openssl-1.1.1e/crypto/perlasm/x86_64-xlate.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/perlasm/x86_64-xlate.pl	2020-03-19 17:00:15.984621582 +0100
 @@ -101,6 +101,33 @@ elsif (!$gas)
      $decor="\$L\$";
  }
@@ -452,9 +330,9 @@ diff -up openssl-1.1.1d/crypto/perlasm/x86_64-xlate.pl.intel-cet openssl-1.1.1d/
  print "\n$current_segment\tENDS\n"	if ($current_segment && $masm);
  print "END\n"				if ($masm);
  
-diff -up openssl-1.1.1d/crypto/perlasm/x86gas.pl.intel-cet openssl-1.1.1d/crypto/perlasm/x86gas.pl
---- openssl-1.1.1d/crypto/perlasm/x86gas.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/perlasm/x86gas.pl	2020-02-17 11:55:07.376557215 +0100
+diff -up openssl-1.1.1e/crypto/perlasm/x86gas.pl.intel-cet openssl-1.1.1e/crypto/perlasm/x86gas.pl
+--- openssl-1.1.1e/crypto/perlasm/x86gas.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/perlasm/x86gas.pl	2020-03-19 17:00:15.985621565 +0100
 @@ -124,6 +124,7 @@ sub ::function_begin_B
      push(@out,".align\t$align\n");
      push(@out,"$func:\n");
@@ -490,292 +368,72 @@ diff -up openssl-1.1.1d/crypto/perlasm/x86gas.pl.intel-cet openssl-1.1.1d/crypto
  }
  
  sub ::data_byte	{   push(@out,".byte\t".join(',',@_)."\n");   }
-diff -up openssl-1.1.1d/crypto/poly1305/asm/poly1305-x86_64.pl.intel-cet openssl-1.1.1d/crypto/poly1305/asm/poly1305-x86_64.pl
---- openssl-1.1.1d/crypto/poly1305/asm/poly1305-x86_64.pl.intel-cet	2020-02-17 11:55:07.376557215 +0100
-+++ openssl-1.1.1d/crypto/poly1305/asm/poly1305-x86_64.pl	2020-02-17 12:02:12.295308065 +0100
-@@ -90,7 +90,7 @@ if (!$avx && $win64 && ($flavour =~ /mas
- 	$avx = ($1>=10) + ($1>=12);
- }
- 
--if (!$avx && `$ENV{CC} -v 2>&1` =~ /((?:^clang|LLVM) version|.*based on LLVM) ([3-9]\.[0-9]+)/) {
-+if (!$avx && `$ENV{CC} -v 2>&1` =~ /((?:^clang|LLVM) version|.*based on LLVM) ([0-9]+\.[0-9]+)/) {
- 	$avx = ($2>=3.0) + ($2>3.0);
- }
- 
-@@ -168,6 +168,7 @@ $code.=<<___;
- .type	poly1305_init,\@function,3
- .align	32
- poly1305_init:
-+.cfi_startproc
- 	xor	%rax,%rax
- 	mov	%rax,0($ctx)		# initialize hash value
- 	mov	%rax,8($ctx)
-@@ -219,6 +220,7 @@ $code.=<<___;
- 	mov	\$1,%eax
- .Lno_key:
- 	ret
-+.cfi_endproc
- .size	poly1305_init,.-poly1305_init
- 
- .type	poly1305_blocks,\@function,4
-@@ -298,6 +300,7 @@ $code.=<<___;
- .type	poly1305_emit,\@function,3
- .align	32
- poly1305_emit:
-+.cfi_startproc
- .Lemit:
- 	mov	0($ctx),%r8	# load hash value
- 	mov	8($ctx),%r9
-@@ -318,6 +321,7 @@ poly1305_emit:
- 	mov	%rcx,8($mac)
- 
- 	ret
-+.cfi_endproc
- .size	poly1305_emit,.-poly1305_emit
- ___
- if ($avx) {
-@@ -342,15 +346,18 @@ $code.=<<___;
- .type	__poly1305_block,\@abi-omnipotent
- .align	32
- __poly1305_block:
-+.cfi_startproc
- ___
- 	&poly1305_iteration();
- $code.=<<___;
- 	ret
-+.cfi_endproc
- .size	__poly1305_block,.-__poly1305_block
- 
- .type	__poly1305_init_avx,\@abi-omnipotent
- .align	32
- __poly1305_init_avx:
-+.cfi_startproc
- 	mov	$r0,$h0
- 	mov	$r1,$h1
- 	xor	$h2,$h2
-@@ -508,6 +515,7 @@ __poly1305_init_avx:
- 
- 	lea	-48-64($ctx),$ctx	# size [de-]optimization
- 	ret
-+.cfi_endproc
- .size	__poly1305_init_avx,.-__poly1305_init_avx
- 
- .type	poly1305_blocks_avx,\@function,4
-@@ -1373,6 +1381,7 @@ $code.=<<___;
- .type	poly1305_emit_avx,\@function,3
- .align	32
- poly1305_emit_avx:
-+.cfi_startproc
- 	cmpl	\$0,20($ctx)	# is_base2_26?
- 	je	.Lemit
- 
-@@ -1423,6 +1432,7 @@ poly1305_emit_avx:
- 	mov	%rcx,8($mac)
- 
- 	ret
-+.cfi_endproc
- .size	poly1305_emit_avx,.-poly1305_emit_avx
- ___
- 
-@@ -2741,6 +2751,7 @@ $code.=<<___;
- .type	poly1305_init_base2_44,\@function,3
- .align	32
- poly1305_init_base2_44:
-+.cfi_startproc
- 	xor	%rax,%rax
- 	mov	%rax,0($ctx)		# initialize hash value
- 	mov	%rax,8($ctx)
-@@ -2782,6 +2793,7 @@ ___
- $code.=<<___;
- 	mov	\$1,%eax
- 	ret
-+.cfi_endproc
- .size	poly1305_init_base2_44,.-poly1305_init_base2_44
- ___
- {
-@@ -2793,6 +2805,8 @@ $code.=<<___;
- .type	poly1305_blocks_vpmadd52,\@function,4
+diff -up openssl-1.1.1e/crypto/poly1305/asm/poly1305-x86_64.pl.intel-cet openssl-1.1.1e/crypto/poly1305/asm/poly1305-x86_64.pl
+--- openssl-1.1.1e/crypto/poly1305/asm/poly1305-x86_64.pl.intel-cet	2020-03-19 17:00:38.185234015 +0100
++++ openssl-1.1.1e/crypto/poly1305/asm/poly1305-x86_64.pl	2020-03-19 17:05:46.575850341 +0100
+@@ -2806,6 +2806,7 @@ $code.=<<___;
  .align	32
  poly1305_blocks_vpmadd52:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	shr	\$4,$len
  	jz	.Lno_data_vpmadd52		# too short
  
-@@ -2899,6 +2913,7 @@ poly1305_blocks_vpmadd52:
- 
- .Lno_data_vpmadd52:
- 	ret
-+.cfi_endproc
- .size	poly1305_blocks_vpmadd52,.-poly1305_blocks_vpmadd52
- ___
- }
-@@ -2916,6 +2931,7 @@ $code.=<<___;
- .type	poly1305_blocks_vpmadd52_4x,\@function,4
- .align	32
- poly1305_blocks_vpmadd52_4x:
-+.cfi_startproc
- 	shr	\$4,$len
- 	jz	.Lno_data_vpmadd52_4x		# too short
- 
-@@ -3340,6 +3356,7 @@ poly1305_blocks_vpmadd52_4x:
- 
- .Lno_data_vpmadd52_4x:
- 	ret
-+.cfi_endproc
- .size	poly1305_blocks_vpmadd52_4x,.-poly1305_blocks_vpmadd52_4x
- ___
- }
-@@ -3358,6 +3375,7 @@ $code.=<<___;
- .type	poly1305_blocks_vpmadd52_8x,\@function,4
- .align	32
- poly1305_blocks_vpmadd52_8x:
-+.cfi_startproc
- 	shr	\$4,$len
- 	jz	.Lno_data_vpmadd52_8x		# too short
- 
-@@ -3713,6 +3731,7 @@ $code.=<<___;
- 
- .Lno_data_vpmadd52_8x:
- 	ret
-+.cfi_endproc
- .size	poly1305_blocks_vpmadd52_8x,.-poly1305_blocks_vpmadd52_8x
- ___
- }
-@@ -3720,6 +3739,8 @@ $code.=<<___;
- .type	poly1305_emit_base2_44,\@function,3
+@@ -3739,6 +3740,7 @@ $code.=<<___;
  .align	32
  poly1305_emit_base2_44:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	mov	0($ctx),%r8	# load hash value
  	mov	8($ctx),%r9
  	mov	16($ctx),%r10
-@@ -3750,6 +3771,7 @@ poly1305_emit_base2_44:
- 	mov	%rcx,8($mac)
- 
- 	ret
-+.cfi_endproc
- .size	poly1305_emit_base2_44,.-poly1305_emit_base2_44
- ___
- }	}	}
-@@ -3800,6 +3822,7 @@ $code.=<<___;
- .type	xor128_encrypt_n_pad,\@abi-omnipotent
+diff -up openssl-1.1.1e/crypto/rc4/asm/rc4-x86_64.pl.intel-cet openssl-1.1.1e/crypto/rc4/asm/rc4-x86_64.pl
+--- openssl-1.1.1e/crypto/rc4/asm/rc4-x86_64.pl.intel-cet	2020-03-19 17:00:38.190233928 +0100
++++ openssl-1.1.1e/crypto/rc4/asm/rc4-x86_64.pl	2020-03-19 17:05:02.598618064 +0100
+@@ -140,6 +140,7 @@ $code=<<___;
  .align	16
- xor128_encrypt_n_pad:
-+.cfi_startproc
- 	sub	$otp,$inp
- 	sub	$otp,$out
- 	mov	$len,%r10		# put len aside
-@@ -3841,12 +3864,14 @@ xor128_encrypt_n_pad:
- .Ldone_enc:
- 	mov	$otp,%rax
- 	ret
-+.cfi_endproc
- .size	xor128_encrypt_n_pad,.-xor128_encrypt_n_pad
- 
- .globl	xor128_decrypt_n_pad
- .type	xor128_decrypt_n_pad,\@abi-omnipotent
- .align	16
- xor128_decrypt_n_pad:
-+.cfi_startproc
- 	sub	$otp,$inp
- 	sub	$otp,$out
- 	mov	$len,%r10		# put len aside
-@@ -3892,6 +3917,7 @@ xor128_decrypt_n_pad:
- .Ldone_dec:
- 	mov	$otp,%rax
- 	ret
-+.cfi_endproc
- .size	xor128_decrypt_n_pad,.-xor128_decrypt_n_pad
- ___
- }
-diff -up openssl-1.1.1d/crypto/rc4/asm/rc4-x86_64.pl.intel-cet openssl-1.1.1d/crypto/rc4/asm/rc4-x86_64.pl
---- openssl-1.1.1d/crypto/rc4/asm/rc4-x86_64.pl.intel-cet	2020-02-17 11:55:07.377557198 +0100
-+++ openssl-1.1.1d/crypto/rc4/asm/rc4-x86_64.pl	2020-02-17 12:03:09.117341235 +0100
-@@ -138,11 +138,13 @@ $code=<<___;
- .globl	RC4
- .type	RC4,\@function,4
- .align	16
--RC4:	or	$len,$len
-+RC4:
-+.cfi_startproc
+ RC4:
+ .cfi_startproc
 +	endbranch
-+	or	$len,$len
+ 	or	$len,$len
  	jne	.Lentry
  	ret
- .Lentry:
--.cfi_startproc
- 	push	%rbx
- .cfi_push	%rbx
- 	push	%r12
-@@ -453,6 +455,8 @@ $code.=<<___;
- .type	RC4_set_key,\@function,3
+@@ -455,6 +456,7 @@ $code.=<<___;
  .align	16
  RC4_set_key:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	lea	8($dat),$dat
  	lea	($inp,$len),$inp
  	neg	$len
-@@ -519,12 +523,15 @@ RC4_set_key:
- 	mov	%eax,-8($dat)
- 	mov	%eax,-4($dat)
- 	ret
-+.cfi_endproc
- .size	RC4_set_key,.-RC4_set_key
- 
- .globl	RC4_options
- .type	RC4_options,\@abi-omnipotent
+@@ -529,6 +531,7 @@ RC4_set_key:
  .align	16
  RC4_options:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	lea	.Lopts(%rip),%rax
  	mov	OPENSSL_ia32cap_P(%rip),%edx
  	bt	\$20,%edx
-@@ -537,6 +544,7 @@ RC4_options:
- 	add	\$12,%rax
- .Ldone:
- 	ret
-+.cfi_endproc
- .align	64
- .Lopts:
- .asciz	"rc4(8x,int)"
-diff -up openssl-1.1.1d/crypto/x86_64cpuid.pl.intel-cet openssl-1.1.1d/crypto/x86_64cpuid.pl
---- openssl-1.1.1d/crypto/x86_64cpuid.pl.intel-cet	2019-09-10 15:13:07.000000000 +0200
-+++ openssl-1.1.1d/crypto/x86_64cpuid.pl	2020-02-17 12:04:04.921391729 +0100
-@@ -39,6 +39,8 @@ print<<___;
- .type	OPENSSL_atomic_add,\@abi-omnipotent
+diff -up openssl-1.1.1e/crypto/x86_64cpuid.pl.intel-cet openssl-1.1.1e/crypto/x86_64cpuid.pl
+--- openssl-1.1.1e/crypto/x86_64cpuid.pl.intel-cet	2020-03-17 15:31:17.000000000 +0100
++++ openssl-1.1.1e/crypto/x86_64cpuid.pl	2020-03-19 17:03:58.172742775 +0100
+@@ -40,6 +40,7 @@ print<<___;
  .align	16
  OPENSSL_atomic_add:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	movl	($arg1),%eax
  .Lspin:	leaq	($arg2,%rax),%r8
  	.byte	0xf0		# lock
-@@ -47,16 +49,20 @@ OPENSSL_atomic_add:
- 	movl	%r8d,%eax
- 	.byte	0x48,0x98	# cltq/cdqe
- 	ret
-+.cfi_endproc
- .size	OPENSSL_atomic_add,.-OPENSSL_atomic_add
- 
- .globl	OPENSSL_rdtsc
- .type	OPENSSL_rdtsc,\@abi-omnipotent
+@@ -56,6 +57,7 @@ OPENSSL_atomic_add:
  .align	16
  OPENSSL_rdtsc:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	rdtsc
  	shl	\$32,%rdx
  	or	%rdx,%rax
- 	ret
-+.cfi_endproc
- .size	OPENSSL_rdtsc,.-OPENSSL_rdtsc
- 
- .globl	OPENSSL_ia32_cpuid
-@@ -64,6 +70,7 @@ OPENSSL_rdtsc:
+@@ -68,6 +70,7 @@ OPENSSL_rdtsc:
  .align	16
  OPENSSL_ia32_cpuid:
  .cfi_startproc
@@ -783,40 +441,31 @@ diff -up openssl-1.1.1d/crypto/x86_64cpuid.pl.intel-cet openssl-1.1.1d/crypto/x8
  	mov	%rbx,%r8		# save %rbx
  .cfi_register	%rbx,%r8
  
-@@ -232,6 +239,8 @@ OPENSSL_ia32_cpuid:
- .type   OPENSSL_cleanse,\@abi-omnipotent
+@@ -237,6 +240,7 @@ OPENSSL_ia32_cpuid:
  .align  16
  OPENSSL_cleanse:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	xor	%rax,%rax
  	cmp	\$15,$arg2
  	jae	.Lot
-@@ -261,12 +270,15 @@ OPENSSL_cleanse:
- 	cmp	\$0,$arg2
- 	jne	.Little
- 	ret
-+.cfi_endproc
- .size	OPENSSL_cleanse,.-OPENSSL_cleanse
- 
- .globl  CRYPTO_memcmp
- .type   CRYPTO_memcmp,\@abi-omnipotent
+@@ -274,6 +278,7 @@ OPENSSL_cleanse:
  .align  16
  CRYPTO_memcmp:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	xor	%rax,%rax
  	xor	%r10,%r10
  	cmp	\$0,$arg3
-@@ -295,6 +307,7 @@ CRYPTO_memcmp:
- 	shr	\$63,%rax
- .Lno_data:
- 	ret
-+.cfi_endproc
- .size	CRYPTO_memcmp,.-CRYPTO_memcmp
- ___
- 
-@@ -303,6 +316,8 @@ print<<___ if (!$win64);
+@@ -312,6 +317,7 @@ print<<___ if (!$win64);
+ .align	16
+ OPENSSL_wipe_cpu:
+ .cfi_startproc
++	endbranch
+ 	pxor	%xmm0,%xmm0
+ 	pxor	%xmm1,%xmm1
+ 	pxor	%xmm2,%xmm2
+@@ -346,6 +352,8 @@ print<<___ if ($win64);
  .type	OPENSSL_wipe_cpu,\@abi-omnipotent
  .align	16
  OPENSSL_wipe_cpu:
@@ -825,61 +474,27 @@ diff -up openssl-1.1.1d/crypto/x86_64cpuid.pl.intel-cet openssl-1.1.1d/crypto/x8
  	pxor	%xmm0,%xmm0
  	pxor	%xmm1,%xmm1
  	pxor	%xmm2,%xmm2
-@@ -329,6 +344,7 @@ OPENSSL_wipe_cpu:
- 	xorq	%r11,%r11
- 	leaq	8(%rsp),%rax
- 	ret
-+.cfi_endproc
- .size	OPENSSL_wipe_cpu,.-OPENSSL_wipe_cpu
- ___
- print<<___ if ($win64);
-@@ -365,6 +381,8 @@ print<<___;
- .type	OPENSSL_instrument_bus,\@abi-omnipotent
+@@ -376,6 +384,7 @@ print<<___;
  .align	16
  OPENSSL_instrument_bus:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	mov	$arg1,$out	# tribute to Win64
  	mov	$arg2,$cnt
  	mov	$arg2,$max
-@@ -391,12 +409,15 @@ OPENSSL_instrument_bus:
- 
- 	mov	$max,%rax
- 	ret
-+.cfi_endproc
- .size	OPENSSL_instrument_bus,.-OPENSSL_instrument_bus
- 
- .globl	OPENSSL_instrument_bus2
- .type	OPENSSL_instrument_bus2,\@abi-omnipotent
+@@ -410,6 +419,7 @@ OPENSSL_instrument_bus:
  .align	16
  OPENSSL_instrument_bus2:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	mov	$arg1,$out	# tribute to Win64
  	mov	$arg2,$cnt
  	mov	$arg3,$max
-@@ -439,6 +460,7 @@ OPENSSL_instrument_bus2:
- 	mov	$redzone(%rsp),%rax
- 	sub	$cnt,%rax
- 	ret
-+.cfi_endproc
- .size	OPENSSL_instrument_bus2,.-OPENSSL_instrument_bus2
- ___
- }
-@@ -450,6 +472,8 @@ print<<___;
- .type	OPENSSL_ia32_${rdop}_bytes,\@abi-omnipotent
+@@ -465,6 +475,7 @@ print<<___;
  .align	16
  OPENSSL_ia32_${rdop}_bytes:
-+.cfi_startproc
+ .cfi_startproc
 +	endbranch
  	xor	%rax, %rax	# return value
  	cmp	\$0,$arg2
  	je	.Ldone_${rdop}_bytes
-@@ -486,6 +510,7 @@ OPENSSL_ia32_${rdop}_bytes:
- .Ldone_${rdop}_bytes:
- 	xor	%r10,%r10	# Clear sensitive data from register
- 	ret
-+.cfi_endproc
- .size	OPENSSL_ia32_${rdop}_bytes,.-OPENSSL_ia32_${rdop}_bytes
- ___
- }

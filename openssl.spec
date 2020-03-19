@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1d
-Release: 7%{?dist}
+Version: 1.1.1e
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -64,12 +64,11 @@ Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
 Patch60: openssl-1.1.1-krb5-kdf.patch
 Patch61: openssl-1.1.1-intel-cet.patch
+Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 # Backported fixes including security fixes
-Patch51: openssl-1.1.1-upstream-sync.patch
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
 Patch54: openssl-1.1.1-regression-fixes.patch
-Patch55: openssl-1.1.1-aes-asm.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -167,13 +166,12 @@ cp %{SOURCE13} test/
 %patch48 -p1 -b .fips-post-rand
 %patch49 -p1 -b .evp-kdf
 %patch50 -p1 -b .ssh-kdf
-%patch51 -p1 -b .upstream-sync
 %patch52 -p1 -b .s390x-update
 %patch53 -p1 -b .crng-test
 %patch54 -p1 -b .regression
-%patch55 -p1 -b .aes-asm
 %patch60 -p1 -b .krb5-kdf
 %patch61 -p1 -b .intel-cet
+%patch65 -p1 -b .drbg-selftest
 
 
 %build
@@ -460,6 +458,11 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Mar 18 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1e-1
+- update to the 1.1.1e release
+- add selftest of the RAND_DRBG implementation
+- fix incorrect error return value from FIPS_selftest_dsa
+
 * Mon Feb 17 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1d-7
 - apply Intel CET support patches by hjl (#1788699)
 
