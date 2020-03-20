@@ -81,6 +81,7 @@ BuildRequires: /usr/sbin/sysctl
 BuildRequires: perl(Test::Harness), perl(Test::More), perl(Math::BigInt)
 BuildRequires: perl(Module::Load::Conditional), perl(File::Temp)
 BuildRequires: perl(Time::HiRes)
+BuildRequires: perl(FindBin)
 Requires: coreutils
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
 
@@ -458,7 +459,7 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
-* Wed Mar 18 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1e-1
+* Fri Mar 20 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1e-1
 - update to the 1.1.1e release
 - add selftest of the RAND_DRBG implementation
 - fix incorrect error return value from FIPS_selftest_dsa
