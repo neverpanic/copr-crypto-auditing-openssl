@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1e
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -69,6 +69,7 @@ Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
 Patch54: openssl-1.1.1-regression-fixes.patch
+Patch55: openssl-1.1.1-eof-error-revert.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -173,6 +174,7 @@ cp %{SOURCE13} test/
 %patch60 -p1 -b .krb5-kdf
 %patch61 -p1 -b .intel-cet
 %patch65 -p1 -b .drbg-selftest
+%patch55 -p1 -b .eof-revert
 
 
 %build
@@ -459,6 +461,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Mar 26 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1e-2
+- revert the unexpected EOF error reporting change as it is
+  too disruptive for the stable release branch
+
 * Fri Mar 20 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1e-1
 - update to the 1.1.1e release
 - add selftest of the RAND_DRBG implementation
