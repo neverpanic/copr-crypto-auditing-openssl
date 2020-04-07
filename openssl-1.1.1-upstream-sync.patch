@@ -1,0 +1,671 @@
+diff --git a/crypto/ec/ec_asn1.c b/crypto/ec/ec_asn1.c
+index 336afc989d..831b74ce6c 100644
+--- a/crypto/ec/ec_asn1.c
++++ b/crypto/ec/ec_asn1.c
+@@ -1297,5 +1297,7 @@ int ECDSA_size(const EC_KEY *r)
+     i = i2d_ASN1_INTEGER(&bs, NULL);
+     i += i;                     /* r and s */
+     ret = ASN1_object_size(1, i, V_ASN1_SEQUENCE);
++    if (ret < 0)
++        return 0;
+     return ret;
+ }
+diff --git a/crypto/ec/ec_lib.c b/crypto/ec/ec_lib.c
+index 3554ada827..22b00e203d 100644
+--- a/crypto/ec/ec_lib.c
++++ b/crypto/ec/ec_lib.c
+@@ -1007,14 +1007,14 @@ int EC_POINTs_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
+     size_t i = 0;
+     BN_CTX *new_ctx = NULL;
+ 
+-    if ((scalar == NULL) && (num == 0)) {
+-        return EC_POINT_set_to_infinity(group, r);
+-    }
+-
+     if (!ec_point_is_compat(r, group)) {
+         ECerr(EC_F_EC_POINTS_MUL, EC_R_INCOMPATIBLE_OBJECTS);
+         return 0;
+     }
++
++    if (scalar == NULL && num == 0)
++        return EC_POINT_set_to_infinity(group, r);
++
+     for (i = 0; i < num; i++) {
+         if (!ec_point_is_compat(points[i], group)) {
+             ECerr(EC_F_EC_POINTS_MUL, EC_R_INCOMPATIBLE_OBJECTS);
+diff --git a/crypto/ec/ec_mult.c b/crypto/ec/ec_mult.c
+index 7980a67282..d2e4773270 100644
+--- a/crypto/ec/ec_mult.c
++++ b/crypto/ec/ec_mult.c
+@@ -260,17 +260,10 @@ int ec_scalar_mul_ladder(const EC_GROUP *group, EC_POINT *r,
+         goto err;
+     }
+ 
+-    /*-
+-     * Apply coordinate blinding for EC_POINT.
+-     *
+-     * The underlying EC_METHOD can optionally implement this function:
+-     * ec_point_blind_coordinates() returns 0 in case of errors or 1 on
+-     * success or if coordinate blinding is not implemented for this
+-     * group.
+-     */
+-    if (!ec_point_blind_coordinates(group, p, ctx)) {
+-        ECerr(EC_F_EC_SCALAR_MUL_LADDER, EC_R_POINT_COORDINATES_BLIND_FAILURE);
+-        goto err;
++    /* ensure input point is in affine coords for ladder step efficiency */
++    if (!p->Z_is_one && !EC_POINT_make_affine(group, p, ctx)) {
++            ECerr(EC_F_EC_SCALAR_MUL_LADDER, ERR_R_EC_LIB);
++            goto err;
+     }
+ 
+     /* Initialize the Montgomery ladder */
+@@ -747,6 +740,20 @@ int ec_wNAF_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
+                     if (r_is_at_infinity) {
+                         if (!EC_POINT_copy(r, val_sub[i][digit >> 1]))
+                             goto err;
++
++                        /*-
++                         * Apply coordinate blinding for EC_POINT.
++                         *
++                         * The underlying EC_METHOD can optionally implement this function:
++                         * ec_point_blind_coordinates() returns 0 in case of errors or 1 on
++                         * success or if coordinate blinding is not implemented for this
++                         * group.
++                         */
++                        if (!ec_point_blind_coordinates(group, r, ctx)) {
++                            ECerr(EC_F_EC_WNAF_MUL, EC_R_POINT_COORDINATES_BLIND_FAILURE);
++                            goto err;
++                        }
++
+                         r_is_at_infinity = 0;
+                     } else {
+                         if (!EC_POINT_add
+diff --git a/crypto/ec/ecp_smpl.c b/crypto/ec/ecp_smpl.c
+index b354bfe9ce..6903db58ff 100644
+--- a/crypto/ec/ecp_smpl.c
++++ b/crypto/ec/ecp_smpl.c
+@@ -1372,6 +1372,7 @@ int ec_GFp_simple_field_sqr(const EC_GROUP *group, BIGNUM *r, const BIGNUM *a,
+  * Computes the multiplicative inverse of a in GF(p), storing the result in r.
+  * If a is zero (or equivalent), you'll get a EC_R_CANNOT_INVERT error.
+  * Since we don't have a Mont structure here, SCA hardening is with blinding.
++ * NB: "a" must be in _decoded_ form. (i.e. field_decode must precede.)
+  */
+ int ec_GFp_simple_field_inv(const EC_GROUP *group, BIGNUM *r, const BIGNUM *a,
+                             BN_CTX *ctx)
+@@ -1431,112 +1432,133 @@ int ec_GFp_simple_blind_coordinates(const EC_GROUP *group, EC_POINT *p,
+     temp = BN_CTX_get(ctx);
+     if (temp == NULL) {
+         ECerr(EC_F_EC_GFP_SIMPLE_BLIND_COORDINATES, ERR_R_MALLOC_FAILURE);
+-        goto err;
++        goto end;
+     }
+ 
+-    /* make sure lambda is not zero */
++    /*-
++     * Make sure lambda is not zero.
++     * If the RNG fails, we cannot blind but nevertheless want
++     * code to continue smoothly and not clobber the error stack.
++     */
+     do {
+-        if (!BN_priv_rand_range(lambda, group->field)) {
+-            ECerr(EC_F_EC_GFP_SIMPLE_BLIND_COORDINATES, ERR_R_BN_LIB);
+-            goto err;
++        ERR_set_mark();
++        ret = BN_priv_rand_range(lambda, group->field);
++        ERR_pop_to_mark();
++        if (ret == 0) {
++            ret = 1;
++            goto end;
+         }
+     } while (BN_is_zero(lambda));
+ 
+     /* if field_encode defined convert between representations */
+-    if (group->meth->field_encode != NULL
+-        && !group->meth->field_encode(group, lambda, lambda, ctx))
+-        goto err;
+-    if (!group->meth->field_mul(group, p->Z, p->Z, lambda, ctx))
+-        goto err;
+-    if (!group->meth->field_sqr(group, temp, lambda, ctx))
+-        goto err;
+-    if (!group->meth->field_mul(group, p->X, p->X, temp, ctx))
+-        goto err;
+-    if (!group->meth->field_mul(group, temp, temp, lambda, ctx))
+-        goto err;
+-    if (!group->meth->field_mul(group, p->Y, p->Y, temp, ctx))
+-        goto err;
+-    p->Z_is_one = 0;
++    if ((group->meth->field_encode != NULL
++         && !group->meth->field_encode(group, lambda, lambda, ctx))
++        || !group->meth->field_mul(group, p->Z, p->Z, lambda, ctx)
++        || !group->meth->field_sqr(group, temp, lambda, ctx)
++        || !group->meth->field_mul(group, p->X, p->X, temp, ctx)
++        || !group->meth->field_mul(group, temp, temp, lambda, ctx)
++        || !group->meth->field_mul(group, p->Y, p->Y, temp, ctx))
++        goto end;
+ 
++    p->Z_is_one = 0;
+     ret = 1;
+ 
+- err:
++ end:
+     BN_CTX_end(ctx);
+     return ret;
+ }
+ 
+ /*-
+- * Set s := p, r := 2p.
++ * Input:
++ * - p: affine coordinates
++ *
++ * Output:
++ * - s := p, r := 2p: blinded projective (homogeneous) coordinates
+  *
+  * For doubling we use Formula 3 from Izu-Takagi "A fast parallel elliptic curve
+- * multiplication resistant against side channel attacks" appendix, as described
+- * at
++ * multiplication resistant against side channel attacks" appendix, described at
+  * https://hyperelliptic.org/EFD/g1p/auto-shortw-xz.html#doubling-dbl-2002-it-2
++ * simplified for Z1=1.
+  *
+- * The input point p will be in randomized Jacobian projective coords:
+- *      x = X/Z**2, y=Y/Z**3
+- *
+- * The output points p, s, and r are converted to standard (homogeneous)
+- * projective coords:
+- *      x = X/Z, y=Y/Z
++ * Blinding uses the equivalence relation (\lambda X, \lambda Y, \lambda Z)
++ * for any non-zero \lambda that holds for projective (homogeneous) coords.
+  */
+ int ec_GFp_simple_ladder_pre(const EC_GROUP *group,
+                              EC_POINT *r, EC_POINT *s,
+                              EC_POINT *p, BN_CTX *ctx)
+ {
+-    BIGNUM *t1, *t2, *t3, *t4, *t5, *t6 = NULL;
++    BIGNUM *t1, *t2, *t3, *t4, *t5 = NULL;
+ 
+-    t1 = r->Z;
+-    t2 = r->Y;
++    t1 = s->Z;
++    t2 = r->Z;
+     t3 = s->X;
+     t4 = r->X;
+     t5 = s->Y;
+-    t6 = s->Z;
+-
+-    /* convert p: (X,Y,Z) -> (XZ,Y,Z**3) */
+-    if (!group->meth->field_mul(group, p->X, p->X, p->Z, ctx)
+-        || !group->meth->field_sqr(group, t1, p->Z, ctx)
+-        || !group->meth->field_mul(group, p->Z, p->Z, t1, ctx)
+-        /* r := 2p */
+-        || !group->meth->field_sqr(group, t2, p->X, ctx)
+-        || !group->meth->field_sqr(group, t3, p->Z, ctx)
+-        || !group->meth->field_mul(group, t4, t3, group->a, ctx)
+-        || !BN_mod_sub_quick(t5, t2, t4, group->field)
+-        || !BN_mod_add_quick(t2, t2, t4, group->field)
+-        || !group->meth->field_sqr(group, t5, t5, ctx)
+-        || !group->meth->field_mul(group, t6, t3, group->b, ctx)
+-        || !group->meth->field_mul(group, t1, p->X, p->Z, ctx)
+-        || !group->meth->field_mul(group, t4, t1, t6, ctx)
+-        || !BN_mod_lshift_quick(t4, t4, 3, group->field)
++
++    if (!p->Z_is_one /* r := 2p */
++        || !group->meth->field_sqr(group, t3, p->X, ctx)
++        || !BN_mod_sub_quick(t4, t3, group->a, group->field)
++        || !group->meth->field_sqr(group, t4, t4, ctx)
++        || !group->meth->field_mul(group, t5, p->X, group->b, ctx)
++        || !BN_mod_lshift_quick(t5, t5, 3, group->field)
+         /* r->X coord output */
+-        || !BN_mod_sub_quick(r->X, t5, t4, group->field)
+-        || !group->meth->field_mul(group, t1, t1, t2, ctx)
+-        || !group->meth->field_mul(group, t2, t3, t6, ctx)
+-        || !BN_mod_add_quick(t1, t1, t2, group->field)
++        || !BN_mod_sub_quick(r->X, t4, t5, group->field)
++        || !BN_mod_add_quick(t1, t3, group->a, group->field)
++        || !group->meth->field_mul(group, t2, p->X, t1, ctx)
++        || !BN_mod_add_quick(t2, group->b, t2, group->field)
+         /* r->Z coord output */
+-        || !BN_mod_lshift_quick(r->Z, t1, 2, group->field)
+-        || !EC_POINT_copy(s, p))
++        || !BN_mod_lshift_quick(r->Z, t2, 2, group->field))
++        return 0;
++
++    /* make sure lambda (r->Y here for storage) is not zero */
++    do {
++        if (!BN_priv_rand_range(r->Y, group->field))
++            return 0;
++    } while (BN_is_zero(r->Y));
++
++    /* make sure lambda (s->Z here for storage) is not zero */
++    do {
++        if (!BN_priv_rand_range(s->Z, group->field))
++            return 0;
++    } while (BN_is_zero(s->Z));
++
++    /* if field_encode defined convert between representations */
++    if (group->meth->field_encode != NULL
++        && (!group->meth->field_encode(group, r->Y, r->Y, ctx)
++            || !group->meth->field_encode(group, s->Z, s->Z, ctx)))
++        return 0;
++
++    /* blind r and s independently */
++    if (!group->meth->field_mul(group, r->Z, r->Z, r->Y, ctx)
++        || !group->meth->field_mul(group, r->X, r->X, r->Y, ctx)
++        || !group->meth->field_mul(group, s->X, p->X, s->Z, ctx)) /* s := p */
+         return 0;
+ 
+     r->Z_is_one = 0;
+     s->Z_is_one = 0;
+-    p->Z_is_one = 0;
+ 
+     return 1;
+ }
+ 
+ /*-
+- * Differential addition-and-doubling using  Eq. (9) and (10) from Izu-Takagi
++ * Input:
++ * - s, r: projective (homogeneous) coordinates
++ * - p: affine coordinates
++ *
++ * Output:
++ * - s := r + s, r := 2r: projective (homogeneous) coordinates
++ *
++ * Differential addition-and-doubling using Eq. (9) and (10) from Izu-Takagi
+  * "A fast parallel elliptic curve multiplication resistant against side channel
+  * attacks", as described at
+- * https://hyperelliptic.org/EFD/g1p/auto-shortw-xz.html#ladder-ladd-2002-it-4
++ * https://hyperelliptic.org/EFD/g1p/auto-shortw-xz.html#ladder-mladd-2002-it-4
+  */
+ int ec_GFp_simple_ladder_step(const EC_GROUP *group,
+                               EC_POINT *r, EC_POINT *s,
+                               EC_POINT *p, BN_CTX *ctx)
+ {
+     int ret = 0;
+-    BIGNUM *t0, *t1, *t2, *t3, *t4, *t5, *t6, *t7 = NULL;
++    BIGNUM *t0, *t1, *t2, *t3, *t4, *t5, *t6 = NULL;
+ 
+     BN_CTX_start(ctx);
+     t0 = BN_CTX_get(ctx);
+@@ -1546,50 +1568,47 @@ int ec_GFp_simple_ladder_step(const EC_GROUP *group,
+     t4 = BN_CTX_get(ctx);
+     t5 = BN_CTX_get(ctx);
+     t6 = BN_CTX_get(ctx);
+-    t7 = BN_CTX_get(ctx);
+ 
+-    if (t7 == NULL
+-        || !group->meth->field_mul(group, t0, r->X, s->X, ctx)
+-        || !group->meth->field_mul(group, t1, r->Z, s->Z, ctx)
+-        || !group->meth->field_mul(group, t2, r->X, s->Z, ctx)
++    if (t6 == NULL
++        || !group->meth->field_mul(group, t6, r->X, s->X, ctx)
++        || !group->meth->field_mul(group, t0, r->Z, s->Z, ctx)
++        || !group->meth->field_mul(group, t4, r->X, s->Z, ctx)
+         || !group->meth->field_mul(group, t3, r->Z, s->X, ctx)
+-        || !group->meth->field_mul(group, t4, group->a, t1, ctx)
+-        || !BN_mod_add_quick(t0, t0, t4, group->field)
+-        || !BN_mod_add_quick(t4, t3, t2, group->field)
+-        || !group->meth->field_mul(group, t0, t4, t0, ctx)
+-        || !group->meth->field_sqr(group, t1, t1, ctx)
+-        || !BN_mod_lshift_quick(t7, group->b, 2, group->field)
+-        || !group->meth->field_mul(group, t1, t7, t1, ctx)
+-        || !BN_mod_lshift1_quick(t0, t0, group->field)
+-        || !BN_mod_add_quick(t0, t1, t0, group->field)
+-        || !BN_mod_sub_quick(t1, t2, t3, group->field)
+-        || !group->meth->field_sqr(group, t1, t1, ctx)
+-        || !group->meth->field_mul(group, t3, t1, p->X, ctx)
+-        || !group->meth->field_mul(group, t0, p->Z, t0, ctx)
+-        /* s->X coord output */
+-        || !BN_mod_sub_quick(s->X, t0, t3, group->field)
+-        /* s->Z coord output */
+-        || !group->meth->field_mul(group, s->Z, p->Z, t1, ctx)
+-        || !group->meth->field_sqr(group, t3, r->X, ctx)
+-        || !group->meth->field_sqr(group, t2, r->Z, ctx)
+-        || !group->meth->field_mul(group, t4, t2, group->a, ctx)
+-        || !BN_mod_add_quick(t5, r->X, r->Z, group->field)
+-        || !group->meth->field_sqr(group, t5, t5, ctx)
+-        || !BN_mod_sub_quick(t5, t5, t3, group->field)
+-        || !BN_mod_sub_quick(t5, t5, t2, group->field)
+-        || !BN_mod_sub_quick(t6, t3, t4, group->field)
+-        || !group->meth->field_sqr(group, t6, t6, ctx)
+-        || !group->meth->field_mul(group, t0, t2, t5, ctx)
+-        || !group->meth->field_mul(group, t0, t7, t0, ctx)
+-        /* r->X coord output */
+-        || !BN_mod_sub_quick(r->X, t6, t0, group->field)
++        || !group->meth->field_mul(group, t5, group->a, t0, ctx)
++        || !BN_mod_add_quick(t5, t6, t5, group->field)
+         || !BN_mod_add_quick(t6, t3, t4, group->field)
+-        || !group->meth->field_sqr(group, t3, t2, ctx)
+-        || !group->meth->field_mul(group, t7, t3, t7, ctx)
+-        || !group->meth->field_mul(group, t5, t5, t6, ctx)
++        || !group->meth->field_mul(group, t5, t6, t5, ctx)
++        || !group->meth->field_sqr(group, t0, t0, ctx)
++        || !BN_mod_lshift_quick(t2, group->b, 2, group->field)
++        || !group->meth->field_mul(group, t0, t2, t0, ctx)
+         || !BN_mod_lshift1_quick(t5, t5, group->field)
++        || !BN_mod_sub_quick(t3, t4, t3, group->field)
++        /* s->Z coord output */
++        || !group->meth->field_sqr(group, s->Z, t3, ctx)
++        || !group->meth->field_mul(group, t4, s->Z, p->X, ctx)
++        || !BN_mod_add_quick(t0, t0, t5, group->field)
++        /* s->X coord output */
++        || !BN_mod_sub_quick(s->X, t0, t4, group->field)
++        || !group->meth->field_sqr(group, t4, r->X, ctx)
++        || !group->meth->field_sqr(group, t5, r->Z, ctx)
++        || !group->meth->field_mul(group, t6, t5, group->a, ctx)
++        || !BN_mod_add_quick(t1, r->X, r->Z, group->field)
++        || !group->meth->field_sqr(group, t1, t1, ctx)
++        || !BN_mod_sub_quick(t1, t1, t4, group->field)
++        || !BN_mod_sub_quick(t1, t1, t5, group->field)
++        || !BN_mod_sub_quick(t3, t4, t6, group->field)
++        || !group->meth->field_sqr(group, t3, t3, ctx)
++        || !group->meth->field_mul(group, t0, t5, t1, ctx)
++        || !group->meth->field_mul(group, t0, t2, t0, ctx)
++        /* r->X coord output */
++        || !BN_mod_sub_quick(r->X, t3, t0, group->field)
++        || !BN_mod_add_quick(t3, t4, t6, group->field)
++        || !group->meth->field_sqr(group, t4, t5, ctx)
++        || !group->meth->field_mul(group, t4, t4, t2, ctx)
++        || !group->meth->field_mul(group, t1, t1, t3, ctx)
++        || !BN_mod_lshift1_quick(t1, t1, group->field)
+         /* r->Z coord output */
+-        || !BN_mod_add_quick(r->Z, t7, t5, group->field))
++        || !BN_mod_add_quick(r->Z, t4, t1, group->field))
+         goto err;
+ 
+     ret = 1;
+@@ -1600,17 +1619,23 @@ int ec_GFp_simple_ladder_step(const EC_GROUP *group,
+ }
+ 
+ /*-
++ * Input:
++ * - s, r: projective (homogeneous) coordinates
++ * - p: affine coordinates
++ *
++ * Output:
++ * - r := (x,y): affine coordinates
++ *
+  * Recovers the y-coordinate of r using Eq. (8) from Brier-Joye, "Weierstrass
+- * Elliptic Curves and Side-Channel Attacks", modified to work in projective
+- * coordinates and return r in Jacobian projective coordinates.
++ * Elliptic Curves and Side-Channel Attacks", modified to work in mixed
++ * projective coords, i.e. p is affine and (r,s) in projective (homogeneous)
++ * coords, and return r in affine coordinates.
+  *
+- * X4 = two*Y1*X2*Z3*Z2*Z1;
+- * Y4 = two*b*Z3*SQR(Z2*Z1) + Z3*(a*Z2*Z1+X1*X2)*(X1*Z2+X2*Z1) - X3*SQR(X1*Z2-X2*Z1);
+- * Z4 = two*Y1*Z3*SQR(Z2)*Z1;
++ * X4 = two*Y1*X2*Z3*Z2;
++ * Y4 = two*b*Z3*SQR(Z2) + Z3*(a*Z2+X1*X2)*(X1*Z2+X2) - X3*SQR(X1*Z2-X2);
++ * Z4 = two*Y1*Z3*SQR(Z2);
+  *
+  * Z4 != 0 because:
+- *  - Z1==0 implies p is at infinity, which would have caused an early exit in
+- *    the caller;
+  *  - Z2==0 implies r is at infinity (handled by the BN_is_zero(r->Z) branch);
+  *  - Z3==0 implies s is at infinity (handled by the BN_is_zero(s->Z) branch);
+  *  - Y1==0 implies p has order 2, so either r or s are infinity and handled by
+@@ -1627,11 +1652,7 @@ int ec_GFp_simple_ladder_post(const EC_GROUP *group,
+         return EC_POINT_set_to_infinity(group, r);
+ 
+     if (BN_is_zero(s->Z)) {
+-        /* (X,Y,Z) -> (XZ,YZ**2,Z) */
+-        if (!group->meth->field_mul(group, r->X, p->X, p->Z, ctx)
+-            || !group->meth->field_sqr(group, r->Z, p->Z, ctx)
+-            || !group->meth->field_mul(group, r->Y, p->Y, r->Z, ctx)
+-            || !BN_copy(r->Z, p->Z)
++        if (!EC_POINT_copy(r, p)
+             || !EC_POINT_invert(group, r, ctx))
+             return 0;
+         return 1;
+@@ -1647,38 +1668,46 @@ int ec_GFp_simple_ladder_post(const EC_GROUP *group,
+     t6 = BN_CTX_get(ctx);
+ 
+     if (t6 == NULL
+-        || !BN_mod_lshift1_quick(t0, p->Y, group->field)
+-        || !group->meth->field_mul(group, t1, r->X, p->Z, ctx)
+-        || !group->meth->field_mul(group, t2, r->Z, s->Z, ctx)
+-        || !group->meth->field_mul(group, t2, t1, t2, ctx)
+-        || !group->meth->field_mul(group, t3, t2, t0, ctx)
+-        || !group->meth->field_mul(group, t2, r->Z, p->Z, ctx)
+-        || !group->meth->field_sqr(group, t4, t2, ctx)
+-        || !BN_mod_lshift1_quick(t5, group->b, group->field)
+-        || !group->meth->field_mul(group, t4, t4, t5, ctx)
+-        || !group->meth->field_mul(group, t6, t2, group->a, ctx)
+-        || !group->meth->field_mul(group, t5, r->X, p->X, ctx)
+-        || !BN_mod_add_quick(t5, t6, t5, group->field)
+-        || !group->meth->field_mul(group, t6, r->Z, p->X, ctx)
+-        || !BN_mod_add_quick(t2, t6, t1, group->field)
+-        || !group->meth->field_mul(group, t5, t5, t2, ctx)
+-        || !BN_mod_sub_quick(t6, t6, t1, group->field)
+-        || !group->meth->field_sqr(group, t6, t6, ctx)
+-        || !group->meth->field_mul(group, t6, t6, s->X, ctx)
+-        || !BN_mod_add_quick(t4, t5, t4, group->field)
+-        || !group->meth->field_mul(group, t4, t4, s->Z, ctx)
+-        || !BN_mod_sub_quick(t4, t4, t6, group->field)
+-        || !group->meth->field_sqr(group, t5, r->Z, ctx)
+-        || !group->meth->field_mul(group, r->Z, p->Z, s->Z, ctx)
+-        || !group->meth->field_mul(group, r->Z, t5, r->Z, ctx)
+-        || !group->meth->field_mul(group, r->Z, r->Z, t0, ctx)
+-        /* t3 := X, t4 := Y */
+-        /* (X,Y,Z) -> (XZ,YZ**2,Z) */
+-        || !group->meth->field_mul(group, r->X, t3, r->Z, ctx)
++        || !BN_mod_lshift1_quick(t4, p->Y, group->field)
++        || !group->meth->field_mul(group, t6, r->X, t4, ctx)
++        || !group->meth->field_mul(group, t6, s->Z, t6, ctx)
++        || !group->meth->field_mul(group, t5, r->Z, t6, ctx)
++        || !BN_mod_lshift1_quick(t1, group->b, group->field)
++        || !group->meth->field_mul(group, t1, s->Z, t1, ctx)
+         || !group->meth->field_sqr(group, t3, r->Z, ctx)
+-        || !group->meth->field_mul(group, r->Y, t4, t3, ctx))
++        || !group->meth->field_mul(group, t2, t3, t1, ctx)
++        || !group->meth->field_mul(group, t6, r->Z, group->a, ctx)
++        || !group->meth->field_mul(group, t1, p->X, r->X, ctx)
++        || !BN_mod_add_quick(t1, t1, t6, group->field)
++        || !group->meth->field_mul(group, t1, s->Z, t1, ctx)
++        || !group->meth->field_mul(group, t0, p->X, r->Z, ctx)
++        || !BN_mod_add_quick(t6, r->X, t0, group->field)
++        || !group->meth->field_mul(group, t6, t6, t1, ctx)
++        || !BN_mod_add_quick(t6, t6, t2, group->field)
++        || !BN_mod_sub_quick(t0, t0, r->X, group->field)
++        || !group->meth->field_sqr(group, t0, t0, ctx)
++        || !group->meth->field_mul(group, t0, t0, s->X, ctx)
++        || !BN_mod_sub_quick(t0, t6, t0, group->field)
++        || !group->meth->field_mul(group, t1, s->Z, t4, ctx)
++        || !group->meth->field_mul(group, t1, t3, t1, ctx)
++        || (group->meth->field_decode != NULL
++            && !group->meth->field_decode(group, t1, t1, ctx))
++        || !group->meth->field_inv(group, t1, t1, ctx)
++        || (group->meth->field_encode != NULL
++            && !group->meth->field_encode(group, t1, t1, ctx))
++        || !group->meth->field_mul(group, r->X, t5, t1, ctx)
++        || !group->meth->field_mul(group, r->Y, t0, t1, ctx))
+         goto err;
+ 
++    if (group->meth->field_set_to_one != NULL) {
++        if (!group->meth->field_set_to_one(group, r->Z, ctx))
++            goto err;
++    } else {
++        if (!BN_one(r->Z))
++            goto err;
++    }
++
++    r->Z_is_one = 1;
+     ret = 1;
+ 
+  err:
+diff --git a/crypto/x509/x509_vfy.c b/crypto/x509/x509_vfy.c
+index f28f2d2610..41625e75ad 100644
+--- a/crypto/x509/x509_vfy.c
++++ b/crypto/x509/x509_vfy.c
+@@ -508,6 +508,12 @@ static int check_chain_extensions(X509_STORE_CTX *ctx)
+                 ret = 1;
+             break;
+         }
++        if ((x->ex_flags & EXFLAG_CA) == 0
++            && x->ex_pathlen != -1
++            && (ctx->param->flags & X509_V_FLAG_X509_STRICT)) {
++            ctx->error = X509_V_ERR_INVALID_EXTENSION;
++            ret = 0;
++        }
+         if (ret == 0 && !verify_cb_cert(ctx, x, i, X509_V_OK))
+             return 0;
+         /* check_purpose() makes the callback as needed */
+diff --git a/crypto/x509v3/v3_purp.c b/crypto/x509v3/v3_purp.c
+index 2bc8253d2d..2eaad1a763 100644
+--- a/crypto/x509v3/v3_purp.c
++++ b/crypto/x509v3/v3_purp.c
+@@ -384,12 +384,16 @@ static void x509v3_cache_extensions(X509 *x)
+         if (bs->ca)
+             x->ex_flags |= EXFLAG_CA;
+         if (bs->pathlen) {
+-            if ((bs->pathlen->type == V_ASN1_NEG_INTEGER)
+-                || !bs->ca) {
++            if (bs->pathlen->type == V_ASN1_NEG_INTEGER) {
+                 x->ex_flags |= EXFLAG_INVALID;
+                 x->ex_pathlen = 0;
+-            } else
++            } else {
+                 x->ex_pathlen = ASN1_INTEGER_get(bs->pathlen);
++                if (!bs->ca && x->ex_pathlen != 0) {
++                    x->ex_flags |= EXFLAG_INVALID;
++                    x->ex_pathlen = 0;
++                }
++            }
+         } else
+             x->ex_pathlen = -1;
+         BASIC_CONSTRAINTS_free(bs);
+diff --git a/doc/man3/EVP_aes.pod b/doc/man3/EVP_aes.pod
+index 4192a9ec36..7db48a427f 100644
+--- a/doc/man3/EVP_aes.pod
++++ b/doc/man3/EVP_aes.pod
+@@ -160,6 +160,13 @@ In particular, XTS-AES-128 (B<EVP_aes_128_xts>) takes input of a 256-bit key to
+ achieve AES 128-bit security, and XTS-AES-256 (B<EVP_aes_256_xts>) takes input
+ of a 512-bit key to achieve AES 256-bit security.
+ 
++The XTS implementation in OpenSSL does not support streaming. That is there must
++only be one L<EVP_EncryptUpdate(3)> call per L<EVP_EncryptInit_ex(3)> call (and
++similarly with the "Decrypt" functions).
++
++The I<iv> parameter to L<EVP_EncryptInit_ex(3)> or L<EVP_DecryptInit_ex(3)> is
++the XTS "tweak" value.
++
+ =back
+ 
+ =head1 RETURN VALUES
+diff --git a/test/certs/ee-pathlen.pem b/test/certs/ee-pathlen.pem
+new file mode 100644
+index 0000000000..0bcae1d7bd
+--- /dev/null
++++ b/test/certs/ee-pathlen.pem
+@@ -0,0 +1,17 @@
++-----BEGIN CERTIFICATE-----
++MIICszCCAZugAwIBAgIBAjANBgkqhkiG9w0BAQsFADANMQswCQYDVQQDDAJDQTAg
++Fw0yMDA0MDMwODA0MTVaGA8yMTIwMDQwNDA4MDQxNVowGTEXMBUGA1UEAwwOc2Vy
++dmVyLmV4YW1wbGUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCo/4lY
++YYWu3tssD9Vz++K3qBt6dWAr1H08c3a1rt6TL38kkG3JHPSKOM2fooAWVsu0LLuT
++5Rcf/w3GQ/4xNPgo2HXpo7uIgu+jcuJTYgVFTeAxl++qnRDSWA2eBp4yuxsIVl1l
++Dz9mjsI2oBH/wFk1/Ukc3RxCMwZ4rgQ4I+XndWfTlK1aqUAfrFkQ9QzBZK1KxMY1
++U7OWaoIbFYvRmavknm+UqtKW5Vf7jJFkijwkFsbSGb6CYBM7YrDtPh2zyvlr3zG5
++ep5LR2inKcc/SuIiJ7TvkGPX79ByST5brbkb1Ctvhmjd1XMSuEPJ3EEPoqNGT4tn
++iIQPYf55NB9KiR+3AgMBAAGjEDAOMAwGA1UdEwQFMAMCAQAwDQYJKoZIhvcNAQEL
++BQADggEBAApOUnWWd09I0ts3xa1oK7eakc+fKTF4d7pbGznFNONaCR3KFRgnBVlG
++Bm8/oehrrQ28Ad3XPSug34DQQ5kM6JIuaddx50/n4Xkgj8/fgXVA0HXizOJ3QpKC
++IojLVajXlQHhpo72VUQuNOha0UxG9daYjS20iXRhanTm9rUz7qQZEugVQCiR0z/f
++9NgM7FU9UaSidzH3gZu/Ufc4Ggn6nZV7LM9sf4IUV+KszS1VpcK+9phAmsB6BaAi
++cFXvVXZjTNualQgPyPwOD8c+vVCIfIemfF5TZ6fyqpOjprWQAphwrTtfNDSmqRTz
++FRhDf+vJERQclgUtg37EgWGKtnNQeRY=
++-----END CERTIFICATE-----
+diff --git a/test/certs/setup.sh b/test/certs/setup.sh
+index 2d53ea5b08..bbe4842a51 100755
+--- a/test/certs/setup.sh
++++ b/test/certs/setup.sh
+@@ -154,7 +154,7 @@ openssl x509 -in sca-cert.pem -trustout \
+     -addtrust anyExtendedKeyUsage -out sca+anyEKU.pem
+ 
+ # Primary leaf cert: ee-cert
+-# ee variants: expired, issuer-key2, issuer-name2
++# ee variants: expired, issuer-key2, issuer-name2, bad-pathlen
+ # trust variants: +serverAuth, -serverAuth, +clientAuth, -clientAuth
+ # purpose variants: client
+ #
+@@ -163,6 +163,8 @@ openssl x509 -in sca-cert.pem -trustout \
+ ./mkcert.sh genee server.example ee-key ee-cert2 ca-key2 ca-cert2
+ ./mkcert.sh genee server.example ee-key ee-name2 ca-key ca-name2
+ ./mkcert.sh genee -p clientAuth server.example ee-key ee-client ca-key ca-cert
++./mkcert.sh genee server.example ee-key ee-pathlen ca-key ca-cert \
++    -extfile <(echo "basicConstraints=CA:FALSE,pathlen:0")
+ #
+ openssl x509 -in ee-cert.pem -trustout \
+     -addtrust serverAuth -out ee+serverAuth.pem
+diff --git a/test/recipes/25-test_verify.t b/test/recipes/25-test_verify.t
+index b80a1cde3e..0e0f5dca21 100644
+--- a/test/recipes/25-test_verify.t
++++ b/test/recipes/25-test_verify.t
+@@ -27,7 +27,7 @@ sub verify {
+     run(app([@args]));
+ }
+ 
+-plan tests => 135;
++plan tests => 137;
+ 
+ # Canonical success
+ ok(verify("ee-cert", "sslserver", ["root-cert"], ["ca-cert"]),
+@@ -222,6 +222,10 @@ ok(verify("ee-client", "sslclient", [qw(ee+clientAuth)], [], "-partial_chain"),
+    "accept direct match with client trust");
+ ok(!verify("ee-client", "sslclient", [qw(ee-clientAuth)], [], "-partial_chain"),
+    "reject direct match with client mistrust");
++ok(verify("ee-pathlen", "sslserver", [qw(root-cert)], [qw(ca-cert)]),
++   "accept non-ca with pathlen:0 by default");
++ok(!verify("ee-pathlen", "sslserver", [qw(root-cert)], [qw(ca-cert)], "-x509_strict"),
++   "reject non-ca with pathlen:0 with strict flag");
+ 
+ # Proxy certificates
+ ok(!verify("pc1-cert", "sslclient", [qw(root-cert)], [qw(ee-client ca-cert)]),
+diff --git a/test/sm2_internal_test.c b/test/sm2_internal_test.c
+index 952f688e8b..f7e4e38d03 100644
+--- a/test/sm2_internal_test.c
++++ b/test/sm2_internal_test.c
+@@ -32,17 +32,18 @@ static size_t fake_rand_size = 0;
+ 
+ static int get_faked_bytes(unsigned char *buf, int num)
+ {
+-    int i;
+-
+     if (fake_rand_bytes == NULL)
+         return saved_rand->bytes(buf, num);
+ 
+-    if (!TEST_size_t_le(fake_rand_bytes_offset + num, fake_rand_size))
++    if (!TEST_size_t_gt(fake_rand_size, 0))
+         return 0;
+ 
+-    for (i = 0; i != num; ++i)
+-        buf[i] = fake_rand_bytes[fake_rand_bytes_offset + i];
+-    fake_rand_bytes_offset += num;
++    while (num-- > 0) {
++        if (fake_rand_bytes_offset >= fake_rand_size)
++            fake_rand_bytes_offset = 0;
++        *buf++ = fake_rand_bytes[fake_rand_bytes_offset++];
++    }
++
+     return 1;
+ }
+ 
+@@ -175,8 +176,7 @@ static int test_sm2_crypt(const EC_GROUP *group,
+ 
+     start_fake_rand(k_hex);
+     if (!TEST_true(sm2_encrypt(key, digest, (const uint8_t *)message, msg_len,
+-                               ctext, &ctext_len))
+-            || !TEST_size_t_eq(fake_rand_bytes_offset, fake_rand_size)) {
++                               ctext, &ctext_len))) {
+         restore_rand();
+         goto done;
+     }
+@@ -296,8 +296,7 @@ static int test_sm2_sign(const EC_GROUP *group,
+     start_fake_rand(k_hex);
+     sig = sm2_do_sign(key, EVP_sm3(), (const uint8_t *)userid, strlen(userid),
+                       (const uint8_t *)message, msg_len);
+-    if (!TEST_ptr(sig)
+-            || !TEST_size_t_eq(fake_rand_bytes_offset, fake_rand_size)) {
++    if (!TEST_ptr(sig)) {
+         restore_rand();
+         goto done;
+     }
