@@ -21,7 +21,7 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1f
+Version: 1.1.1g
 Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
@@ -68,7 +68,6 @@ Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
-Patch54: openssl-1.1.1-upstream-sync.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -172,7 +171,6 @@ cp %{SOURCE13} test/
 %patch60 -p1 -b .krb5-kdf
 %patch61 -p1 -b .intel-cet
 %patch65 -p1 -b .drbg-selftest
-%patch54 -p1 -b .upstream-sync
 
 
 %build
@@ -459,6 +457,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Apr 23 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-1
+- update to the 1.1.1g release
+
 * Tue Apr  7 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1f-1
 - update to the 1.1.1f release
 

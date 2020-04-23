@@ -1,6 +1,6 @@
-diff -up openssl-1.1.1e/crypto/fips/fips_post.c.drbg-selftest openssl-1.1.1e/crypto/fips/fips_post.c
---- openssl-1.1.1e/crypto/fips/fips_post.c.drbg-selftest	2020-03-19 17:07:51.096676537 +0100
-+++ openssl-1.1.1e/crypto/fips/fips_post.c	2020-03-19 17:07:51.209674565 +0100
+diff -up openssl-1.1.1g/crypto/fips/fips_post.c.drbg-selftest openssl-1.1.1g/crypto/fips/fips_post.c
+--- openssl-1.1.1g/crypto/fips/fips_post.c.drbg-selftest	2020-04-23 13:33:12.500624151 +0200
++++ openssl-1.1.1g/crypto/fips/fips_post.c	2020-04-23 13:33:12.618621925 +0200
 @@ -67,12 +67,18 @@
  
  # include <openssl/fips.h>
@@ -20,18 +20,20 @@ diff -up openssl-1.1.1e/crypto/fips/fips_post.c.drbg-selftest openssl-1.1.1e/cry
      if (!FIPS_selftest_drbg())
          rv = 0;
      if (!FIPS_selftest_sha1())
-diff -up openssl-1.1.1e/crypto/rand/build.info.drbg-selftest openssl-1.1.1e/crypto/rand/build.info
---- openssl-1.1.1e/crypto/rand/build.info.drbg-selftest	2020-03-19 17:07:51.179675088 +0100
-+++ openssl-1.1.1e/crypto/rand/build.info	2020-03-19 17:08:14.005276610 +0100
-@@ -1,4 +1,4 @@
+diff -up openssl-1.1.1g/crypto/rand/build.info.drbg-selftest openssl-1.1.1g/crypto/rand/build.info
+--- openssl-1.1.1g/crypto/rand/build.info.drbg-selftest	2020-04-23 13:33:12.619621907 +0200
++++ openssl-1.1.1g/crypto/rand/build.info	2020-04-23 13:34:10.857523497 +0200
+@@ -1,6 +1,6 @@
  LIBS=../../libcrypto
  SOURCE[../../libcrypto]=\
          randfile.c rand_lib.c rand_err.c rand_crng_test.c rand_egd.c \
 -        rand_win.c rand_unix.c rand_vms.c drbg_lib.c drbg_ctr.c
 +        rand_win.c rand_unix.c rand_vms.c drbg_lib.c drbg_ctr.c drbg_selftest.c
-diff -up openssl-1.1.1e/crypto/rand/drbg_selftest.c.drbg-selftest openssl-1.1.1e/crypto/rand/drbg_selftest.c
---- openssl-1.1.1e/crypto/rand/drbg_selftest.c.drbg-selftest	2020-03-19 17:08:14.011276505 +0100
-+++ openssl-1.1.1e/crypto/rand/drbg_selftest.c	2020-03-19 17:08:14.011276505 +0100
+ 
+ INCLUDE[drbg_ctr.o]=../modes
+diff -up openssl-1.1.1g/crypto/rand/drbg_selftest.c.drbg-selftest openssl-1.1.1g/crypto/rand/drbg_selftest.c
+--- openssl-1.1.1g/crypto/rand/drbg_selftest.c.drbg-selftest	2020-04-23 13:33:12.619621907 +0200
++++ openssl-1.1.1g/crypto/rand/drbg_selftest.c	2020-04-23 13:33:12.619621907 +0200
 @@ -0,0 +1,537 @@
 +/*
 + * Copyright 2017-2019 The OpenSSL Project Authors. All Rights Reserved.
@@ -570,9 +572,9 @@ diff -up openssl-1.1.1e/crypto/rand/drbg_selftest.c.drbg-selftest openssl-1.1.1e
 +
 +    return 1;
 +}
-diff -up openssl-1.1.1e/include/crypto/rand.h.drbg-selftest openssl-1.1.1e/include/crypto/rand.h
---- openssl-1.1.1e/include/crypto/rand.h.drbg-selftest	2020-03-19 17:07:51.182675036 +0100
-+++ openssl-1.1.1e/include/crypto/rand.h	2020-03-19 17:08:14.004276627 +0100
+diff -up openssl-1.1.1g/include/crypto/rand.h.drbg-selftest openssl-1.1.1g/include/crypto/rand.h
+--- openssl-1.1.1g/include/crypto/rand.h.drbg-selftest	2020-04-23 13:33:12.587622510 +0200
++++ openssl-1.1.1g/include/crypto/rand.h	2020-04-23 13:33:12.619621907 +0200
 @@ -140,4 +140,9 @@ void rand_pool_cleanup(void);
   */
  void rand_pool_keep_random_devices_open(int keep);
