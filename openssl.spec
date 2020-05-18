@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -62,12 +62,16 @@ Patch47: openssl-1.1.1-ts-sha256-default.patch
 Patch48: openssl-1.1.1-fips-post-rand.patch
 Patch49: openssl-1.1.1-evp-kdf.patch
 Patch50: openssl-1.1.1-ssh-kdf.patch
+Patch51: openssl-1.1.1-intel-cet.patch
 Patch60: openssl-1.1.1-krb5-kdf.patch
-Patch61: openssl-1.1.1-intel-cet.patch
+Patch61: openssl-1.1.1-edk2-build.patch
+Patch62: openssl-1.1.1-fips-curves.patch
 Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
+Patch55: openssl-1.1.1-arm-update.patch
+Patch56: openssl-1.1.1-s390x-ecc.patch
 
 License: OpenSSL
 URL: http://www.openssl.org/
@@ -166,10 +170,14 @@ cp %{SOURCE13} test/
 %patch48 -p1 -b .fips-post-rand
 %patch49 -p1 -b .evp-kdf
 %patch50 -p1 -b .ssh-kdf
+%patch51 -p1 -b .intel-cet
 %patch52 -p1 -b .s390x-update
 %patch53 -p1 -b .crng-test
+%patch55 -p1 -b .arm-update
+%patch56 -p1 -b .s390x-ecc
 %patch60 -p1 -b .krb5-kdf
-%patch61 -p1 -b .intel-cet
+%patch61 -p1 -b .edk2-build
+%patch62 -p1 -b .fips-curves
 %patch65 -p1 -b .drbg-selftest
 
 
@@ -457,6 +465,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon May 18 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-3
+- pull some fixes and improvements from RHEL-8
+
 * Fri May 15 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-2
 - FIPS module installed state definition is modified
 
