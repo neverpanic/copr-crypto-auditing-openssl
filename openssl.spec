@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -465,6 +465,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue May 19 2020 Adam Williamson <awilliam@redhat.com> - 1.1.1g-4
+- Revert the change from -2 as it seems to cause segfaults in systemd
+
 * Mon May 18 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-3
 - pull some fixes and improvements from RHEL-8
 
