@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 5%{?dist}
+Release: 6%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -67,13 +67,14 @@ Patch60: openssl-1.1.1-krb5-kdf.patch
 Patch61: openssl-1.1.1-edk2-build.patch
 Patch62: openssl-1.1.1-fips-curves.patch
 Patch65: openssl-1.1.1-fips-drbg-selftest.patch
+Patch66: openssl-1.1.1-fips-dh.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
 Patch55: openssl-1.1.1-arm-update.patch
 Patch56: openssl-1.1.1-s390x-ecc.patch
 
-License: OpenSSL
+License: OpenSSL and ASL 2.0
 URL: http://www.openssl.org/
 BuildRequires: gcc
 BuildRequires: coreutils, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
@@ -179,6 +180,7 @@ cp %{SOURCE13} test/
 %patch61 -p1 -b .edk2-build
 %patch62 -p1 -b .fips-curves
 %patch65 -p1 -b .drbg-selftest
+%patch66 -p1 -b .fips-dh
 
 
 %build
@@ -465,6 +467,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon May 25 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-6
+- Allow only well known DH groups in the FIPS mode
+
 * Thu May 21 2020 Adam Williamson <awilliam@redhat.com> - 1.1.1g-5
 - Re-apply the change from -2 now we have fixed nosync to work with it
 
