@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 7%{?dist}
+Release: 8%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -68,6 +68,7 @@ Patch61: openssl-1.1.1-edk2-build.patch
 Patch62: openssl-1.1.1-fips-curves.patch
 Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 Patch66: openssl-1.1.1-fips-dh.patch
+Patch67: openssl-1.1.1-kdf-selftest.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
@@ -181,6 +182,7 @@ cp %{SOURCE13} test/
 %patch62 -p1 -b .fips-curves
 %patch65 -p1 -b .drbg-selftest
 %patch66 -p1 -b .fips-dh
+%patch67 -p1 -b .kdf-selftest
 
 
 %build
@@ -467,7 +469,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
-* Tue May 28 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-7
+* Wed Jun  3 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-8
+- Add FIPS selftest for PBKDF2 and KBKDF
+
+* Tue May 26 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-7
 - Use the well known DH groups in TLS
 
 * Mon May 25 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-6
