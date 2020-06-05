@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 8%{?dist}
+Release: 9%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -69,6 +69,8 @@ Patch62: openssl-1.1.1-fips-curves.patch
 Patch65: openssl-1.1.1-fips-drbg-selftest.patch
 Patch66: openssl-1.1.1-fips-dh.patch
 Patch67: openssl-1.1.1-kdf-selftest.patch
+Patch68: openssl-1.1.1-reneg-no-extms.patch
+Patch69: openssl-1.1.1-alpn-cb.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
@@ -183,6 +185,8 @@ cp %{SOURCE13} test/
 %patch65 -p1 -b .drbg-selftest
 %patch66 -p1 -b .fips-dh
 %patch67 -p1 -b .kdf-selftest
+%patch68 -p1 -b .reneg-no-extms
+%patch69 -p1 -b .alpn-cb
 
 
 %build
@@ -469,6 +473,13 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Jun  5 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-9
+- Disallow dropping Extended Master Secret extension
+  on renegotiation
+- Return alert from s_server if ALPN protocol does not match
+- SHA1 is allowed in @SECLEVEL=2 only if allowed by
+  TLS SigAlgs configuration
+
 * Wed Jun  3 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-8
 - Add FIPS selftest for PBKDF2 and KBKDF
 
