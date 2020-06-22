@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 9%{?dist}
+Release: 10%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -71,6 +71,7 @@ Patch66: openssl-1.1.1-fips-dh.patch
 Patch67: openssl-1.1.1-kdf-selftest.patch
 Patch68: openssl-1.1.1-reneg-no-extms.patch
 Patch69: openssl-1.1.1-alpn-cb.patch
+Patch70: openssl-1.1.1-rewire-fips-drbg.patch
 # Backported fixes including security fixes
 Patch52: openssl-1.1.1-s390x-update.patch
 Patch53: openssl-1.1.1-fips-crng-test.patch
@@ -187,6 +188,7 @@ cp %{SOURCE13} test/
 %patch67 -p1 -b .kdf-selftest
 %patch68 -p1 -b .reneg-no-extms
 %patch69 -p1 -b .alpn-cb
+%patch70 -p1 -b .rewire-fips-drbg
 
 
 %build
@@ -473,6 +475,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon Jun 22 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-10
+- Rewire FIPS_drbg API to use the RAND_DRBG
+
 * Fri Jun  5 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-9
 - Disallow dropping Extended Master Secret extension
   on renegotiation
