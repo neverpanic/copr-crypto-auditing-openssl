@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 11%{?dist}
+Release: 12%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -475,6 +475,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Jul 17 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-12
+- Further changes for SP 800-56A rev3 requirements
+
 * Mon Jun 22 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-11
 - Drop long ago obsolete part of the FIPS patch
 
