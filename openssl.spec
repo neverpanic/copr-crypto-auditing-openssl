@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1g
-Release: 13%{?dist}
+Release: 14%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -327,7 +327,7 @@ make test
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 # Install OpenSSL.
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_includedir},%{_libdir},%{_mandir},%{_libdir}/openssl,%{_pkgdocdir}}
-make DESTDIR=$RPM_BUILD_ROOT install
+%make_install
 rename so.%{soversion} so.%{version} $RPM_BUILD_ROOT%{_libdir}/*.so.%{soversion}
 for lib in $RPM_BUILD_ROOT%{_libdir}/*.so.%{version} ; do
 	chmod 755 ${lib}
@@ -475,6 +475,10 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Jul 21 2020 Tom Stellard <tstellar@redhat.com> - 1:1.1.1g-14
+- Use make macros
+- https://fedoraproject.org/wiki/Changes/UseMakeBuildInstallMacro
+
 * Mon Jul 20 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1g-13
 - Additional FIPS mode check for EC key generation
 
