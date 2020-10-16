@@ -428,6 +428,7 @@ export LD_LIBRARY_PATH
 %{_pkgdocdir}/Makefile.certificate
 %exclude %{_mandir}/man1*/*.pl*
 %exclude %{_mandir}/man1*/c_rehash*
+%exclude %{_mandir}/man1*/openssl-c_rehash*
 %exclude %{_mandir}/man1*/tsget*
 %exclude %{_mandir}/man1*/openssl-tsget*
 
@@ -464,6 +465,7 @@ export LD_LIBRARY_PATH
 %{_bindir}/tsget
 %{_mandir}/man1*/*.pl*
 %{_mandir}/man1*/c_rehash*
+%{_mandir}/man1*/openssl-c_rehash*
 %{_mandir}/man1*/tsget*
 %{_mandir}/man1*/openssl-tsget*
 %dir %{_sysconfdir}/pki/CA
