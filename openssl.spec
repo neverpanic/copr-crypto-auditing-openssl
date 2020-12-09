@@ -21,7 +21,7 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1h
+Version: 1.1.1i
 Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
@@ -473,6 +473,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Dec 9 2020 Tomáš Mráz <tmraz@redhat.com> 1.1.1i-1
+- Update to the 1.1.1i release fixing CVE-2020-1971
+
 * Mon Nov 9 2020 Sahana Prasad <sahana@redhat.com> - 1.1.1h-1
 - Upgrade to version 1.1.1.h
 
