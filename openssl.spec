@@ -78,6 +78,7 @@ Patch56: openssl-1.1.1-s390x-ecc.patch
 
 License: OpenSSL and ASL 2.0
 URL: http://www.openssl.org/
+BuildRequires: make
 BuildRequires: gcc
 BuildRequires: coreutils, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
 BuildRequires: lksctp-tools-devel
