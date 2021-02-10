@@ -22,7 +22,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 1.1.1i
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -44,6 +44,9 @@ Patch3: openssl-1.1.1-no-html.patch
 Patch4: openssl-1.1.1-man-rename.patch
 # Bug fixes
 Patch21: openssl-1.1.0-issuer-hash.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1916594
+Patch71: openssl-1.1.1-verify-cert.patch
+
 # Functionality changes
 Patch31: openssl-1.1.1-conf-paths.patch
 Patch32: openssl-1.1.1-version-add-engines.patch
@@ -186,6 +189,7 @@ cp %{SOURCE13} test/
 %patch67 -p1 -b .kdf-selftest
 %patch69 -p1 -b .alpn-cb
 %patch70 -p1 -b .rewire-fips-drbg
+%patch71 -p1 -b .verify-cert
 
 
 %build
@@ -474,6 +478,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Feb 10 2021 Sahana Prasad <sahana@redhat.com> - 1:1.1.1i-3
+- Fix regression in X509_verify_cert() (bz1916594)
+
 * Tue Jan 26 2021 Fedora Release Engineering <releng@fedoraproject.org> - 1:1.1.1i-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
 
