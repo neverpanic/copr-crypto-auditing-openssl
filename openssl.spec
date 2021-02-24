@@ -21,8 +21,8 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1i
-Release: 3%{?dist}
+Version: 1.1.1j
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -42,10 +42,6 @@ Patch1: openssl-1.1.1-build.patch
 Patch2: openssl-1.1.1-defaults.patch
 Patch3: openssl-1.1.1-no-html.patch
 Patch4: openssl-1.1.1-man-rename.patch
-# Bug fixes
-Patch21: openssl-1.1.0-issuer-hash.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1916594
-Patch71: openssl-1.1.1-verify-cert.patch
 
 # Functionality changes
 Patch31: openssl-1.1.1-conf-paths.patch
@@ -158,8 +154,6 @@ cp %{SOURCE13} test/
 %patch3 -p1 -b .no-html  %{?_rawbuild}
 %patch4 -p1 -b .man-rename
 
-%patch21 -p1 -b .issuer-hash
-
 %patch31 -p1 -b .conf-paths
 %patch32 -p1 -b .version-add-engines
 %patch33 -p1 -b .dgst
@@ -189,7 +183,6 @@ cp %{SOURCE13} test/
 %patch67 -p1 -b .kdf-selftest
 %patch69 -p1 -b .alpn-cb
 %patch70 -p1 -b .rewire-fips-drbg
-%patch71 -p1 -b .verify-cert
 
 
 %build
@@ -478,6 +471,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Feb 23 2021 Sahana Prasad <sahana@redhat.com> - 1:1.1.1j-1
+- Upgrade to version 1.1.1.j
+
 * Wed Feb 10 2021 Sahana Prasad <sahana@redhat.com> - 1:1.1.1i-3
 - Fix regression in X509_verify_cert() (bz1916594)
 

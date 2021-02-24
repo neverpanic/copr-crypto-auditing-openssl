@@ -1,6 +1,6 @@
-diff -up openssl-1.1.1g/crypto/bn/bn_const.c.fips-dh openssl-1.1.1g/crypto/bn/bn_const.c
---- openssl-1.1.1g/crypto/bn/bn_const.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/bn/bn_const.c	2020-07-17 10:36:29.245788441 +0200
+diff -up openssl-1.1.1j/crypto/bn/bn_const.c.fips-dh openssl-1.1.1j/crypto/bn/bn_const.c
+--- openssl-1.1.1j/crypto/bn/bn_const.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/bn/bn_const.c	2021-03-03 14:23:27.403092418 +0100
 @@ -1,13 +1,17 @@
  /*
 - * Copyright 2005-2016 The OpenSSL Project Authors. All Rights Reserved.
@@ -477,9 +477,9 @@ diff -up openssl-1.1.1g/crypto/bn/bn_const.c.fips-dh openssl-1.1.1g/crypto/bn/bn
 -    return BN_bin2bn(RFC3526_PRIME_8192, sizeof(RFC3526_PRIME_8192), bn);
 +    return COPY_BN(bn, _bignum_modp_8192_p);
  }
-diff -up openssl-1.1.1g/crypto/bn/bn_dh.c.fips-dh openssl-1.1.1g/crypto/bn/bn_dh.c
---- openssl-1.1.1g/crypto/bn/bn_dh.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/bn/bn_dh.c	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/bn/bn_dh.c.fips-dh openssl-1.1.1j/crypto/bn/bn_dh.c
+--- openssl-1.1.1j/crypto/bn/bn_dh.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/bn/bn_dh.c	2021-03-03 14:23:27.404092427 +0100
 @@ -1,7 +1,7 @@
  /*
 - * Copyright 2014-2017 The OpenSSL Project Authors. All Rights Reserved.
@@ -1956,9 +1956,9 @@ diff -up openssl-1.1.1g/crypto/bn/bn_dh.c.fips-dh openssl-1.1.1g/crypto/bn/bn_dh
  
 -#endif
 +#endif /* OPENSSL_NO_DH */
-diff -up openssl-1.1.1g/crypto/dh/dh_check.c.fips-dh openssl-1.1.1g/crypto/dh/dh_check.c
---- openssl-1.1.1g/crypto/dh/dh_check.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_check.c	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/dh/dh_check.c.fips-dh openssl-1.1.1j/crypto/dh/dh_check.c
+--- openssl-1.1.1j/crypto/dh/dh_check.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/dh/dh_check.c	2021-03-03 14:23:27.404092427 +0100
 @@ -10,6 +10,7 @@
  #include <stdio.h>
  #include "internal/cryptlib.h"
@@ -2043,9 +2043,9 @@ diff -up openssl-1.1.1g/crypto/dh/dh_check.c.fips-dh openssl-1.1.1g/crypto/dh/dh
 +    return dh_check_pub_key_int(dh, q, pub_key, ret);
 +}
 +
-diff -up openssl-1.1.1g/crypto/dh/dh_gen.c.fips-dh openssl-1.1.1g/crypto/dh/dh_gen.c
---- openssl-1.1.1g/crypto/dh/dh_gen.c.fips-dh	2020-07-17 10:36:29.182787923 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_gen.c	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/dh/dh_gen.c.fips-dh openssl-1.1.1j/crypto/dh/dh_gen.c
+--- openssl-1.1.1j/crypto/dh/dh_gen.c.fips-dh	2021-03-03 14:23:27.338091859 +0100
++++ openssl-1.1.1j/crypto/dh/dh_gen.c	2021-03-03 14:23:27.404092427 +0100
 @@ -27,8 +27,7 @@ int DH_generate_parameters_ex(DH *ret, i
                                BN_GENCB *cb)
  {
@@ -2075,10 +2075,10 @@ diff -up openssl-1.1.1g/crypto/dh/dh_gen.c.fips-dh openssl-1.1.1g/crypto/dh/dh_g
      ctx = BN_CTX_new();
      if (ctx == NULL)
          goto err;
-diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_key.c
---- openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh	2020-07-17 10:36:29.182787923 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_key.c	2020-07-17 11:00:07.783777846 +0200
-@@ -100,10 +100,18 @@ static int generate_key(DH *dh)
+diff -up openssl-1.1.1j/crypto/dh/dh_key.c.fips-dh openssl-1.1.1j/crypto/dh/dh_key.c
+--- openssl-1.1.1j/crypto/dh/dh_key.c.fips-dh	2021-03-03 14:23:27.338091859 +0100
++++ openssl-1.1.1j/crypto/dh/dh_key.c	2021-03-03 14:51:36.235296236 +0100
+@@ -120,10 +120,18 @@ static int generate_key(DH *dh)
      BIGNUM *pub_key = NULL, *priv_key = NULL;
  
  #ifdef OPENSSL_FIPS
@@ -2101,7 +2101,7 @@ diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_k
      }
  #endif
  
-@@ -139,7 +147,15 @@ static int generate_key(DH *dh)
+@@ -159,7 +167,15 @@ static int generate_key(DH *dh)
      }
  
      if (generate_new_key) {
@@ -2118,7 +2118,7 @@ diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_k
              do {
                  if (!BN_priv_rand_range(priv_key, dh->q))
                      goto err;
-@@ -175,6 +191,15 @@ static int generate_key(DH *dh)
+@@ -195,6 +211,15 @@ static int generate_key(DH *dh)
          }
          /* We MUST free prk before any further use of priv_key */
          BN_clear_free(prk);
@@ -2134,7 +2134,7 @@ diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_k
      }
  
      dh->pub_key = pub_key;
-@@ -197,6 +222,7 @@ static int compute_key(unsigned char *ke
+@@ -217,6 +242,7 @@ static int compute_key(unsigned char *ke
      BN_CTX *ctx = NULL;
      BN_MONT_CTX *mont = NULL;
      BIGNUM *tmp;
@@ -2142,7 +2142,7 @@ diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_k
      int ret = -1;
      int check_result;
  
-@@ -243,6 +269,18 @@ static int compute_key(unsigned char *ke
+@@ -263,6 +289,18 @@ static int compute_key(unsigned char *ke
          DHerr(DH_F_COMPUTE_KEY, ERR_R_BN_LIB);
          goto err;
      }
@@ -2159,11 +2159,11 @@ diff -up openssl-1.1.1g/crypto/dh/dh_key.c.fips-dh openssl-1.1.1g/crypto/dh/dh_k
 +        goto err;
 +    }
  
-     ret = BN_bn2bin(tmp, key);
+     ret = BN_bn2binpad(tmp, key, BN_num_bytes(dh->p));
   err:
-diff -up openssl-1.1.1g/crypto/dh/dh_lib.c.fips-dh openssl-1.1.1g/crypto/dh/dh_lib.c
---- openssl-1.1.1g/crypto/dh/dh_lib.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_lib.c	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/dh/dh_lib.c.fips-dh openssl-1.1.1j/crypto/dh/dh_lib.c
+--- openssl-1.1.1j/crypto/dh/dh_lib.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/dh/dh_lib.c	2021-03-03 14:23:27.405092436 +0100
 @@ -8,6 +8,7 @@
   */
  
@@ -2193,9 +2193,9 @@ diff -up openssl-1.1.1g/crypto/dh/dh_lib.c.fips-dh openssl-1.1.1g/crypto/dh/dh_l
          dh->length = BN_num_bits(q);
      }
  
-diff -up openssl-1.1.1g/crypto/dh/dh_local.h.fips-dh openssl-1.1.1g/crypto/dh/dh_local.h
---- openssl-1.1.1g/crypto/dh/dh_local.h.fips-dh	2020-07-17 10:36:28.968786163 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_local.h	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/dh/dh_local.h.fips-dh openssl-1.1.1j/crypto/dh/dh_local.h
+--- openssl-1.1.1j/crypto/dh/dh_local.h.fips-dh	2021-03-03 14:23:27.202090689 +0100
++++ openssl-1.1.1j/crypto/dh/dh_local.h	2021-03-03 14:23:27.405092436 +0100
 @@ -35,6 +35,7 @@ struct dh_st {
      const DH_METHOD *meth;
      ENGINE *engine;
@@ -2215,9 +2215,9 @@ diff -up openssl-1.1.1g/crypto/dh/dh_local.h.fips-dh openssl-1.1.1g/crypto/dh/dh
 +/* FIPS mode only check which requires nid set and looks up q based on it. */
 +int dh_check_pub_key_full(const DH *dh, const BIGNUM *pub_key, int *ret);
 +
-diff -up openssl-1.1.1g/crypto/dh/dh_rfc7919.c.fips-dh openssl-1.1.1g/crypto/dh/dh_rfc7919.c
---- openssl-1.1.1g/crypto/dh/dh_rfc7919.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/dh/dh_rfc7919.c	2020-07-17 10:36:29.246788449 +0200
+diff -up openssl-1.1.1j/crypto/dh/dh_rfc7919.c.fips-dh openssl-1.1.1j/crypto/dh/dh_rfc7919.c
+--- openssl-1.1.1j/crypto/dh/dh_rfc7919.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/dh/dh_rfc7919.c	2021-03-03 14:23:27.405092436 +0100
 @@ -7,6 +7,8 @@
   * https://www.openssl.org/source/license.html
   */
@@ -2387,10 +2387,10 @@ diff -up openssl-1.1.1g/crypto/dh/dh_rfc7919.c.fips-dh openssl-1.1.1g/crypto/dh/
 +    return dh_match_group(dh, q, NULL) != NID_undef;
 +}
 +
-diff -up openssl-1.1.1g/crypto/ec/ec_key.c.fips-dh openssl-1.1.1g/crypto/ec/ec_key.c
---- openssl-1.1.1g/crypto/ec/ec_key.c.fips-dh	2020-07-17 11:00:53.958175227 +0200
-+++ openssl-1.1.1g/crypto/ec/ec_key.c	2020-07-20 13:24:03.941107320 +0200
-@@ -280,9 +280,18 @@ int ec_key_simple_generate_key(EC_KEY *e
+diff -up openssl-1.1.1j/crypto/ec/ec_key.c.fips-dh openssl-1.1.1j/crypto/ec/ec_key.c
+--- openssl-1.1.1j/crypto/ec/ec_key.c.fips-dh	2021-03-03 14:23:27.339091868 +0100
++++ openssl-1.1.1j/crypto/ec/ec_key.c	2021-03-03 14:23:27.405092436 +0100
+@@ -281,9 +281,18 @@ int ec_key_simple_generate_key(EC_KEY *e
      if (!EC_POINT_mul(eckey->group, pub_key, priv_key, NULL, NULL, ctx))
          goto err;
  
@@ -2410,7 +2410,7 @@ diff -up openssl-1.1.1g/crypto/ec/ec_key.c.fips-dh openssl-1.1.1g/crypto/ec/ec_k
      ok = 1;
  
   err:
-@@ -296,8 +305,23 @@ int ec_key_simple_generate_key(EC_KEY *e
+@@ -297,8 +306,23 @@ int ec_key_simple_generate_key(EC_KEY *e
  
  int ec_key_simple_generate_public_key(EC_KEY *eckey)
  {
@@ -2435,9 +2435,9 @@ diff -up openssl-1.1.1g/crypto/ec/ec_key.c.fips-dh openssl-1.1.1g/crypto/ec/ec_k
  }
  
  int EC_KEY_check_key(const EC_KEY *eckey)
-diff -up openssl-1.1.1g/crypto/evp/p_lib.c.fips-dh openssl-1.1.1g/crypto/evp/p_lib.c
---- openssl-1.1.1g/crypto/evp/p_lib.c.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/crypto/evp/p_lib.c	2020-07-17 10:36:29.247788458 +0200
+diff -up openssl-1.1.1j/crypto/evp/p_lib.c.fips-dh openssl-1.1.1j/crypto/evp/p_lib.c
+--- openssl-1.1.1j/crypto/evp/p_lib.c.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/crypto/evp/p_lib.c	2021-03-03 14:23:27.405092436 +0100
 @@ -540,7 +540,8 @@ EC_KEY *EVP_PKEY_get1_EC_KEY(EVP_PKEY *p
  
  int EVP_PKEY_set1_DH(EVP_PKEY *pkey, DH *key)
@@ -2448,9 +2448,9 @@ diff -up openssl-1.1.1g/crypto/evp/p_lib.c.fips-dh openssl-1.1.1g/crypto/evp/p_l
      int ret = EVP_PKEY_assign(pkey, type, key);
  
      if (ret)
-diff -up openssl-1.1.1g/crypto/objects/obj_dat.h.fips-dh openssl-1.1.1g/crypto/objects/obj_dat.h
---- openssl-1.1.1g/crypto/objects/obj_dat.h.fips-dh	2020-07-17 10:36:29.239788392 +0200
-+++ openssl-1.1.1g/crypto/objects/obj_dat.h	2020-07-17 10:36:29.247788458 +0200
+diff -up openssl-1.1.1j/crypto/objects/obj_dat.h.fips-dh openssl-1.1.1j/crypto/objects/obj_dat.h
+--- openssl-1.1.1j/crypto/objects/obj_dat.h.fips-dh	2021-03-03 14:23:27.394092341 +0100
++++ openssl-1.1.1j/crypto/objects/obj_dat.h	2021-03-03 14:23:27.406092444 +0100
 @@ -1078,7 +1078,7 @@ static const unsigned char so[7762] = {
      0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x0D,       /* [ 7753] OBJ_hmacWithSHA512_256 */
  };
@@ -2512,9 +2512,9 @@ diff -up openssl-1.1.1g/crypto/objects/obj_dat.h.fips-dh openssl-1.1.1g/crypto/o
       481,    /* "nSRecord" */
       173,    /* "name" */
       681,    /* "onBasis" */
-diff -up openssl-1.1.1g/crypto/objects/objects.txt.fips-dh openssl-1.1.1g/crypto/objects/objects.txt
---- openssl-1.1.1g/crypto/objects/objects.txt.fips-dh	2020-07-17 10:36:29.239788392 +0200
-+++ openssl-1.1.1g/crypto/objects/objects.txt	2020-07-17 10:36:29.247788458 +0200
+diff -up openssl-1.1.1j/crypto/objects/objects.txt.fips-dh openssl-1.1.1j/crypto/objects/objects.txt
+--- openssl-1.1.1j/crypto/objects/objects.txt.fips-dh	2021-03-03 14:23:27.395092350 +0100
++++ openssl-1.1.1j/crypto/objects/objects.txt	2021-03-03 14:23:27.406092444 +0100
 @@ -1657,6 +1657,13 @@ id-pkinit 5                     : pkInit
                              : ffdhe4096
                              : ffdhe6144
@@ -2529,9 +2529,9 @@ diff -up openssl-1.1.1g/crypto/objects/objects.txt.fips-dh openssl-1.1.1g/crypto
  
  # OIDs for DSTU-4145/DSTU-7564 (http://zakon2.rada.gov.ua/laws/show/z0423-17)
  
-diff -up openssl-1.1.1g/crypto/objects/obj_mac.num.fips-dh openssl-1.1.1g/crypto/objects/obj_mac.num
---- openssl-1.1.1g/crypto/objects/obj_mac.num.fips-dh	2020-07-17 10:36:29.239788392 +0200
-+++ openssl-1.1.1g/crypto/objects/obj_mac.num	2020-07-17 10:36:29.248788466 +0200
+diff -up openssl-1.1.1j/crypto/objects/obj_mac.num.fips-dh openssl-1.1.1j/crypto/objects/obj_mac.num
+--- openssl-1.1.1j/crypto/objects/obj_mac.num.fips-dh	2021-03-03 14:23:27.395092350 +0100
++++ openssl-1.1.1j/crypto/objects/obj_mac.num	2021-03-03 14:23:27.406092444 +0100
 @@ -1196,3 +1196,9 @@ sshkdf		1195
  kbkdf		1196
  krb5kdf		1197
@@ -2542,9 +2542,9 @@ diff -up openssl-1.1.1g/crypto/objects/obj_mac.num.fips-dh openssl-1.1.1g/crypto
 +modp_4096		1202
 +modp_6144		1203
 +modp_8192		1204
-diff -up openssl-1.1.1g/doc/man3/DH_new_by_nid.pod.fips-dh openssl-1.1.1g/doc/man3/DH_new_by_nid.pod
---- openssl-1.1.1g/doc/man3/DH_new_by_nid.pod.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/doc/man3/DH_new_by_nid.pod	2020-07-17 10:36:29.248788466 +0200
+diff -up openssl-1.1.1j/doc/man3/DH_new_by_nid.pod.fips-dh openssl-1.1.1j/doc/man3/DH_new_by_nid.pod
+--- openssl-1.1.1j/doc/man3/DH_new_by_nid.pod.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/doc/man3/DH_new_by_nid.pod	2021-03-03 14:23:27.406092444 +0100
 @@ -8,13 +8,15 @@ DH_new_by_nid, DH_get_nid - get or find
  
   #include <openssl/dh.h>
@@ -2563,9 +2563,9 @@ diff -up openssl-1.1.1g/doc/man3/DH_new_by_nid.pod.fips-dh openssl-1.1.1g/doc/ma
  
  DH_get_nid() determines if the parameters contained in B<dh> match
  any named set. It returns the NID corresponding to the matching parameters or
-diff -up openssl-1.1.1g/doc/man3/EVP_PKEY_CTX_ctrl.pod.fips-dh openssl-1.1.1g/doc/man3/EVP_PKEY_CTX_ctrl.pod
---- openssl-1.1.1g/doc/man3/EVP_PKEY_CTX_ctrl.pod.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/doc/man3/EVP_PKEY_CTX_ctrl.pod	2020-07-17 10:36:29.248788466 +0200
+diff -up openssl-1.1.1j/doc/man3/EVP_PKEY_CTX_ctrl.pod.fips-dh openssl-1.1.1j/doc/man3/EVP_PKEY_CTX_ctrl.pod
+--- openssl-1.1.1j/doc/man3/EVP_PKEY_CTX_ctrl.pod.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/doc/man3/EVP_PKEY_CTX_ctrl.pod	2021-03-03 14:23:27.406092444 +0100
 @@ -294,10 +294,11 @@ The EVP_PKEY_CTX_set_dh_pad() macro sets
  If B<pad> is zero (the default) then no padding is performed.
  
@@ -2582,9 +2582,9 @@ diff -up openssl-1.1.1g/doc/man3/EVP_PKEY_CTX_ctrl.pod.fips-dh openssl-1.1.1g/do
  The nid parameter and the rfc5114 parameter are mutually exclusive.
  
  The EVP_PKEY_CTX_set_dh_rfc5114() and EVP_PKEY_CTX_set_dhx_rfc5114() macros are
-diff -up openssl-1.1.1g/include/crypto/bn_dh.h.fips-dh openssl-1.1.1g/include/crypto/bn_dh.h
---- openssl-1.1.1g/include/crypto/bn_dh.h.fips-dh	2020-04-21 14:22:39.000000000 +0200
-+++ openssl-1.1.1g/include/crypto/bn_dh.h	2020-07-17 10:36:29.248788466 +0200
+diff -up openssl-1.1.1j/include/crypto/bn_dh.h.fips-dh openssl-1.1.1j/include/crypto/bn_dh.h
+--- openssl-1.1.1j/include/crypto/bn_dh.h.fips-dh	2021-02-16 16:24:01.000000000 +0100
++++ openssl-1.1.1j/include/crypto/bn_dh.h	2021-03-03 14:23:27.406092444 +0100
 @@ -1,7 +1,7 @@
  /*
 - * Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
@@ -2633,9 +2633,9 @@ diff -up openssl-1.1.1g/include/crypto/bn_dh.h.fips-dh openssl-1.1.1g/include/cr
 +extern const BIGNUM _bignum_modp_4096_q;
 +extern const BIGNUM _bignum_modp_6144_q;
 +extern const BIGNUM _bignum_modp_8192_q;
-diff -up openssl-1.1.1g/include/openssl/obj_mac.h.fips-dh openssl-1.1.1g/include/openssl/obj_mac.h
---- openssl-1.1.1g/include/openssl/obj_mac.h.fips-dh	2020-07-17 10:36:29.240788400 +0200
-+++ openssl-1.1.1g/include/openssl/obj_mac.h	2020-07-17 10:36:29.248788466 +0200
+diff -up openssl-1.1.1j/include/openssl/obj_mac.h.fips-dh openssl-1.1.1j/include/openssl/obj_mac.h
+--- openssl-1.1.1j/include/openssl/obj_mac.h.fips-dh	2021-03-03 14:23:27.396092358 +0100
++++ openssl-1.1.1j/include/openssl/obj_mac.h	2021-03-03 14:23:27.407092453 +0100
 @@ -5115,6 +5115,24 @@
  #define SN_ffdhe8192            "ffdhe8192"
  #define NID_ffdhe8192           1130
@@ -2661,10 +2661,10 @@ diff -up openssl-1.1.1g/include/openssl/obj_mac.h.fips-dh openssl-1.1.1g/include
  #define SN_ISO_UA               "ISO-UA"
  #define NID_ISO_UA              1150
  #define OBJ_ISO_UA              OBJ_member_body,804L
-diff -up openssl-1.1.1g/ssl/s3_lib.c.fips-dh openssl-1.1.1g/ssl/s3_lib.c
---- openssl-1.1.1g/ssl/s3_lib.c.fips-dh	2020-07-17 10:36:29.199788063 +0200
-+++ openssl-1.1.1g/ssl/s3_lib.c	2020-07-17 10:36:29.248788466 +0200
-@@ -4858,13 +4858,51 @@ int ssl_derive(SSL *s, EVP_PKEY *privkey
+diff -up openssl-1.1.1j/ssl/s3_lib.c.fips-dh openssl-1.1.1j/ssl/s3_lib.c
+--- openssl-1.1.1j/ssl/s3_lib.c.fips-dh	2021-03-03 14:23:27.354091997 +0100
++++ openssl-1.1.1j/ssl/s3_lib.c	2021-03-03 14:23:27.407092453 +0100
+@@ -4849,13 +4849,51 @@ int ssl_derive(SSL *s, EVP_PKEY *privkey
  EVP_PKEY *ssl_dh_to_pkey(DH *dh)
  {
      EVP_PKEY *ret;
@@ -2716,11 +2716,10 @@ diff -up openssl-1.1.1g/ssl/s3_lib.c.fips-dh openssl-1.1.1g/ssl/s3_lib.c
      return ret;
  }
  #endif
- 
-diff -up openssl-1.1.1h/ssl/t1_lib.c.fips-dh openssl-1.1.1h/ssl/t1_lib.c
---- openssl-1.1.1h/ssl/t1_lib.c.fips-dh	2020-11-04 14:04:41.851711629 +0100
-+++ openssl-1.1.1h/ssl/t1_lib.c	2020-11-04 14:06:06.506431652 +0100
-@@ -2470,7 +2470,7 @@
+diff -up openssl-1.1.1j/ssl/t1_lib.c.fips-dh openssl-1.1.1j/ssl/t1_lib.c
+--- openssl-1.1.1j/ssl/t1_lib.c.fips-dh	2021-03-03 14:23:27.401092401 +0100
++++ openssl-1.1.1j/ssl/t1_lib.c	2021-03-03 14:23:27.407092453 +0100
+@@ -2542,7 +2542,7 @@ DH *ssl_get_auto_dh(SSL *s)
          p = BN_get_rfc3526_prime_4096(NULL);
      else if (dh_secbits >= 128)
          p = BN_get_rfc3526_prime_3072(NULL);
