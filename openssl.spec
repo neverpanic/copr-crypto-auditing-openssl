@@ -21,7 +21,7 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 1.1.1j
+Version: 1.1.1k
 Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
@@ -471,6 +471,9 @@ export LD_LIBRARY_PATH
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Mar 26 2021 Sahana Prasad <sahana@redhat.com> - 1:1.1.1k-1
+- Upgrade to version 1.1.1.k
+
 * Tue Feb 23 2021 Sahana Prasad <sahana@redhat.com> - 1:1.1.1j-1
 - Upgrade to version 1.1.1.j
 
