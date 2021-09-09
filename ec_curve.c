@@ -1,17 +1,24 @@
 /*
- * Copyright 2002-2019 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
- * Licensed under the OpenSSL license (the "License").  You may not use
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
 
+/*
+ * ECDSA low level APIs are deprecated for public use, but still ok for
+ * internal use.
+ */
+#include "internal/deprecated.h"
+
 #include <string.h>
 #include "ec_local.h"
 #include <openssl/err.h>
 #include <openssl/obj_mac.h>
+#include <openssl/objects.h>
 #include <openssl/opensslconf.h>
 #include "internal/nelem.h"
 
@@ -242,43 +249,115 @@ typedef struct _ec_list_element_st {
     const char *comment;
 } ec_list_element;
 
+#ifdef FIPS_MODULE
 static const ec_list_element curve_list[] = {
     /* prime field curves */
     /* secg curves */
-#ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-    {NID_secp224r1, &_EC_NIST_PRIME_224.h, EC_GFp_nistp224_method,
+    {NID_secp224r1, &_EC_NIST_PRIME_224.h,
+# if !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+     EC_GFp_nistp224_method,
+# else
+     0,
+# endif
      "NIST/SECG curve over a 224 bit prime field"},
-#else
-    {NID_secp224r1, &_EC_NIST_PRIME_224.h, 0,
-     "NIST/SECG curve over a 224 bit prime field"},
-#endif
-    {NID_secp256k1, &_EC_SECG_PRIME_256K1.h, 0,
-     "SECG curve over a 256 bit prime field"},
     /* SECG secp256r1 is the same as X9.62 prime256v1 and hence omitted */
-    {NID_secp384r1, &_EC_NIST_PRIME_384.h, 0,
+    {NID_secp384r1, &_EC_NIST_PRIME_384.h,
+# if defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp384_method,
+# else
+     0,
+# endif
      "NIST/SECG curve over a 384 bit prime field"},
-#ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-    {NID_secp521r1, &_EC_NIST_PRIME_521.h, EC_GFp_nistp521_method,
+
+    {NID_secp521r1, &_EC_NIST_PRIME_521.h,
+# if defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp521_method,
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+     EC_GFp_nistp521_method,
+# else
+     0,
+# endif
      "NIST/SECG curve over a 521 bit prime field"},
-#else
-    {NID_secp521r1, &_EC_NIST_PRIME_521.h, 0,
-     "NIST/SECG curve over a 521 bit prime field"},
-#endif
+
     /* X9.62 curves */
     {NID_X9_62_prime256v1, &_EC_X9_62_PRIME_256V1.h,
-#if defined(ECP_NISTZ256_ASM)
+# if defined(ECP_NISTZ256_ASM)
      EC_GFp_nistz256_method,
-#elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# elif defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp256_method,
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
      EC_GFp_nistp256_method,
-#else
+# else
      0,
-#endif
+# endif
      "X9.62/SECG curve over a 256 bit prime field"},
 };
 
+#else
+
+static const ec_list_element curve_list[] = {
+    /* prime field curves */
+    /* secg curves */
+# ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+    {NID_secp224r1, &_EC_NIST_PRIME_224.h, EC_GFp_nistp224_method,
+     "NIST/SECG curve over a 224 bit prime field"},
+# else
+    {NID_secp224r1, &_EC_NIST_PRIME_224.h, 0,
+     "NIST/SECG curve over a 224 bit prime field"},
+# endif
+    {NID_secp256k1, &_EC_SECG_PRIME_256K1.h, 0,
+     "SECG curve over a 256 bit prime field"},
+    /* SECG secp256r1 is the same as X9.62 prime256v1 and hence omitted */
+    {NID_secp384r1, &_EC_NIST_PRIME_384.h,
+# if defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp384_method,
+# else
+     0,
+# endif
+     "NIST/SECG curve over a 384 bit prime field"},
+    {NID_secp521r1, &_EC_NIST_PRIME_521.h,
+# if defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp521_method,
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+     EC_GFp_nistp521_method,
+# else
+     0,
+# endif
+     "NIST/SECG curve over a 521 bit prime field"},
+    /* X9.62 curves */
+    {NID_X9_62_prime256v1, &_EC_X9_62_PRIME_256V1.h,
+# if defined(ECP_NISTZ256_ASM)
+     EC_GFp_nistz256_method,
+# elif defined(S390X_EC_ASM)
+     EC_GFp_s390x_nistp256_method,
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+     EC_GFp_nistp256_method,
+# else
+     0,
+# endif
+     "X9.62/SECG curve over a 256 bit prime field"},
+};
+#endif /* FIPS_MODULE */
+
 #define curve_list_length OSSL_NELEM(curve_list)
 
-static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
+static const ec_list_element *ec_curve_nid2curve(int nid)
+{
+    size_t i;
+
+    if (nid <= 0)
+        return NULL;
+
+    for (i = 0; i < curve_list_length; i++) {
+        if (curve_list[i].nid == nid)
+            return &curve_list[i];
+    }
+    return NULL;
+}
+
+static EC_GROUP *ec_group_new_from_data(OSSL_LIB_CTX *libctx,
+                                        const char *propq,
+                                        const ec_list_element curve)
 {
     EC_GROUP *group = NULL;
     EC_POINT *P = NULL;
@@ -293,10 +372,11 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
 
     /* If no curve data curve method must handle everything */
     if (curve.data == NULL)
-        return EC_GROUP_new(curve.meth != NULL ? curve.meth() : NULL);
+        return ossl_ec_group_new_ex(libctx, propq,
+                                    curve.meth != NULL ? curve.meth() : NULL);
 
-    if ((ctx = BN_CTX_new()) == NULL) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_MALLOC_FAILURE);
+    if ((ctx = BN_CTX_new_ex(libctx)) == NULL) {
+        ERR_raise(ERR_LIB_EC, ERR_R_MALLOC_FAILURE);
         goto err;
     }
 
@@ -309,20 +389,20 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
     if ((p = BN_bin2bn(params + 0 * param_len, param_len, NULL)) == NULL
         || (a = BN_bin2bn(params + 1 * param_len, param_len, NULL)) == NULL
         || (b = BN_bin2bn(params + 2 * param_len, param_len, NULL)) == NULL) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_BN_LIB);
         goto err;
     }
 
     if (curve.meth != 0) {
         meth = curve.meth();
-        if (((group = EC_GROUP_new(meth)) == NULL) ||
+        if (((group = ossl_ec_group_new_ex(libctx, propq, meth)) == NULL) ||
             (!(group->meth->group_set_curve(group, p, a, b, ctx)))) {
-            ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+            ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
             goto err;
         }
     } else if (data->field_type == NID_X9_62_prime_field) {
         if ((group = EC_GROUP_new_curve_GFp(p, a, b, ctx)) == NULL) {
-            ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+            ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
             goto err;
         }
     }
@@ -331,7 +411,7 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
                                  * NID_X9_62_characteristic_two_field */
 
         if ((group = EC_GROUP_new_curve_GF2m(p, a, b, ctx)) == NULL) {
-            ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+            ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
             goto err;
         }
     }
@@ -340,31 +420,31 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
     EC_GROUP_set_curve_name(group, curve.nid);
 
     if ((P = EC_POINT_new(group)) == NULL) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
         goto err;
     }
 
     if ((x = BN_bin2bn(params + 3 * param_len, param_len, NULL)) == NULL
         || (y = BN_bin2bn(params + 4 * param_len, param_len, NULL)) == NULL) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_BN_LIB);
         goto err;
     }
     if (!EC_POINT_set_affine_coordinates(group, P, x, y, ctx)) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
         goto err;
     }
     if ((order = BN_bin2bn(params + 5 * param_len, param_len, NULL)) == NULL
         || !BN_set_word(x, (BN_ULONG)data->cofactor)) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_BN_LIB);
         goto err;
     }
     if (!EC_GROUP_set_generator(group, P, order, x)) {
-        ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+        ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
         goto err;
     }
     if (seed_len) {
         if (!EC_GROUP_set_seed(group, params - seed_len, seed_len)) {
-            ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB);
+            ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
             goto err;
         }
     }
@@ -385,27 +465,32 @@ static EC_GROUP *ec_group_new_from_data(const ec_list_element curve)
     return group;
 }
 
-EC_GROUP *EC_GROUP_new_by_curve_name(int nid)
+EC_GROUP *EC_GROUP_new_by_curve_name_ex(OSSL_LIB_CTX *libctx, const char *propq,
+                                        int nid)
 {
-    size_t i;
     EC_GROUP *ret = NULL;
+    const ec_list_element *curve;
 
-    if (nid <= 0)
-        return NULL;
-
-    for (i = 0; i < curve_list_length; i++)
-        if (curve_list[i].nid == nid) {
-            ret = ec_group_new_from_data(curve_list[i]);
-            break;
-        }
-
-    if (ret == NULL) {
-        ECerr(EC_F_EC_GROUP_NEW_BY_CURVE_NAME, EC_R_UNKNOWN_GROUP);
+    if ((curve = ec_curve_nid2curve(nid)) == NULL
+        || (ret = ec_group_new_from_data(libctx, propq, *curve)) == NULL) {
+#ifndef FIPS_MODULE
+        ERR_raise_data(ERR_LIB_EC, EC_R_UNKNOWN_GROUP,
+                       "name=%s", OBJ_nid2sn(nid));
+#else
+        ERR_raise(ERR_LIB_EC, EC_R_UNKNOWN_GROUP);
+#endif
         return NULL;
     }
 
     return ret;
 }
+
+#ifndef FIPS_MODULE
+EC_GROUP *EC_GROUP_new_by_curve_name(int nid)
+{
+    return EC_GROUP_new_by_curve_name_ex(NULL, NULL, nid);
+}
+#endif
 
 size_t EC_get_builtin_curves(EC_builtin_curve *r, size_t nitems)
 {
@@ -424,49 +509,14 @@ size_t EC_get_builtin_curves(EC_builtin_curve *r, size_t nitems)
     return curve_list_length;
 }
 
-/* Functions to translate between common NIST curve names and NIDs */
-
-typedef struct {
-    const char *name;           /* NIST Name of curve */
-    int nid;                    /* Curve NID */
-} EC_NIST_NAME;
-
-static EC_NIST_NAME nist_curves[] = {
-    {"B-163", NID_sect163r2},
-    {"B-233", NID_sect233r1},
-    {"B-283", NID_sect283r1},
-    {"B-409", NID_sect409r1},
-    {"B-571", NID_sect571r1},
-    {"K-163", NID_sect163k1},
-    {"K-233", NID_sect233k1},
-    {"K-283", NID_sect283k1},
-    {"K-409", NID_sect409k1},
-    {"K-571", NID_sect571k1},
-    {"P-192", NID_X9_62_prime192v1},
-    {"P-224", NID_secp224r1},
-    {"P-256", NID_X9_62_prime256v1},
-    {"P-384", NID_secp384r1},
-    {"P-521", NID_secp521r1}
-};
-
 const char *EC_curve_nid2nist(int nid)
 {
-    size_t i;
-    for (i = 0; i < OSSL_NELEM(nist_curves); i++) {
-        if (nist_curves[i].nid == nid)
-            return nist_curves[i].name;
-    }
-    return NULL;
+    return ossl_ec_curve_nid2nist_int(nid);
 }
 
 int EC_curve_nist2nid(const char *name)
 {
-    size_t i;
-    for (i = 0; i < OSSL_NELEM(nist_curves); i++) {
-        if (strcmp(nist_curves[i].name, name) == 0)
-            return nist_curves[i].nid;
-    }
-    return NID_undef;
+    return ossl_ec_curve_nist2nid_int(name);
 }
 
 #define NUM_BN_FIELDS 6
@@ -478,7 +528,7 @@ int EC_curve_nist2nid(const char *name)
  * Returns: The nid associated with the found named curve, or NID_undef
  *          if not found. If there was an error it returns -1.
  */
-int ec_curve_nid_from_params(const EC_GROUP *group, BN_CTX *ctx)
+int ossl_ec_curve_nid_from_params(const EC_GROUP *group, BN_CTX *ctx)
 {
     int ret = -1, nid, len, field_type, param_len;
     size_t i, seed_len;
@@ -486,17 +536,13 @@ int ec_curve_nid_from_params(const EC_GROUP *group, BN_CTX *ctx)
     unsigned char *param_bytes = NULL;
     const EC_CURVE_DATA *data;
     const EC_POINT *generator = NULL;
-    const EC_METHOD *meth;
     const BIGNUM *cofactor = NULL;
     /* An array of BIGNUMs for (p, a, b, x, y, order) */
     BIGNUM *bn[NUM_BN_FIELDS] = {NULL, NULL, NULL, NULL, NULL, NULL};
 
-    meth = EC_GROUP_method_of(group);
-    if (meth == NULL)
-        return -1;
     /* Use the optional named curve nid as a search field */
     nid = EC_GROUP_get_curve_name(group);
-    field_type = EC_METHOD_get_field_type(meth);
+    field_type = EC_GROUP_get_field_type(group);
     seed_len = EC_GROUP_get_seed_len(group);
     seed = EC_GROUP_get0_seed(group);
     cofactor = EC_GROUP_get0_cofactor(group);
