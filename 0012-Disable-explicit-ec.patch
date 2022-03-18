@@ -1,0 +1,80 @@
+diff -up openssl-3.0.1/crypto/ec/ec_lib.c.disable_explicit_ec openssl-3.0.1/crypto/ec/ec_lib.c
+--- openssl-3.0.1/crypto/ec/ec_lib.c.disable_explicit_ec	2022-02-22 09:08:48.557823665 +0100
++++ openssl-3.0.1/crypto/ec/ec_lib.c	2022-02-22 09:09:26.634133847 +0100
+@@ -1458,7 +1458,7 @@ static EC_GROUP *ec_group_explicit_to_na
+                 goto err;
+         }
+     } else {
+-        ret_group = (EC_GROUP *)group;
++        goto err;
+     }
+     EC_GROUP_free(dup);
+     return ret_group;
+diff -up openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c.disable_explicit_ec openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c
+--- openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c.disable_explicit_ec	2022-02-22 13:04:16.850856612 +0100
++++ openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c	2022-02-22 14:16:19.848369641 +0100
+@@ -936,11 +936,8 @@ int ec_validate(const void *keydata, int
+     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0) {
+         int flags = EC_KEY_get_flags(eck);
+ 
+-        if ((flags & EC_FLAG_CHECK_NAMED_GROUP) != 0)
+-            ok = ok && EC_GROUP_check_named_curve(EC_KEY_get0_group(eck),
+-                           (flags & EC_FLAG_CHECK_NAMED_GROUP_NIST) != 0, ctx);
+-        else
+-            ok = ok && EC_GROUP_check(EC_KEY_get0_group(eck), ctx);
++        ok = ok && EC_GROUP_check_named_curve(EC_KEY_get0_group(eck),
++                      (flags & EC_FLAG_CHECK_NAMED_GROUP_NIST) != 0, ctx);
+     }
+ 
+     if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0) {
+@@ -1217,6 +1214,10 @@ static int ec_gen_assign_group(EC_KEY *e
+         ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+         return 0;
+     }
++    if (EC_GROUP_get_curve_name(group) == NID_undef) {
++        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
++        return 0;
++    }
+     return EC_KEY_set_group(ec, group) > 0;
+ }
+ 
+diff -up openssl-3.0.1/providers/common/securitycheck.c.disable_explicit_ec openssl-3.0.1/providers/common/securitycheck.c
+--- openssl-3.0.1/providers/common/securitycheck.c.disable_explicit_ec	2022-02-25 11:44:19.554673396 +0100
++++ openssl-3.0.1/providers/common/securitycheck.c	2022-02-25 12:16:38.168610089 +0100
+@@ -93,22 +93,22 @@ int ossl_rsa_check_key(OSSL_LIB_CTX *ctx
+ int ossl_ec_check_key(OSSL_LIB_CTX *ctx, const EC_KEY *ec, int protect)
+ {
+ # if !defined(OPENSSL_NO_FIPS_SECURITYCHECKS)
+-    if (ossl_securitycheck_enabled(ctx)) {
+-        int nid, strength;
+-        const char *curve_name;
+-        const EC_GROUP *group = EC_KEY_get0_group(ec);
++    int nid, strength;
++    const char *curve_name;
++    const EC_GROUP *group = EC_KEY_get0_group(ec);
+ 
+-        if (group == NULL) {
+-            ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_CURVE, "No group");
+-            return 0;
+-        }
+-        nid = EC_GROUP_get_curve_name(group);
+-        if (nid == NID_undef) {
+-            ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_CURVE,
+-                           "Explicit curves are not allowed in fips mode");
+-            return 0;
+-        }
++    if (group == NULL) {
++        ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_CURVE, "No group");
++        return 0;
++    }
++    nid = EC_GROUP_get_curve_name(group);
++    if (nid == NID_undef) {
++        ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_CURVE,
++                       "Explicit curves are not allowed in this build");
++        return 0;
++    }
+ 
++    if (ossl_securitycheck_enabled(ctx)) {
+         curve_name = EC_curve_nid2nist(nid);
+         if (curve_name == NULL) {
+             ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_CURVE,

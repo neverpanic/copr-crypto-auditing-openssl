@@ -2300,8 +2300,8 @@ int setup_tests(void)
     ADD_ALL_TESTS(check_ec_key_field_public_range_test, crv_len);
     ADD_ALL_TESTS(check_named_curve_from_ecparameters, crv_len);
     ADD_ALL_TESTS(ec_point_hex2point_test, crv_len);
-    ADD_ALL_TESTS(custom_generator_test, crv_len);
-    ADD_ALL_TESTS(custom_params_test, crv_len);
+    /* ADD_ALL_TESTS(custom_generator_test, crv_len);
+    ADD_ALL_TESTS(custom_params_test, crv_len); */
     return 1;
 }
 

@@ -14,13 +14,13 @@
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
-Version: 3.0.0
-Release: 2%{?dist}
+Version: 3.0.2
+Release: 1%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
 # The original openssl upstream tarball cannot be shipped in the .src.rpm.
-Source: openssl-%{version}-hobbled.tar.xz
+Source: openssl-%{version}-hobbled.tar.gz
 Source1: hobble-openssl
 Source2: Makefile.certificate
 Source3: genpatches
@@ -52,8 +52,12 @@ Patch8: 0008-Add-FIPS_mode-compatibility-macro.patch
 #Patch9: 0009-Add-Kernel-FIPS-mode-flag-support.patch
 # remove unsupported EC curves
 Patch11: 0011-Remove-EC-curves.patch
+# Disable explicit EC curves
+Patch12: 0012-Disable-explicit-ec.patch
 # Instructions to load legacy provider in openssl.cnf
 Patch24: 0024-load-legacy-prov.patch
+# Backport of patch for RHEL for Edge rhbz #2027261
+Patch51: 0051-Support-different-R_BITS-lengths-for-KBKDF.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -177,6 +181,10 @@ sslflags=enable-ec_nistp_64_gcc_128
 %ifarch riscv64
 sslarch=linux-generic64
 %endif
+ktlsopt=enable-ktls
+%ifarch armv7hl
+ktlsopt=disable-ktls
+%endif
 
 # Add -Wa,--noexecstack here so that libcrypto's assembler modules will be
 # marked as not requiring an executable stack.
@@ -194,7 +202,7 @@ export HASHBANGPERL=/usr/bin/perl
 	--prefix=%{_prefix} --openssldir=%{_sysconfdir}/pki/tls ${sslflags} \
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
-	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips\
+	enable-cms enable-md2 enable-rc5 ${ktlsopt} enable-fips\
 	no-mdc2 no-ec2m no-sm2 no-sm4 \
 	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\""'
 
@@ -376,6 +384,9 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Mar 18 2022 Dmitry Belyavskiy <dbelyavs@redhat.com> - 1:3.0.2-1
+- Rebase to upstream version 3.0.2
+
 * Thu Jan 20 2022 Fedora Release Engineering <releng@fedoraproject.org> - 1:3.0.0-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
 

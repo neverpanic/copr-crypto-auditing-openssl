@@ -216,14 +216,6 @@ index b1d3f7919e..f7cc7fed48 100644
      /* Add TLSv1.3 ciphers first - we always prefer those if possible */
      for (i = 0; i < sk_SSL_CIPHER_num(tls13_ciphersuites); i++) {
          const SSL_CIPHER *sslc = sk_SSL_CIPHER_value(tls13_ciphersuites, i);
-@@ -1622,6 +1679,7 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(SSL_CTX *ctx,
- 
-         if (!sk_SSL_CIPHER_push(cipherstack, sslc)) {
-             sk_SSL_CIPHER_free(cipherstack);
-+            OPENSSL_free(co_list);
-             return NULL;
-         }
-     }
 @@ -1656,6 +1714,14 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(SSL_CTX *ctx,
      *cipher_list = cipherstack;
  
