@@ -24,6 +24,7 @@ Source: openssl-%{version}-hobbled.tar.gz
 Source1: hobble-openssl
 Source2: Makefile.certificate
 Source3: genpatches
+Source4: openssl.rpmlintrc
 Source6: make-dummy-cert
 Source7: renew-dummy-cert
 Source9: configuration-switch.h
@@ -388,6 +389,9 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Apr 07 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-2
+- Silence a few rpmlint false positives.
+
 * Thu Apr 07 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-2
 - Allow disabling SHA1 signature creation and verification.
   Set rh-allow-sha1-signatures = no to disable.
