@@ -15,7 +15,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.2
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -57,12 +57,22 @@ Patch11: 0011-Remove-EC-curves.patch
 Patch12: 0012-Disable-explicit-ec.patch
 # Instructions to load legacy provider in openssl.cnf
 Patch24: 0024-load-legacy-prov.patch
+%if 0%{?rhel}
+# Selectively disallow SHA1 signatures
+Patch49: 0049-Selectively-disallow-SHA1-signatures.patch
+%else
 # Selectively disallow SHA1 signatures rhbz#2070977
 Patch49: 0049-Allow-disabling-of-SHA1-signatures.patch
+%endif
 # Backport of patch for RHEL for Edge rhbz #2027261
 Patch51: 0051-Support-different-R_BITS-lengths-for-KBKDF.patch
+%if 0%{?rhel}
+# Allow SHA1 in seclevel 2 if rh-allow-sha1-signatures = yes
+Patch52: 0052-Allow-SHA1-in-seclevel-2-if-rh-allow-sha1-signatures.patch
+%else
 # Support SHA1 in TLS in LEGACY crypto-policy (which is SECLEVEL=1)
 Patch52: 0052-Allow-SHA1-in-seclevel-1-if-rh-allow-sha1-signatures.patch
+%endif
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -236,6 +246,10 @@ patch -p1 -R < %{PATCH4}
 
 OPENSSL_ENABLE_MD5_VERIFY=
 export OPENSSL_ENABLE_MD5_VERIFY
+%if 0%{?rhel}
+OPENSSL_ENABLE_SHA1_SIGNATURES=
+export OPENSSL_ENABLE_SHA1_SIGNATURES
+%endif
 OPENSSL_SYSTEM_CIPHERS_OVERRIDE=xyz_nonexistent_file
 export OPENSSL_SYSTEM_CIPHERS_OVERRIDE
 make test HARNESS_JOBS=8
@@ -389,6 +403,9 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Apr 20 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-3
+- Disable SHA-1 by default in ELN using the patches from CentOS
+
 * Thu Apr 07 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-2
 - Silence a few rpmlint false positives.
 
