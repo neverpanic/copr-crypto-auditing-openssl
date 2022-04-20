@@ -86,7 +86,7 @@ index 0c9110d28a..02e7ca706f 100644
  
 +Note that enabling B<rh-allow-sha1-signatures> will allow TLS signature
 +algorithms that use SHA1 in security level 1, despite the definition of
-+security level 1 of FIXME bits of security, which SHA1 does not meet.  This
++security level 1 of 80 bits of security, which SHA1 does not meet.  This
 +allows using SHA1 in TLS in the LEGACY crypto-policy on Fedora without
 +requiring to set the security level to 0, which would include further insecure
 +algorithms.

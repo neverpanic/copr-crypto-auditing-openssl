@@ -405,6 +405,7 @@ install -m644 %{SOURCE9} \
 %changelog
 * Wed Apr 20 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-3
 - Disable SHA-1 by default in ELN using the patches from CentOS
+- Fix a FIXME in the openssl.cnf(5) manpage
 
 * Thu Apr 07 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-2
 - Silence a few rpmlint false positives.
