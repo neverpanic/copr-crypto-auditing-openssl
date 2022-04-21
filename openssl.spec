@@ -15,7 +15,7 @@
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.2
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -73,6 +73,12 @@ Patch52: 0052-Allow-SHA1-in-seclevel-2-if-rh-allow-sha1-signatures.patch
 # Support SHA1 in TLS in LEGACY crypto-policy (which is SECLEVEL=1)
 Patch52: 0052-Allow-SHA1-in-seclevel-1-if-rh-allow-sha1-signatures.patch
 %endif
+%if 0%{?rhel}
+# no USDT probe instrumentation required
+%else
+# Instrument with USDT probes related to SHA-1 deprecation
+Patch53: 0053-Add-SHA1-probes.patch
+%endif
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -87,6 +93,7 @@ BuildRequires: perl(Module::Load::Conditional), perl(File::Temp)
 BuildRequires: perl(Time::HiRes), perl(IPC::Cmd), perl(Pod::Html), perl(Digest::SHA)
 BuildRequires: perl(FindBin), perl(lib), perl(File::Compare), perl(File::Copy), perl(bigint)
 BuildRequires: git-core
+BuildRequires: systemtap-sdt-devel
 Requires: coreutils
 Requires: %{name}-libs%{?_isa} = %{epoch}:%{version}-%{release}
 
@@ -403,6 +410,9 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Apr 26 2022 Alexander Sosedkin <asosedkin@redhat.com> - 1:3.0.2-4
+- Instrument with USDT probes related to SHA-1 deprecation
+
 * Wed Apr 20 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-3
 - Disable SHA-1 by default in ELN using the patches from CentOS
 - Fix a FIXME in the openssl.cnf(5) manpage
