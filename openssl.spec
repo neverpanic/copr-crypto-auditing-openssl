@@ -410,6 +410,11 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Wed Apr 27 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.2-4
+- Support rsa_pkcs1_md5_sha1 in TLS 1.0/1.1 with rh-allow-sha1-signatures = yes
+  to restore TLS 1.0 and 1.1 support in LEGACY crypto-policy.
+  Related: rhbz#2069239
+
 * Tue Apr 26 2022 Alexander Sosedkin <asosedkin@redhat.com> - 1:3.0.2-4
 - Instrument with USDT probes related to SHA-1 deprecation
 
