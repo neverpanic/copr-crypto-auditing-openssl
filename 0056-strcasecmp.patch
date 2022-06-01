@@ -1,0 +1,14 @@
+diff -up openssl-3.0.3/util/libcrypto.num.locale openssl-3.0.3/util/libcrypto.num
+--- openssl-3.0.3/util/libcrypto.num.locale	2022-06-01 12:35:52.667498724 +0200
++++ openssl-3.0.3/util/libcrypto.num	2022-06-01 12:36:08.112633093 +0200
+@@ -5425,8 +5425,8 @@ ASN1_item_d2i_ex
+ ASN1_TIME_print_ex                      5553	3_0_0	EXIST::FUNCTION:
+ EVP_PKEY_get0_provider                  5554	3_0_0	EXIST::FUNCTION:
+ EVP_PKEY_CTX_get0_provider              5555	3_0_0	EXIST::FUNCTION:
+-OPENSSL_strcasecmp                      5556	3_0_3	EXIST::FUNCTION:
+-OPENSSL_strncasecmp                     5557	3_0_3	EXIST::FUNCTION:
++OPENSSL_strcasecmp                      5556	3_0_1	EXIST::FUNCTION:
++OPENSSL_strncasecmp                     5557	3_0_1	EXIST::FUNCTION:
+ ossl_safe_getenv                        ?	3_0_0	EXIST::FUNCTION:
+ ossl_ctx_legacy_digest_signatures_allowed ?	3_0_1	EXIST::FUNCTION:
+ ossl_ctx_legacy_digest_signatures_allowed_set ?	3_0_1	EXIST::FUNCTION:
