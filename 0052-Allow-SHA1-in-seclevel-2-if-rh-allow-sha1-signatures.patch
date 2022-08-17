@@ -1,4 +1,4 @@
-From c63599ee9708d543205a9173207ee7167315c624 Mon Sep 17 00:00:00 2001
+From dbd1021466572be733dfc6f7ae484f1adf467f40 Mon Sep 17 00:00:00 2001
 From: Clemens Lang <cllang@redhat.com>
 Date: Tue, 1 Mar 2022 15:44:18 +0100
 Subject: [PATCH] Allow SHA1 in seclevel 2 if rh-allow-sha1-signatures = yes
@@ -12,7 +12,7 @@ References: rhbz#2055796
  4 files changed, 79 insertions(+), 18 deletions(-)
 
 diff --git a/crypto/x509/x509_vfy.c b/crypto/x509/x509_vfy.c
-index ff3ca83de6..a549c1c111 100644
+index 2f175ca517f5dd8f8e7d79e5d562981b74c8f987..d1c7d0ce204ca31021a4497ddaa8e7dee45ff6f6 100644
 --- a/crypto/x509/x509_vfy.c
 +++ b/crypto/x509/x509_vfy.c
 @@ -25,6 +25,7 @@
@@ -23,7 +23,7 @@ index ff3ca83de6..a549c1c111 100644
  #include "crypto/x509.h"
  #include "x509_local.h"
  
-@@ -3440,14 +3441,30 @@ static int check_sig_level(X509_STORE_CTX *ctx, X509 *cert)
+@@ -3441,14 +3442,30 @@ static int check_sig_level(X509_STORE_CTX *ctx, X509 *cert)
  {
      int secbits = -1;
      int level = ctx->param->auth_level;
@@ -56,10 +56,10 @@ index ff3ca83de6..a549c1c111 100644
      return secbits >= minbits_table[level - 1];
  }
 diff --git a/doc/man5/config.pod b/doc/man5/config.pod
-index aa1be5ca7f..aa69e2b844 100644
+index f1536258470563b4fe74f8d1e3db6d73ed316341..29ca805ea7152aa9d39bb14e74cc7fd704ec7acf 100644
 --- a/doc/man5/config.pod
 +++ b/doc/man5/config.pod
-@@ -305,7 +305,12 @@ When set to B<no>, any attempt to create or verify a signature with a SHA1
+@@ -313,7 +313,12 @@ When set to B<no>, any attempt to create or verify a signature with a SHA1
  digest will fail.  For compatibility with older versions of OpenSSL, set this
  option to B<yes>.  This setting also affects TLS, where signature algorithms
  that use SHA1 as digest will no longer be supported if this option is set to
@@ -74,7 +74,7 @@ index aa1be5ca7f..aa69e2b844 100644
  =item B<fips_mode> (deprecated)
  
 diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
-index 4b74ee1a34..5f089de107 100644
+index 909e38c2fe88324884a939b583fd7f43d01f3920..860c7a81d1eaa834e72f81e433e7a0a6a8b1b641 100644
 --- a/ssl/t1_lib.c
 +++ b/ssl/t1_lib.c
 @@ -20,6 +20,7 @@
@@ -85,7 +85,7 @@ index 4b74ee1a34..5f089de107 100644
  #include "internal/sslconf.h"
  #include "internal/nelem.h"
  #include "internal/sizes.h"
-@@ -1561,19 +1562,27 @@ int tls12_check_peer_sigalg(SSL *s, uint16_t sig, EVP_PKEY *pkey)
+@@ -1566,19 +1567,27 @@ int tls12_check_peer_sigalg(SSL *s, uint16_t sig, EVP_PKEY *pkey)
          SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_UNKNOWN_DIGEST);
          return 0;
      }
@@ -126,7 +126,7 @@ index 4b74ee1a34..5f089de107 100644
      }
      /* Store the sigalg the peer uses */
      s->s3.tmp.peer_sigalg = lu;
-@@ -2106,6 +2115,14 @@ static int tls12_sigalg_allowed(const SSL *s, int op, const SIGALG_LOOKUP *lu)
+@@ -2111,6 +2120,14 @@ static int tls12_sigalg_allowed(const SSL *s, int op, const SIGALG_LOOKUP *lu)
          }
      }
  
@@ -141,7 +141,7 @@ index 4b74ee1a34..5f089de107 100644
      /* Finally see if security callback allows it */
      secbits = sigalg_security_bits(s->ctx, lu);
      sigalgstr[0] = (lu->sigalg >> 8) & 0xff;
-@@ -2977,6 +2994,8 @@ static int ssl_security_cert_sig(SSL *s, SSL_CTX *ctx, X509 *x, int op)
+@@ -2980,6 +2997,8 @@ static int ssl_security_cert_sig(SSL *s, SSL_CTX *ctx, X509 *x, int op)
  {
      /* Lookup signature algorithm digest */
      int secbits, nid, pknid;
@@ -150,7 +150,7 @@ index 4b74ee1a34..5f089de107 100644
      /* Don't check signature if self signed */
      if ((X509_get_extension_flags(x) & EXFLAG_SS) != 0)
          return 1;
-@@ -2985,6 +3004,25 @@ static int ssl_security_cert_sig(SSL *s, SSL_CTX *ctx, X509 *x, int op)
+@@ -2988,6 +3007,25 @@ static int ssl_security_cert_sig(SSL *s, SSL_CTX *ctx, X509 *x, int op)
      /* If digest NID not defined use signature NID */
      if (nid == NID_undef)
          nid = pknid;
@@ -177,19 +177,19 @@ index 4b74ee1a34..5f089de107 100644
          return ssl_security(s, op, secbits, nid, x);
      else
 diff --git a/test/recipes/25-test_verify.t b/test/recipes/25-test_verify.t
-index 700bbd849c..2de1d76b5e 100644
+index bf85ba57c1cf51fe4e8e54654890121bac6738fe..d5665434aaef1ca2b5f2f37b2499f40b1405fd9d 100644
 --- a/test/recipes/25-test_verify.t
 +++ b/test/recipes/25-test_verify.t
 @@ -29,7 +29,7 @@ sub verify {
      run(app([@args]));
  }
  
--plan tests => 160;
-+plan tests => 159;
+-plan tests => 163;
++plan tests => 162;
  
  # Canonical success
  ok(verify("ee-cert", "sslserver", ["root-cert"], ["ca-cert"]),
-@@ -387,8 +387,9 @@ ok(verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "0"
+@@ -410,8 +410,9 @@ ok(verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "0"
  ok(verify("ee-pss-sha256-cert", "", ["root-cert"], ["ca-cert"], ),
      "CA with PSS signature using SHA256");
  
@@ -202,5 +202,5 @@ index 700bbd849c..2de1d76b5e 100644
  ok(verify("ee-pss-sha256-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "2"),
      "PSS signature using SHA256 and auth level 2");
 -- 
-2.35.1
+2.37.2
 
