@@ -44,12 +44,12 @@ diff -up openssl-3.0.0/apps/openssl.cnf.legacy-prov openssl-3.0.0/apps/openssl.c
 -[default_sect]
 -# activate = 1
 +[provider_sect]
-+##default = default_sect
++default = default_sect
 +##legacy = legacy_sect
 +##
-+##[default_sect]
-+##activate = 1
-+##
++[default_sect]
++activate = 1
++
 +##[legacy_sect]
 +##activate = 1
  

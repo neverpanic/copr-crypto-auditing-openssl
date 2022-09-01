@@ -293,8 +293,8 @@ index 7ae546e1d70c..7b976c0a1b5e 100644
 --- a/test/recipes/30-test_evp.t
 +++ b/test/recipes/30-test_evp.t
 @@ -45,6 +45,7 @@ my @files = qw(
+                 evpciph_aes_wrap.txt
                  evpciph_aes_stitched.txt
-                 evpciph_des3_common.txt
                  evpkdf_hkdf.txt
 +                evpkdf_kbkdf_counter.txt
                  evpkdf_pbkdf1.txt
