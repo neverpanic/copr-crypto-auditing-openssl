@@ -2284,7 +2284,7 @@ int setup_tests(void)
         return 0;
 
     ADD_TEST(parameter_test);
-    ADD_TEST(cofactor_range_test);
+    /*ADD_TEST(cofactor_range_test);*/
     ADD_ALL_TESTS(cardinality_test, crv_len);
     ADD_TEST(prime_field_tests);
 #ifndef OPENSSL_NO_EC2M
