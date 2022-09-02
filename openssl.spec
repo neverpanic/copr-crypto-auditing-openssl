@@ -10,12 +10,26 @@
 # also be handled in opensslconf-new.h.
 %define multilib_arches %{ix86} ia64 %{mips} ppc ppc64 s390 s390x sparcv9 sparc64 x86_64
 
+%define srpmhash() %{lua:
+local files = rpm.expand("%_specdir/openssl.spec")
+for i, p in ipairs(patches) do
+   files = files.." "..p
+end
+for i, p in ipairs(sources) do
+   files = files.." "..p
+end
+local sha256sum = assert(io.popen("cat "..files.." 2>/dev/null | sha256sum"))
+local hash = sha256sum:read("*a")
+sha256sum:close()
+print(string.sub(hash, 0, 16))
+}
+
 %global _performance_build 1
 
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.5
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -31,6 +45,7 @@ Source9: configuration-switch.h
 Source10: configuration-prefix.h
 Source12: ec_curve.c
 Source13: ectest.c
+Source14: 0025-for-tests.patch
 
 # Patches exported from source git
 # Aarch64 and ppc64le use lib64
@@ -50,13 +65,40 @@ Patch7: 0007-Add-support-for-PROFILE-SYSTEM-system-default-cipher.patch
 # Add FIPS_mode() compatibility macro
 Patch8: 0008-Add-FIPS_mode-compatibility-macro.patch
 # Add check to see if fips flag is enabled in kernel
-#Patch9: 0009-Add-Kernel-FIPS-mode-flag-support.patch
+Patch9: 0009-Add-Kernel-FIPS-mode-flag-support.patch
 # remove unsupported EC curves
 Patch11: 0011-Remove-EC-curves.patch
 # Disable explicit EC curves
+# https://bugzilla.redhat.com/show_bug.cgi?id=2066412
 Patch12: 0012-Disable-explicit-ec.patch
+# https://github.com/openssl/openssl/pull/17981
+# Patch13: 0013-FIPS-provider-explicit-ec.patch
+# https://github.com/openssl/openssl/pull/17998
+# Patch14: 0014-FIPS-disable-explicit-ec.patch
+# https://github.com/openssl/openssl/pull/18609
+# Patch15: 0015-FIPS-decoded-from-explicit.patch
 # Instructions to load legacy provider in openssl.cnf
 Patch24: 0024-load-legacy-prov.patch
+# Tmp: test name change
+Patch31: 0031-tmp-Fix-test-names.patch
+# We load FIPS provider and set FIPS properties implicitly
+Patch32: 0032-Force-fips.patch
+# Embed HMAC into the fips.so
+Patch33: 0033-FIPS-embed-hmac.patch
+# Comment out fipsinstall command-line utility
+Patch34: 0034.fipsinstall_disable.patch
+# Skip unavailable algorithms running `openssl speed`
+Patch35: 0035-speed-skip-unavailable-dgst.patch
+# Extra public/private key checks required by FIPS-140-3
+Patch44: 0044-FIPS-140-3-keychecks.patch
+# Minimize fips services
+Patch45: 0045-FIPS-services-minimize.patch
+# Backport of s390x hardening, https://github.com/openssl/openssl/pull/17486
+# Patch46: 0046-FIPS-s390x-hardening.patch
+# Execute KATS before HMAC verification
+Patch47: 0047-FIPS-early-KATS.patch
+# Backport of correctly handle 2^14 byte long records #17538
+# Patch48: 0048-correctly-handle-records.patch
 %if 0%{?rhel}
 # Selectively disallow SHA1 signatures
 Patch49: 0049-Selectively-disallow-SHA1-signatures.patch
@@ -79,14 +121,66 @@ Patch52: 0052-Allow-SHA1-in-seclevel-1-if-rh-allow-sha1-signatures.patch
 # Instrument with USDT probes related to SHA-1 deprecation
 Patch53: 0053-Add-SHA1-probes.patch
 %endif
+# https://bugzilla.redhat.com/show_bug.cgi?id=2004915, backport of 2c0f7d46b8449423446cfe1e52fc1e1ecd506b62
+# Patch54: 0054-Replace-size-check-with-more-meaningful-pubkey-check.patch
+# https://github.com/openssl/openssl/pull/17324
+# Patch55: 0055-nonlegacy-fetch-null-deref.patch
 # https://github.com/openssl/openssl/pull/18103
 # The patch is incorporated in 3.0.3 but we provide this function since 3.0.1
 # so the patch should persist
 Patch56: 0056-strcasecmp.patch
+# https://github.com/openssl/openssl/pull/18175
+# Patch57: 0057-strcasecmp-fix.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2053289
+Patch58: 0058-FIPS-limit-rsa-encrypt.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2069235
+Patch60: 0060-FIPS-KAT-signature-tests.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2087147
+Patch61: 0061-Deny-SHA-1-signature-verification-in-FIPS-provider.patch
+Patch62: 0062-fips-Expose-a-FIPS-indicator.patch
+# https://github.com/openssl/openssl/pull/18141
+# Patch63: 0063-CVE-2022-1473.patch
+# upstream commits 55c80c222293a972587004c185dc5653ae207a0e 2eda98790c5c2741d76d23cc1e74b0dc4f4b391a
+# Patch64: 0064-CVE-2022-1343.diff
+# upstream commit 1ad73b4d27bd8c1b369a3cd453681d3a4f1bb9b2
+# Patch65: 0065-CVE-2022-1292.patch
+# https://github.com/openssl/openssl/pull/18444
+# https://github.com/openssl/openssl/pull/18467
+# Patch66: 0066-replace-expired-certs.patch
+# https://github.com/openssl/openssl/pull/18512
+# Patch67: 0067-fix-ppc64-montgomery.patch
+#https://github.com/openssl/openssl/commit/2c9c35870601b4a44d86ddbf512b38df38285cfa
+#https://github.com/openssl/openssl/commit/8a3579a7b7067a983e69a4eda839ac408c120739
+# Patch68: 0068-CVE-2022-2068.patch
+# https://github.com/openssl/openssl/commit/a98f339ddd7e8f487d6e0088d4a9a42324885a93
+# https://github.com/openssl/openssl/commit/52d50d52c2f1f4b70d37696bfa74fe5e581e7ba8
+# Patch69: 0069-CVE-2022-2097.patch
+# https://github.com/openssl/openssl/commit/edceec7fe0c9a5534ae155c8398c63dd7dd95483
+# Patch70: 0070-EVP_PKEY_Q_keygen-Call-OPENSSL_init_crypto-to-init-s.patch
+# https://github.com/openssl/openssl/commit/44a563dde1584cd9284e80b6e45ee5019be8d36c
+# https://github.com/openssl/openssl/commit/345c99b6654b8313c792d54f829943068911ddbd
+Patch71: 0071-AES-GCM-performance-optimization.patch
+# https://github.com/openssl/openssl/commit/f596bbe4da779b56eea34d96168b557d78e1149
+# https://github.com/openssl/openssl/commit/7e1f3ffcc5bc15fb9a12b9e3bb202f544c6ed5aa
+# hunks in crypto/ppccap.c from https://github.com/openssl/openssl/commit/f5485b97b6c9977c0d39c7669b9f97a879312447
+Patch72: 0072-ChaCha20-performance-optimizations-for-ppc64le.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2102535
+Patch73: 0073-FIPS-Use-OAEP-in-KATs-support-fixed-OAEP-seed.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2102535
+Patch74: 0074-FIPS-Use-digest_sign-digest_verify-in-self-test.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2102535
+Patch75: 0075-FIPS-Use-FFDHE2048-in-self-test.patch
+# Downstream only. Reseed DRBG using getrandom(GRND_RANDOM)
+# https://bugzilla.redhat.com/show_bug.cgi?id=2102541
+Patch76: 0076-FIPS-140-3-DRBG.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2102542
+Patch77: 0077-FIPS-140-3-zeroization.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2114772
+Patch78: 0078-Add-FIPS-indicator-parameter-to-HKDF.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
-BuildRequires: gcc
+BuildRequires: gcc g++
 BuildRequires: coreutils, perl-interpreter, sed, zlib-devel, /usr/bin/cmp
 BuildRequires: lksctp-tools-devel
 BuildRequires: /usr/bin/rename
@@ -220,6 +314,7 @@ RPM_OPT_FLAGS="$RPM_OPT_FLAGS -Wa,--noexecstack -Wa,--generate-missing-build-not
 
 export HASHBANGPERL=/usr/bin/perl
 
+%define fips %{version}-%{srpmhash}
 # ia64, x86_64, ppc are OK by default
 # Configure the build tree.  Override OpenSSL defaults with known-good defaults
 # usable on all platforms.  The Configure script already knows to use -fPIC and
@@ -229,8 +324,8 @@ export HASHBANGPERL=/usr/bin/perl
 	--system-ciphers-file=%{_sysconfdir}/crypto-policies/back-ends/openssl.config \
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 ${ktlsopt} enable-fips\
-	no-mdc2 no-ec2m no-sm2 no-sm4 \
-	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\""'
+	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
+	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DREDHAT_FIPS_VERSION="\"%{fips}\""'
 
 # Do not run this in a production package the FIPS symbols must be patched-in
 #util/mkdef.pl crypto update
@@ -254,6 +349,8 @@ done
 
 # We must revert patch4 before tests otherwise they will fail
 patch -p1 -R < %{PATCH4}
+#We must disable default provider before tests otherwise they will fail
+patch -p1 < %{SOURCE14}
 
 OPENSSL_ENABLE_MD5_VERIFY=
 export OPENSSL_ENABLE_MD5_VERIFY
@@ -263,18 +360,25 @@ export OPENSSL_ENABLE_SHA1_SIGNATURES
 %endif
 OPENSSL_SYSTEM_CIPHERS_OVERRIDE=xyz_nonexistent_file
 export OPENSSL_SYSTEM_CIPHERS_OVERRIDE
+#embed HMAC into fips provider for test run
+LD_LIBRARY_PATH=. apps/openssl dgst -binary -sha256 -mac HMAC -macopt hexkey:f4556650ac31d35461610bac4ed81b1a181b2d8a43ea2854cbae22ca74560813 < providers/fips.so > providers/fips.so.hmac
+objcopy --update-section .rodata1=providers/fips.so.hmac providers/fips.so providers/fips.so.mac
+mv providers/fips.so.mac providers/fips.so
+#run tests itself
 make test HARNESS_JOBS=8
 
 # Add generation of HMAC checksum of the final stripped library
-#%define __spec_install_post \
-#    %{?__debug_package:%{__debug_install_post}} \
-#    %{__arch_install_post} \
-#    %{__os_install_post} \
-#    crypto/fips/fips_standalone_hmac $RPM_BUILD_ROOT%{_libdir}/libcrypto.so.%{version} >$RPM_BUILD_ROOT%{_libdir}/.libcrypto.so.%{version}.hmac \
-#    ln -sf .libcrypto.so.%{version}.hmac $RPM_BUILD_ROOT%{_libdir}/.libcrypto.so.%{soversion}.hmac \
-#    crypto/fips/fips_standalone_hmac $RPM_BUILD_ROOT%{_libdir}/libssl.so.%{version} >$RPM_BUILD_ROOT%{_libdir}/.libssl.so.%{version}.hmac \
-#    ln -sf .libssl.so.%{version}.hmac $RPM_BUILD_ROOT%{_libdir}/.libssl.so.%{soversion}.hmac \
-#%{nil}
+# We manually copy standard definition of __spec_install_post
+# and add hmac calculation/embedding to fips.so
+%define __spec_install_post \
+    %{?__debug_package:%{__debug_install_post}} \
+    %{__arch_install_post} \
+    %{__os_install_post} \
+    LD_LIBRARY_PATH=. apps/openssl dgst -binary -sha256 -mac HMAC -macopt hexkey:f4556650ac31d35461610bac4ed81b1a181b2d8a43ea2854cbae22ca74560813 < $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so > $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so.hmac \
+    objcopy --update-section .rodata1=$RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so.hmac $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so.mac \
+    mv $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so.mac $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so \
+    rm $RPM_BUILD_ROOT%{_libdir}/ossl-modules/fips.so.hmac \
+%{nil}
 
 %define __provides_exclude_from %{_libdir}/openssl
 
@@ -324,9 +428,8 @@ touch -r %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/ct_log_list.cnf
 
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/openssl.cnf.dist
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/ct_log_list.cnf.dist
-%ifarch i686
+#we don't use native fipsmodule.cnf because FIPS module is loaded automatically
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/pki/tls/fipsmodule.cnf
-%endif
 
 # Determine which arch opensslconf.h is going to try to #include.
 basearch=%{_arch}
@@ -388,9 +491,6 @@ install -m644 %{SOURCE9} \
 %{_libdir}/libssl.so.%{soversion}
 %attr(0755,root,root) %{_libdir}/engines-%{soversion}
 %attr(0755,root,root) %{_libdir}/ossl-modules
-%ifnarch i686
-%config(noreplace) %{_sysconfdir}/pki/tls/fipsmodule.cnf
-%endif
 
 %files devel
 %doc CHANGES.md doc/dir-locals.example.el doc/openssl-c-indent.el
@@ -414,6 +514,10 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Sep 01 2022 Dmitry Belyavskiy <dbelyavs@redhat.com> - 1:3.0.5-3
+- Sync patches with RHEL
+  Related: rhbz#2123755
+
 * Fri Jul 22 2022 Fedora Release Engineering <releng@fedoraproject.org> - 1:3.0.5-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
 
