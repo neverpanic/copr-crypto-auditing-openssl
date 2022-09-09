@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.5
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -159,6 +159,7 @@ Patch62: 0062-fips-Expose-a-FIPS-indicator.patch
 # Patch70: 0070-EVP_PKEY_Q_keygen-Call-OPENSSL_init_crypto-to-init-s.patch
 # https://github.com/openssl/openssl/commit/44a563dde1584cd9284e80b6e45ee5019be8d36c
 # https://github.com/openssl/openssl/commit/345c99b6654b8313c792d54f829943068911ddbd
+# Regression on Power8, see rhbz2124845, https://github.com/openssl/openssl/issues/19163; fix in 0079-Fix-AES-GCM-on-Power-8-CPUs.patch
 Patch71: 0071-AES-GCM-performance-optimization.patch
 # https://github.com/openssl/openssl/commit/f596bbe4da779b56eea34d96168b557d78e1149
 # https://github.com/openssl/openssl/commit/7e1f3ffcc5bc15fb9a12b9e3bb202f544c6ed5aa
@@ -177,6 +178,8 @@ Patch76: 0076-FIPS-140-3-DRBG.patch
 Patch77: 0077-FIPS-140-3-zeroization.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2114772
 Patch78: 0078-Add-FIPS-indicator-parameter-to-HKDF.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2124845, https://github.com/openssl/openssl/pull/19182
+Patch79: 0079-Fix-AES-GCM-on-Power-8-CPUs.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -514,6 +517,10 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Fri Sep 09 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.5-4
+- Fix AES-GCM on Power 8 CPUs
+  Resolves: rhbz#2124845
+
 * Thu Sep 01 2022 Dmitry Belyavskiy <dbelyavs@redhat.com> - 1:3.0.5-3
 - Sync patches with RHEL
   Related: rhbz#2123755
