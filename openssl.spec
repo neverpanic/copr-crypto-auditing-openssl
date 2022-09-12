@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.5
-Release: 4%{?dist}
+Release: 5%{?dist}
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -168,7 +168,11 @@ Patch72: 0072-ChaCha20-performance-optimizations-for-ppc64le.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2102535
 Patch73: 0073-FIPS-Use-OAEP-in-KATs-support-fixed-OAEP-seed.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2102535
+%if 0%{?rhel}
+Patch74: 0074-FIPS-Use-digest_sign-digest_verify-in-self-test-eln.patch
+%else
 Patch74: 0074-FIPS-Use-digest_sign-digest_verify-in-self-test.patch
+%endif
 # https://bugzilla.redhat.com/show_bug.cgi?id=2102535
 Patch75: 0075-FIPS-Use-FFDHE2048-in-self-test.patch
 # Downstream only. Reseed DRBG using getrandom(GRND_RANDOM)
@@ -517,6 +521,10 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Mon Sep 12 2022 Dmitry Belyavskiy <dbelyavs@redhat.com> - 1:3.0.5-5
+- Update patches to make ELN build happy
+  Resolves: rhbz#2123755
+
 * Fri Sep 09 2022 Clemens Lang <cllang@redhat.com> - 1:3.0.5-4
 - Fix AES-GCM on Power 8 CPUs
   Resolves: rhbz#2124845
