@@ -1,0 +1,75 @@
+From 2fea56832780248af2aba2e4433ece2d18428515 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Mon, 14 Nov 2022 10:25:15 -0500
+Subject: [PATCH] Drop explicit check for engines in opt_legacy_okay
+
+The providers indication should always indicate that this is not a
+legacy request.
+This makes a check for engines redundant as the default return is that
+legacy is ok if there are no explicit providers.
+
+Fixes #19662
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Paul Dale <pauli@openssl.org>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19671)
+---
+ apps/lib/apps.c                    |  8 --------
+ test/recipes/20-test_legacy_okay.t | 23 +++++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 8 deletions(-)
+ create mode 100755 test/recipes/20-test_legacy_okay.t
+
+diff --git a/apps/lib/apps.c b/apps/lib/apps.c
+index 3d52e030ab7e258f9cd983b2d9755d954cb3aee5..bbe0d009efb35fcf1a902c86cbddc61e657e57f1 100644
+--- a/apps/lib/apps.c
++++ b/apps/lib/apps.c
+@@ -3405,14 +3405,6 @@ int opt_legacy_okay(void)
+ {
+     int provider_options = opt_provider_option_given();
+     int libctx = app_get0_libctx() != NULL || app_get0_propq() != NULL;
+-#ifndef OPENSSL_NO_ENGINE
+-    ENGINE *e = ENGINE_get_first();
+-
+-    if (e != NULL) {
+-        ENGINE_free(e);
+-        return 1;
+-    }
+-#endif
+     /*
+      * Having a provider option specified or a custom library context or
+      * property query, is a sure sign we're not using legacy.
+diff --git a/test/recipes/20-test_legacy_okay.t b/test/recipes/20-test_legacy_okay.t
+new file mode 100755
+index 0000000000000000000000000000000000000000..183499f3fd93f97e8a4a30681a9f383d2f6e0c56
+--- /dev/null
++++ b/test/recipes/20-test_legacy_okay.t
+@@ -0,0 +1,23 @@
++#! /usr/bin/env perl
++# Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
++#
++# Licensed under the Apache License 2.0 (the "License").  You may not use
++# this file except in compliance with the License.  You can obtain a copy
++# in the file LICENSE in the source distribution or at
++# https://www.openssl.org/source/license.html
++
++use strict;
++use warnings;
++
++use OpenSSL::Test;
++
++setup("test_legacy");
++
++plan tests => 3;
++
++ok(run(app(['openssl', 'rand', '-out', 'rand.txt', '256'])), "Generate random file");
++
++ok(run(app(['openssl', 'dgst', '-sha256', 'rand.txt'])), "Generate a digest");
++
++ok(!run(app(['openssl', 'dgst', '-sha256', '-propquery', 'foo=1',
++             'rand.txt'])), "Fail to generate a digest");
+-- 
+2.38.1
+

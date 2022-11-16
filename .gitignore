@@ -1,6 +1,5 @@
 .build*.log
 clog
-000*.patch
 *.src.rpm
 openssl-1.0.0a-usa.tar.bz2
 /openssl-1.0.0b-usa.tar.bz2

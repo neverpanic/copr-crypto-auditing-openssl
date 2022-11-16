@@ -1,0 +1,52 @@
+From 504427eb5f32108dd64ff7858012863fe47b369b Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Thu, 10 Nov 2022 16:58:28 -0500
+Subject: [PATCH 2/3] Update documentation for keymgmt export utils
+
+Change function prototypes and explain how to use the selection
+argument.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19648)
+
+diff --git a/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod b/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
+index 1fee9f6ff9..7099e44964 100644
+--- a/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
++++ b/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
+@@ -20,12 +20,14 @@ OP_CACHE_ELEM
+ 
+  int evp_keymgmt_util_export(const EVP_PKEY *pk, int selection,
+                              OSSL_CALLBACK *export_cb, void *export_cbarg);
+- void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt);
++ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                           int selection);
+  OP_CACHE_ELEM *evp_keymgmt_util_find_operation_cache(EVP_PKEY *pk,
+-                                                      EVP_KEYMGMT *keymgmt);
++                                                      EVP_KEYMGMT *keymgmt,
++                                                      int selection);
+  int evp_keymgmt_util_clear_operation_cache(EVP_PKEY *pk, int locking);
+- int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk,
+-                                    EVP_KEYMGMT *keymgmt, void *keydata);
++ int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                    void *keydata, int selection);
+  void evp_keymgmt_util_cache_keyinfo(EVP_PKEY *pk);
+  void *evp_keymgmt_util_fromdata(EVP_PKEY *target, EVP_KEYMGMT *keymgmt,
+                                  int selection, const OSSL_PARAM params[]);
+@@ -65,6 +67,11 @@ evp_keymgmt_util_fromdata() can be used to add key object data to a
+ given key I<target> via a B<EVP_KEYMGMT> interface.  This is used as a
+ helper for L<EVP_PKEY_fromdata(3)>.
+ 
++In all functions that take a I<selection> argument, the selection is used to
++constraint the information requested on export. It is also used in the cache
++so that key data is guaranteed to contain all the information requested in
++the selection.
++
+ =head1 RETURN VALUES
+ 
+ evp_keymgmt_export_to_provider() and evp_keymgmt_util_fromdata()
+-- 
+2.38.1
+

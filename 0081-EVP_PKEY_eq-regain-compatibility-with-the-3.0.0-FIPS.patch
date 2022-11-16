@@ -1,0 +1,41 @@
+From c342004e07fd2c03a672f79353d13554fe0ffdaf Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tom=C3=A1=C5=A1=20Mr=C3=A1z?= <tomas@openssl.org>
+Date: Tue, 13 Sep 2022 14:37:05 +1000
+Subject: [PATCH] EVP_PKEY_eq: regain compatibility with the 3.0.0 FIPS
+ provider
+
+Reviewed-by: Matt Caswell <matt@openssl.org>
+Reviewed-by: Shane Lontis <shane.lontis@oracle.com>
+Reviewed-by: Paul Dale <pauli@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19201)
+---
+ crypto/evp/p_lib.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/crypto/evp/p_lib.c b/crypto/evp/p_lib.c
+index 170cb89cb0..c8c342b3e9 100644
+--- a/crypto/evp/p_lib.c
++++ b/crypto/evp/p_lib.c
+@@ -339,9 +339,16 @@ int EVP_PKEY_eq(const EVP_PKEY *a, const EVP_PKEY *b)
+     if (a == NULL || b == NULL)
+         return 0;
+ 
+-    if (a->keymgmt != NULL || b->keymgmt != NULL)
+-        return evp_pkey_cmp_any(a, b, (SELECT_PARAMETERS
+-                                       | OSSL_KEYMGMT_SELECT_KEYPAIR));
++    if (a->keymgmt != NULL || b->keymgmt != NULL) {
++        int selection = SELECT_PARAMETERS;
++
++        if (evp_keymgmt_util_has((EVP_PKEY *)a, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
++            && evp_keymgmt_util_has((EVP_PKEY *)b, OSSL_KEYMGMT_SELECT_PUBLIC_KEY))
++            selection |= OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
++        else
++            selection |= OSSL_KEYMGMT_SELECT_KEYPAIR;
++        return evp_pkey_cmp_any(a, b, selection);
++    }
+ 
+     /* All legacy keys */
+     if (a->type != b->type)
+-- 
+2.38.1
+
