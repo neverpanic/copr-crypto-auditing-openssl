@@ -5011,3 +5011,15 @@ diff -up openssl-3.0.0-beta1/test/recipes/30-test_evp_data/evppkey_ecc.txt.remov
  Title=prime256v1 curve tests
  
  PrivateKey=ALICE_cf_prime256v1
+diff -up openssl-3.0.7/test/recipes/15-test_ec.t.skipshort openssl-3.0.7/test/recipes/15-test_ec.t
+--- openssl-3.0.7/test/recipes/15-test_ec.t.skipshort	2022-11-23 12:40:55.324395782 +0100
++++ openssl-3.0.7/test/recipes/15-test_ec.t	2022-11-23 12:42:12.478094387 +0100
+@@ -90,7 +90,7 @@ subtest 'Ed448 conversions -- public key
+ 
+ subtest 'Check loading of fips and non-fips keys' => sub {
+     plan skip_all => "FIPS is disabled"
+-        if $no_fips;
++        if 1; #Red Hat specific, original value is $no_fips;
+ 
+     plan tests => 2;
+ 

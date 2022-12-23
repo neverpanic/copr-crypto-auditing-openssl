@@ -7,6 +7,14 @@
 diff -up openssl-3.0.1/crypto/provider_conf.c.fipsact openssl-3.0.1/crypto/provider_conf.c
 --- openssl-3.0.1/crypto/provider_conf.c.fipsact	2022-05-12 12:44:31.199034948 +0200
 +++ openssl-3.0.1/crypto/provider_conf.c	2022-05-12 12:49:17.468318373 +0200
+@@ -10,6 +10,7 @@
+ #include <string.h>
+ #include <openssl/trace.h>
+ #include <openssl/err.h>
++#include <openssl/evp.h>
+ #include <openssl/conf.h>
+ #include <openssl/safestack.h>
+ #include <openssl/provider.h>
 @@ -136,58 +136,18 @@ static int prov_already_activated(const
      return 0;
  }
