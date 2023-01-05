@@ -1,7 +1,7 @@
-diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/providers/fips/self_test.c
---- openssl-3.0.0/providers/fips/self_test.c.embed-hmac	2021-11-16 13:57:05.127171056 +0100
-+++ openssl-3.0.0/providers/fips/self_test.c	2021-11-16 14:07:21.963412455 +0100
-@@ -171,11 +171,27 @@ DEP_FINI_ATTRIBUTE void cleanup(void)
+diff -up openssl-3.0.7/providers/fips/self_test.c.embed-hmac openssl-3.0.7/providers/fips/self_test.c
+--- openssl-3.0.7/providers/fips/self_test.c.embed-hmac	2023-01-05 10:03:44.864869710 +0100
++++ openssl-3.0.7/providers/fips/self_test.c	2023-01-05 10:15:17.041606472 +0100
+@@ -172,11 +172,27 @@ DEP_FINI_ATTRIBUTE void cleanup(void)
  }
  #endif
  
@@ -29,13 +29,7 @@ diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/provi
  static int verify_integrity(OSSL_CORE_BIO *bio, OSSL_FUNC_BIO_read_ex_fn read_ex_cb,
                              unsigned char *expected, size_t expected_len,
                              OSSL_LIB_CTX *libctx, OSSL_SELF_TEST *ev,
-@@ -183,14 +199,26 @@ static int verify_integrity(OSSL_CORE_BI
- {
-     int ret = 0, status;
-     unsigned char out[MAX_MD_SIZE];
--    unsigned char buf[INTEGRITY_BUF_SIZE];
-+    unsigned char buf[INTEGRITY_BUF_SIZE+HMAC_LEN];
-     size_t bytes_read = 0, out_len = 0;
+@@ -189,9 +205,20 @@ static int verify_integrity(OSSL_CORE_BI
      EVP_MAC *mac = NULL;
      EVP_MAC_CTX *ctx = NULL;
      OSSL_PARAM params[2], *p = params;
@@ -44,7 +38,6 @@ diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/provi
 +    struct link_map *lm = NULL;
 +    unsigned long paddr;
 +    unsigned long off = 0;
-+    int have_rest = 0;
  
      OSSL_SELF_TEST_onbegin(ev, event_type, OSSL_SELF_TEST_DESC_INTEGRITY_HMAC);
  
@@ -57,64 +50,52 @@ diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/provi
      mac = EVP_MAC_fetch(libctx, MAC_NAME, NULL);
      if (mac == NULL)
          goto err;
-@@ -204,12 +233,53 @@ static int verify_integrity(OSSL_CORE_BI
+@@ -205,13 +233,42 @@ static int verify_integrity(OSSL_CORE_BI
      if (!EVP_MAC_init(ctx, fixed_key, sizeof(fixed_key), params))
          goto err;
  
-+    status = read_ex_cb(bio, buf, HMAC_LEN, &bytes_read);
-+    if (status != 1 || bytes_read != HMAC_LEN)
-+        goto err;
-+    off += HMAC_LEN;
-+
-     while (1) {
+-    while (1) {
 -        status = read_ex_cb(bio, buf, sizeof(buf), &bytes_read);
--        if (status != 1)
-+        status = read_ex_cb(bio, buf+HMAC_LEN, INTEGRITY_BUF_SIZE, &bytes_read);
-+        if (status != 1) {
-+            have_rest = 1;
-+            break;
-+        }
-+
-+        if (bytes_read == INTEGRITY_BUF_SIZE) { /* Full block */
-+            /* Logic:
-+             * We have HMAC_LEN (read before) + INTEGRITY_BUF_SIZE (read now) in buffer
-+             * We calculate HMAC from first INTEGRITY_BUF_SIZE bytes
-+             * and move last HMAC_LEN bytes to the beginning of the buffer
-+             *
-+             * If we have read (a part of) buffer fips_hmac_container
-+             * we should replace it with zeros.
-+             * If it is inside our current buffer, we will update now.
-+             * If it intersects the upper bound, we will clean up on the next step.
-+             */
-+            if (off - HMAC_LEN <= paddr && paddr <= off + bytes_read)
-+                memset (buf + HMAC_LEN + paddr - off, 0, HMAC_LEN);
-+            off += bytes_read;
-+
-+            if (!EVP_MAC_update(ctx, buf, bytes_read))
-+                goto err;
-+            memcpy (buf, buf+INTEGRITY_BUF_SIZE, HMAC_LEN);
-+        } else { /* Final block */
-+            /* Logic is basically the same as in previous branch
-+             * but we calculate HMAC from HMAC_LEN (rest of previous step)
-+             * and bytes_read read on this step
-+             * */
-+            if (off - HMAC_LEN <= paddr && paddr <= off + bytes_read)
-+                memset (buf + HMAC_LEN + paddr - off, 0, HMAC_LEN);
-+            if (!EVP_MAC_update(ctx, buf, bytes_read+HMAC_LEN))
-+                goto err;
-+            off += bytes_read;
++    while ((off + INTEGRITY_BUF_SIZE) <= paddr) {
++        status = read_ex_cb(bio, buf, INTEGRITY_BUF_SIZE, &bytes_read);
+         if (status != 1)
              break;
--        if (!EVP_MAC_update(ctx, buf, bytes_read))
-+        }
-+    }
-+    if (have_rest) {
-+        if (!EVP_MAC_update(ctx, buf, HMAC_LEN))
+         if (!EVP_MAC_update(ctx, buf, bytes_read))
              goto err;
-+        off += HMAC_LEN;
++	off += bytes_read;
      }
++
++    if (off + INTEGRITY_BUF_SIZE > paddr) {
++        int delta = paddr - off;
++        status = read_ex_cb(bio, buf, delta, &bytes_read);
++        if (status != 1)
++            goto err;
++        if (!EVP_MAC_update(ctx, buf, bytes_read))
++            goto err;
++	off += bytes_read;
++
++        status = read_ex_cb(bio, buf, HMAC_LEN, &bytes_read);
++        memset(buf, 0, HMAC_LEN);
++        if (status != 1)
++            goto err;
++        if (!EVP_MAC_update(ctx, buf, bytes_read))
++            goto err;
++	off += bytes_read;
++    }
++
++    while (bytes_read > 0) {
++        status = read_ex_cb(bio, buf, INTEGRITY_BUF_SIZE, &bytes_read);
++        if (status != 1)
++            break;
++        if (!EVP_MAC_update(ctx, buf, bytes_read))
++            goto err;
++	off += bytes_read;
++    }
++
      if (!EVP_MAC_final(ctx, out, &out_len, sizeof(out)))
          goto err;
-@@ -284,8 +358,7 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
+ 
+@@ -285,8 +342,7 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
          CRYPTO_THREAD_unlock(fips_state_lock);
      }
  
@@ -124,7 +105,7 @@ diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/provi
          ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CONFIG_DATA);
          goto end;
      }
-@@ -294,8 +367,9 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
+@@ -305,8 +361,9 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
      if (ev == NULL)
          goto end;
  
@@ -136,7 +117,7 @@ diff -up openssl-3.0.0/providers/fips/self_test.c.embed-hmac openssl-3.0.0/provi
      if (module_checksum == NULL) {
          ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CONFIG_DATA);
          goto end;
-@@ -357,7 +431,6 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
+@@ -356,7 +413,6 @@ int SELF_TEST_post(SELF_TEST_POST_PARAMS
      ok = 1;
  end:
      OSSL_SELF_TEST_free(ev);
