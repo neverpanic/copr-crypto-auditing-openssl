@@ -104,9 +104,9 @@ index 54e2a1c61ca..094a6632b66 100644
      /* make data into a big number */
      if (BN_bin2bn(from, (int)flen, f) == NULL)
          goto err;
-@@ -471,14 +490,92 @@ static int rsa_ossl_private_decrypt(int flen, const unsigned char *from,
-         if (!rsa_blinding_invert(blinding, ret, unblind, ctx))
-             goto err;
+@@ -471,6 +490,81 @@ static int rsa_ossl_private_decrypt(int flen, const unsigned char *from,
+         BN_free(d);
+     }
  
 +    /*
 +     * derive the Key Derivation Key from private exponent and public
@@ -183,9 +183,11 @@ index 54e2a1c61ca..094a6632b66 100644
 +        }
 +    }
 +
-     j = BN_bn2binpad(ret, buf, num);
-     if (j < 0)
-         goto err;
+     if (blinding) {
+         /*
+          * ossl_bn_rsa_do_unblind() combines blinding inversion and
+@@ -471,9 +545,12 @@ static int rsa_ossl_private_decrypt(int flen, const unsigned char *from,
+     }
  
      switch (padding) {
 -    case RSA_PKCS1_PADDING:
@@ -698,8 +700,8 @@ index ac3f6271969..cb770c9e857 100644
 --- a/doc/man7/provider-asym_cipher.pod
 +++ b/doc/man7/provider-asym_cipher.pod
 @@ -235,6 +235,15 @@ The TLS protocol version first requested by the client.
- The negotiated TLS protocol version. See
- B<RSA_PKCS1_WITH_TLS_PADDING> on the page L<EVP_PKEY_CTX_set_rsa_padding(3)>.
+ 
+ The negotiated TLS protocol version.
  
 +=item "implicit-rejection" (B<OSSL_PKEY_PARAM_IMPLICIT_REJECTION>) <unsigned integer>
 +

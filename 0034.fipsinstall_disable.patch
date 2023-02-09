@@ -148,7 +148,7 @@ diff -up openssl-3.0.0/doc/man5/fips_config.pod.xxx openssl-3.0.0/doc/man5/fips_
 +environment variable B<OPENSSL_FORCE_FIPS_MODE> is set. See the documentation
 +for more information.
  
- =head1 COPYRIGHT
+ =head1 HISTORY
  
 diff -up openssl-3.0.0/doc/man7/OSSL_PROVIDER-FIPS.pod.xxx openssl-3.0.0/doc/man7/OSSL_PROVIDER-FIPS.pod
 --- openssl-3.0.0/doc/man7/OSSL_PROVIDER-FIPS.pod.xxx	2021-11-22 13:18:13.850086386 +0100

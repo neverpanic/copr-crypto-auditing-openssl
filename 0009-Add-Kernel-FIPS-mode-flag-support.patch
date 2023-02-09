@@ -2,8 +2,8 @@ diff -up openssl-3.0.0-alpha13/crypto/context.c.kernel-fips openssl-3.0.0-alpha1
 --- openssl-3.0.0-alpha13/crypto/context.c.kernel-fips	2021-03-16 00:09:55.814826432 +0100
 +++ openssl-3.0.0-alpha13/crypto/context.c	2021-03-16 00:15:55.129043811 +0100
 @@ -12,11 +12,46 @@
- #include "internal/provider.h"
  #include "crypto/ctype.h"
+ #include "crypto/rand.h"
  
 +# include <sys/types.h>
 +# include <sys/stat.h>
