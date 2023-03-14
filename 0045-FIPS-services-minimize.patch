@@ -434,9 +434,9 @@ diff -up openssl-3.0.1/test/recipes/30-test_evp.t.fipsmin3 openssl-3.0.1/test/re
 +                evpkdf_x942_des.txt
 +                evpmac_cmac_des.txt
 +               ) unless $no_des;
+ push @defltfiles, qw(evppkey_brainpool.txt) unless $no_ec;
  push @defltfiles, qw(evppkey_sm2.txt) unless $no_sm2;
  
- plan tests =>
 diff -up openssl-3.0.1/test/recipes/30-test_evp_data/evpmac_common.txt.fipsmin3 openssl-3.0.1/test/recipes/30-test_evp_data/evpmac_common.txt
 --- openssl-3.0.1/test/recipes/30-test_evp_data/evpmac_common.txt.fipsmin3	2022-05-05 14:46:32.721700697 +0200
 +++ openssl-3.0.1/test/recipes/30-test_evp_data/evpmac_common.txt	2022-05-05 14:51:40.205418897 +0200
