@@ -1,0 +1,187 @@
+diff -up openssl-3.0.1/crypto/dh/dh_key.c.fips3 openssl-3.0.1/crypto/dh/dh_key.c
+--- openssl-3.0.1/crypto/dh/dh_key.c.fips3	2022-07-18 16:01:41.159543735 +0200
++++ openssl-3.0.1/crypto/dh/dh_key.c	2022-07-18 16:24:30.251388248 +0200
+@@ -43,6 +43,9 @@ int ossl_dh_compute_key(unsigned char *k
+     BN_MONT_CTX *mont = NULL;
+     BIGNUM *z = NULL, *pminus1;
+     int ret = -1;
++#ifdef FIPS_MODULE
++    int validate = 0;
++#endif
+ 
+     if (BN_num_bits(dh->params.p) > OPENSSL_DH_MAX_MODULUS_BITS) {
+         ERR_raise(ERR_LIB_DH, DH_R_MODULUS_TOO_LARGE);
+@@ -54,6 +57,13 @@ int ossl_dh_compute_key(unsigned char *k
+         return 0;
+     }
+ 
++#ifdef FIPS_MODULE
++    if (DH_check_pub_key(dh, pub_key, &validate) <= 0) {
++        ERR_raise(ERR_LIB_DH, DH_R_CHECK_PUBKEY_INVALID);
++        return 0;
++    }
++#endif
++
+     ctx = BN_CTX_new_ex(dh->libctx);
+     if (ctx == NULL)
+         goto err;
+@@ -262,6 +272,9 @@ static int generate_key(DH *dh)
+ #endif
+     BN_CTX *ctx = NULL;
+     BIGNUM *pub_key = NULL, *priv_key = NULL;
++#ifdef FIPS_MODULE
++    int validate = 0;
++#endif
+ 
+     if (BN_num_bits(dh->params.p) > OPENSSL_DH_MAX_MODULUS_BITS) {
+         ERR_raise(ERR_LIB_DH, DH_R_MODULUS_TOO_LARGE);
+@@ -354,8 +367,23 @@ static int generate_key(DH *dh)
+     if (!ossl_dh_generate_public_key(ctx, dh, priv_key, pub_key))
+         goto err;
+ 
++#ifdef FIPS_MODULE
++    if (DH_check_pub_key(dh, pub_key, &validate) <= 0) {
++        ERR_raise(ERR_LIB_DH, DH_R_CHECK_PUBKEY_INVALID);
++        goto err;
++    }
++#endif
++
+     dh->pub_key = pub_key;
+     dh->priv_key = priv_key;
++#ifdef FIPS_MODULE
++    if (ossl_dh_check_pairwise(dh) <= 0) {
++        dh->pub_key = dh->priv_key = NULL;
++        ERR_raise(ERR_LIB_DH, DH_R_CHECK_PUBKEY_INVALID);
++        goto err;
++    }
++#endif
++
+     dh->dirty_cnt++;
+     ok = 1;
+  err:
+diff -up openssl-3.0.1/crypto/ec/ec_key.c.fips3 openssl-3.0.1/crypto/ec/ec_key.c
+diff -up openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c.fips3 openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c
+--- openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c.fips3	2022-07-25 13:42:46.814952053 +0200
++++ openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c	2022-07-25 13:52:12.292065706 +0200
+@@ -488,6 +488,25 @@ int ecdh_plain_derive(void *vpecdhctx, u
+     }
+ 
+     ppubkey = EC_KEY_get0_public_key(pecdhctx->peerk);
++#ifdef FIPS_MODULE
++    {
++        BN_CTX *bn_ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(privk));
++        int check = 0;
++
++        if (bn_ctx == NULL) {
++            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
++            goto end;
++        }
++
++        check = ossl_ec_key_public_check(pecdhctx->peerk, bn_ctx);
++        BN_CTX_free(bn_ctx);
++
++        if (check <= 0) {
++            ERR_raise(ERR_LIB_PROV, EC_R_INVALID_PEER_KEY);
++            goto end;
++        }
++    }
++#endif
+ 
+     retlen = ECDH_compute_key(secret, size, ppubkey, privk, NULL);
+ 
+diff -up openssl-3.0.1/crypto/ec/ec_key.c.fips3 openssl-3.0.1/crypto/ec/ec_key.c
+--- openssl-3.0.1/crypto/ec/ec_key.c.fips3	2022-07-25 14:03:34.420222507 +0200
++++ openssl-3.0.1/crypto/ec/ec_key.c	2022-07-25 14:09:00.728164294 +0200
+@@ -336,6 +336,11 @@ static int ec_generate_key(EC_KEY *eckey
+ 
+         OSSL_SELF_TEST_get_callback(eckey->libctx, &cb, &cbarg);
+         ok = ecdsa_keygen_pairwise_test(eckey, cb, cbarg);
++
++#ifdef FIPS_MODULE
++        ok &= ossl_ec_key_public_check(eckey, ctx);
++        ok &= ossl_ec_key_pairwise_check(eckey, ctx);
++#endif /* FIPS_MODULE */
+     }
+ err:
+     /* Step (9): If there is an error return an invalid keypair. */
+diff -up openssl-3.0.1/crypto/rsa/rsa_gen.c.fips3 openssl-3.0.1/crypto/rsa/rsa_gen.c
+--- openssl-3.0.1/crypto/rsa/rsa_gen.c.fips3	2022-07-25 17:02:17.807271297 +0200
++++ openssl-3.0.1/crypto/rsa/rsa_gen.c	2022-07-25 17:18:24.931959649 +0200
+@@ -23,6 +23,7 @@
+ #include <time.h>
+ #include "internal/cryptlib.h"
+ #include <openssl/bn.h>
++#include <openssl/obj_mac.h>
+ #include <openssl/self_test.h>
+ #include "prov/providercommon.h"
+ #include "rsa_local.h"
+@@ -476,52 +476,43 @@ static int rsa_keygen(OSSL_LIB_CTX *libc
+ static int rsa_keygen_pairwise_test(RSA *rsa, OSSL_CALLBACK *cb, void *cbarg)
+ {
+     int ret = 0;
+-    unsigned int ciphertxt_len;
+-    unsigned char *ciphertxt = NULL;
+-    const unsigned char plaintxt[16] = {0};
+-    unsigned char *decoded = NULL;
+-    unsigned int decoded_len;
+-    unsigned int plaintxt_len = (unsigned int)sizeof(plaintxt_len);
+-    int padding = RSA_PKCS1_PADDING;
++    unsigned int signature_len;
++    unsigned char *signature = NULL;
+     OSSL_SELF_TEST *st = NULL;
++    static const unsigned char dgst[] = {
++        0x7f, 0x83, 0xb1, 0x65, 0x7f, 0xf1, 0xfc, 0x53, 0xb9, 0x2d, 0xc1, 0x81,
++        0x48, 0xa1, 0xd6, 0x5d, 0xfc, 0x2d, 0x4b, 0x1f, 0xa3, 0xd6, 0x77, 0x28,
++        0x4a, 0xdd, 0xd2, 0x00, 0x12, 0x6d, 0x90, 0x69
++    };
+ 
+     st = OSSL_SELF_TEST_new(cb, cbarg);
+     if (st == NULL)
+         goto err;
+     OSSL_SELF_TEST_onbegin(st, OSSL_SELF_TEST_TYPE_PCT,
++                           /* No special name for RSA signature PCT*/
+                            OSSL_SELF_TEST_DESC_PCT_RSA_PKCS1);
+ 
+-    ciphertxt_len = RSA_size(rsa);
++    signature_len = RSA_size(rsa);
+-    /*
+-     * RSA_private_encrypt() and RSA_private_decrypt() requires the 'to'
+-     * parameter to be a maximum of RSA_size() - allocate space for both.
+-     */
+-    ciphertxt = OPENSSL_zalloc(ciphertxt_len * 2);
+-    if (ciphertxt == NULL)
++    signature = OPENSSL_zalloc(signature_len);
++    if (signature == NULL)
+         goto err;
+-    decoded = ciphertxt + ciphertxt_len;
+ 
+-    ciphertxt_len = RSA_public_encrypt(plaintxt_len, plaintxt, ciphertxt, rsa,
+-                                       padding);
+-    if (ciphertxt_len <= 0)
++    if (RSA_sign(NID_sha256, dgst, sizeof(dgst), signature, &signature_len, rsa) <= 0)
+         goto err;
+-    if (ciphertxt_len == plaintxt_len
+-        && memcmp(ciphertxt, plaintxt, plaintxt_len) == 0)
++
++    if (signature_len <= 0)
+         goto err;
+ 
+-    OSSL_SELF_TEST_oncorrupt_byte(st, ciphertxt);
++    OSSL_SELF_TEST_oncorrupt_byte(st, signature);
+ 
+-    decoded_len = RSA_private_decrypt(ciphertxt_len, ciphertxt, decoded, rsa,
+-                                      padding);
+-    if (decoded_len != plaintxt_len
+-        || memcmp(decoded, plaintxt,  decoded_len) != 0)
++    if (RSA_verify(NID_sha256, dgst, sizeof(dgst), signature, signature_len, rsa) <= 0)
+         goto err;
+ 
+     ret = 1;
+ err:
+     OSSL_SELF_TEST_onend(st, ret);
+     OSSL_SELF_TEST_free(st);
+-    OPENSSL_free(ciphertxt);
++    OPENSSL_free(signature);
+ 
+     return ret;
+ }
