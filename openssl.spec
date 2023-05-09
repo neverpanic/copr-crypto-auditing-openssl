@@ -31,7 +31,7 @@ Name: openssl
 Version: 3.0.8
 Release: 2%{?dist}
 Epoch: 1
-Source: openssl-%{version}.tar.gz
+Source: https://www.openssl.org/source/openssl-%{version}.tar.gz
 Source2: Makefile.certificate
 Source3: genpatches
 Source4: openssl.rpmlintrc
