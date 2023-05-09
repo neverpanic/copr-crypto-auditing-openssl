@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.8
-Release: 2%{?dist}.1
+Release: 2%{?dist}.2
 Epoch: 1
 Source: https://www.openssl.org/source/openssl-%{version}.tar.gz
 Source2: Makefile.certificate
@@ -537,6 +537,9 @@ install -m644 %{SOURCE9} \
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue May 09 2023 Clemens Lang <cllang@redhat.com> 3.0.8-2.2
+- Mention all patches as sources to fix tito build
+
 * Tue May 09 2023 Clemens Lang <cllang@redhat.com> 3.0.8-2.1
 - Use sources from openssl.org upstream
 - Add crypto-auditing probe points for TLS
