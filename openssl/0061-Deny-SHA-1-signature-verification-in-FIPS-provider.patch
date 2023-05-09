@@ -1,0 +1,1418 @@
+From 5f4f350ce797a7cd2fdca84c474ee196da9d6fae Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Wed, 18 May 2022 17:25:59 +0200
+Subject: [PATCH] Deny SHA-1 signature verification in FIPS provider
+
+For RHEL, we already disable SHA-1 signatures by default in the default
+provider, so it is unexpected that the FIPS provider would have a more
+lenient configuration in this regard. Additionally, we do not think
+continuing to accept SHA-1 signatures is a good idea due to the
+published chosen-prefix collision attacks.
+
+As a consequence, disable verification of SHA-1 signatures in the FIPS
+provider.
+
+This requires adjusting a few tests that would otherwise fail:
+- 30-test_acvp: Remove the test vectors that use SHA-1.
+- 30-test_evp: Mark tests in evppkey_rsa_common.txt and
+  evppkey_ecdsa.txt that use SHA-1 digests as "Availablein = default",
+  which will not run them when the FIPS provider is enabled.
+- 80-test_cms: Re-create all certificates in test/smime-certificates
+  with SHA256 signatures while keeping the same private keys. These
+  certificates were signed with SHA-1 and thus fail verification in the
+  FIPS provider.
+  Fix some other tests by explicitly running them in the default
+  provider, where SHA-1 is available.
+- 80-test_ssl_old: Skip tests that rely on SSLv3 and SHA-1 when run with
+  the FIPS provider.
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+---
+ providers/implementations/signature/dsa_sig.c |  4 --
+ .../implementations/signature/ecdsa_sig.c     |  4 --
+ providers/implementations/signature/rsa_sig.c |  8 +--
+ test/acvp_test.inc                            | 20 -------
+ .../30-test_evp_data/evppkey_ecdsa.txt        |  7 +++
+ .../30-test_evp_data/evppkey_rsa_common.txt   | 51 +++++++++++++++-
+ test/recipes/80-test_cms.t                    |  4 +-
+ test/recipes/80-test_ssl_old.t                |  4 ++
+ test/smime-certs/smdh.pem                     | 18 +++---
+ test/smime-certs/smdsa1.pem                   | 60 +++++++++----------
+ test/smime-certs/smdsa2.pem                   | 60 +++++++++----------
+ test/smime-certs/smdsa3.pem                   | 60 +++++++++----------
+ test/smime-certs/smec1.pem                    | 30 +++++-----
+ test/smime-certs/smec2.pem                    | 30 +++++-----
+ test/smime-certs/smec3.pem                    | 30 +++++-----
+ test/smime-certs/smroot.pem                   | 38 ++++++------
+ test/smime-certs/smrsa1.pem                   | 38 ++++++------
+ test/smime-certs/smrsa2.pem                   | 38 ++++++------
+ test/smime-certs/smrsa3.pem                   | 38 ++++++------
+ 19 files changed, 286 insertions(+), 256 deletions(-)
+
+diff --git a/providers/implementations/signature/dsa_sig.c b/providers/implementations/signature/dsa_sig.c
+index fa3822f39f..c365d7b13a 100644
+--- a/providers/implementations/signature/dsa_sig.c
++++ b/providers/implementations/signature/dsa_sig.c
+@@ -128,11 +128,7 @@ static int dsa_setup_md(PROV_DSA_CTX *ctx,
+         EVP_MD *md = EVP_MD_fetch(ctx->libctx, mdname, mdprops);
+         int md_nid;
+         size_t mdname_len = strlen(mdname);
+-#ifdef FIPS_MODULE
+-        int sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
+-#else
+         int sha1_allowed = 0;
+-#endif
+         md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
+                                                             sha1_allowed);
+ 
+diff --git a/providers/implementations/signature/ecdsa_sig.c b/providers/implementations/signature/ecdsa_sig.c
+index 99b228e82c..44a22832ec 100644
+--- a/providers/implementations/signature/ecdsa_sig.c
++++ b/providers/implementations/signature/ecdsa_sig.c
+@@ -237,11 +237,7 @@ static int ecdsa_setup_md(PROV_ECDSA_CTX *ctx, const char *mdname,
+                        "%s could not be fetched", mdname);
+         return 0;
+     }
+-#ifdef FIPS_MODULE
+-    sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
+-#else
+     sha1_allowed = 0;
+-#endif
+     md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
+                                                     sha1_allowed);
+     if (md_nid < 0) {
+diff --git a/providers/implementations/signature/rsa_sig.c b/providers/implementations/signature/rsa_sig.c
+index f66d7705c3..34f45175e8 100644
+--- a/providers/implementations/signature/rsa_sig.c
++++ b/providers/implementations/signature/rsa_sig.c
+@@ -292,11 +292,7 @@ static int rsa_setup_md(PROV_RSA_CTX *ctx, const char *mdname,
+         EVP_MD *md = EVP_MD_fetch(ctx->libctx, mdname, mdprops);
+         int md_nid;
+         size_t mdname_len = strlen(mdname);
+-#ifdef FIPS_MODULE
+-        int sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
+-#else
+         int sha1_allowed = 0;
+-#endif
+         md_nid = ossl_digest_rsa_sign_get_md_nid(ctx->libctx, md,
+                                                      sha1_allowed);
+ 
+@@ -1355,8 +1351,10 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+ 
+     if (prsactx->md == NULL && pmdname == NULL
+         && pad_mode == RSA_PKCS1_PSS_PADDING) {
++#ifdef FIPS_MODULE
++        pmdname = RSA_DEFAULT_DIGEST_NAME_NONLEGACY;
++#else
+         pmdname = RSA_DEFAULT_DIGEST_NAME;
+-#ifndef FIPS_MODULE
+         if (!ossl_ctx_legacy_digest_signatures_allowed(prsactx->libctx, 0)) {
+             pmdname = RSA_DEFAULT_DIGEST_NAME_NONLEGACY;
+         }
+diff --git a/test/acvp_test.inc b/test/acvp_test.inc
+index ad11d3ae1e..73b24bdb0c 100644
+--- a/test/acvp_test.inc
++++ b/test/acvp_test.inc
+@@ -1841,17 +1841,6 @@ static const struct rsa_sigver_st rsa_sigver_data[] = {
+         NO_PSS_SALT_LEN,
+         FAIL
+     },
+-    {
+-        "x931",
+-        3072,
+-        "SHA1",
+-        ITM(rsa_sigverx931_0_msg),
+-        ITM(rsa_sigverx931_0_n),
+-        ITM(rsa_sigverx931_0_e),
+-        ITM(rsa_sigverx931_0_sig),
+-        NO_PSS_SALT_LEN,
+-        PASS
+-    },
+     {
+         "x931",
+         3072,
+diff --git a/test/recipes/30-test_evp_data/evppkey_ecdsa.txt b/test/recipes/30-test_evp_data/evppkey_ecdsa.txt
+index f36982845d..51e507a61c 100644
+--- a/test/recipes/30-test_evp_data/evppkey_ecdsa.txt
++++ b/test/recipes/30-test_evp_data/evppkey_ecdsa.txt
+@@ -37,12 +37,14 @@ PrivPubKeyPair = P-256:P-256-PUBLIC
+ 
+ Title = ECDSA tests
+ 
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+ Output = 3045022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e15202201898cdd52b41ca502098184b409cf83a21bc945006746e3b7cea52234e043ec8
+ 
+ # Digest too long
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF12345"
+@@ -50,6 +52,7 @@ Output = 3045022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e
+ Result = VERIFY_ERROR
+ 
+ # Digest too short
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF123"
+@@ -57,6 +60,7 @@ Output = 3045022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e
+ Result = VERIFY_ERROR
+ 
+ # Digest invalid
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1235"
+@@ -64,6 +68,7 @@ Output = 3045022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e
+ Result = VERIFY_ERROR
+ 
+ # Invalid signature
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+@@ -79,12 +84,14 @@ Output = 3045022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e
+ Result = VERIFY_ERROR
+ 
+ # BER signature
++Availablein = default
+ Verify = P-256
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+ Output = 3080022100b1d1cb1a577035bccdd5a86c6148c2cc7c633cd42b7234139b593076d041e15202201898cdd52b41ca502098184b409cf83a21bc945006746e3b7cea52234e043ec80000
+ Result = VERIFY_ERROR
+ 
++Availablein = default
+ Verify = P-256-PUBLIC
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+diff --git a/test/recipes/30-test_evp_data/evppkey_rsa_common.txt b/test/recipes/30-test_evp_data/evppkey_rsa_common.txt
+index b8d8bb2993..8dd566067b 100644
+--- a/test/recipes/30-test_evp_data/evppkey_rsa_common.txt
++++ b/test/recipes/30-test_evp_data/evppkey_rsa_common.txt
+@@ -96,6 +96,7 @@ NDL6WCBbets=
+ 
+ Title = RSA tests
+ 
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+@@ -112,24 +113,28 @@ Ctrl = digest:SHA512-224
+ Input = "0123456789ABCDEF123456789ABC"
+ Output = 5f720e9488139bb21e1c2f027fd5ce5993e6d31c5a8faaee833487b3a944d66891178868ace8070cad3ee2ffbe54aa4885a15fd1a7cc5166970fe1fd8c0423e72bd3e3b56fc4a53ed80aaaeca42497f0ec3c62113edc05cd006608f5eef7ce3ad4cba1069f68731dd28a524a1f93fcdc5547112d48d45586dd943ba0d443be9635720d8a61697c54c96627f0d85c5fbeaa3b4af86a65cf2fc3800dd5de34c046985f25d0efc0bb6edccc1d08b3a4fb9c8faffe181c7e68b31e374ad1440a4a664eec9ca0dc53a9d2f5bc7d9940d866f64201bcbc63612754df45727ea24b531d7de83d1bb707444859fa35521320c33bf6f4dbeb6fb56e653adbf7af15843f17
+ 
++Availablein = default
+ VerifyRecover = RSA-2048
+ Ctrl = digest:SHA1
+ Input = c09d402423cbf233d26cae21f954547bc43fe80fd41360a0336cfdbe9aedad05bef6fd2eaee6cd60089a52482d4809a238149520df3bdde4cb9e23d9307b05c0a6f327052325a29adf2cc95b66523be7024e2a585c3d4db15dfbe146efe0ecdc0402e33fe5d40324ee96c5c3edd374a15cdc0f5d84aa243c0f07e188c6518fbfceae158a9943be398e31097da81b62074f626eff738be6160741d5a26957a482b3251fd85d8df78b98148459de10aa93305dbb4a5230aa1da291a9b0e481918f99b7638d72bb687f97661d304ae145d64a474437a4ef39d7b8059332ddeb07e92bf6e0e3acaf8afedc93795e4511737ec1e7aab6d5bc9466afc950c1c17b48ad
+ Output = "0123456789ABCDEF1234"
+ 
+ # Leading zero in the signature
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+ Output = 00c09d402423cbf233d26cae21f954547bc43fe80fd41360a0336cfdbe9aedad05bef6fd2eaee6cd60089a52482d4809a238149520df3bdde4cb9e23d9307b05c0a6f327052325a29adf2cc95b66523be7024e2a585c3d4db15dfbe146efe0ecdc0402e33fe5d40324ee96c5c3edd374a15cdc0f5d84aa243c0f07e188c6518fbfceae158a9943be398e31097da81b62074f626eff738be6160741d5a26957a482b3251fd85d8df78b98148459de10aa93305dbb4a5230aa1da291a9b0e481918f99b7638d72bb687f97661d304ae145d64a474437a4ef39d7b8059332ddeb07e92bf6e0e3acaf8afedc93795e4511737ec1e7aab6d5bc9466afc950c1c17b48ad
+ Result = VERIFY_ERROR
+ 
++Availablein = default
+ VerifyRecover = RSA-2048
+ Ctrl = digest:SHA1
+ Input = 00c09d402423cbf233d26cae21f954547bc43fe80fd41360a0336cfdbe9aedad05bef6fd2eaee6cd60089a52482d4809a238149520df3bdde4cb9e23d9307b05c0a6f327052325a29adf2cc95b66523be7024e2a585c3d4db15dfbe146efe0ecdc0402e33fe5d40324ee96c5c3edd374a15cdc0f5d84aa243c0f07e188c6518fbfceae158a9943be398e31097da81b62074f626eff738be6160741d5a26957a482b3251fd85d8df78b98148459de10aa93305dbb4a5230aa1da291a9b0e481918f99b7638d72bb687f97661d304ae145d64a474437a4ef39d7b8059332ddeb07e92bf6e0e3acaf8afedc93795e4511737ec1e7aab6d5bc9466afc950c1c17b48ad
+ Result = KEYOP_ERROR
+ 
+ # Mismatched digest
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1233"
+@@ -137,6 +142,7 @@ Output = c09d402423cbf233d26cae21f954547bc43fe80fd41360a0336cfdbe9aedad05bef6fd2
+ Result = VERIFY_ERROR
+ 
+ # Corrupted signature
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1233"
+@@ -144,6 +150,7 @@ Output = c09d402423cbf233d26cae21f954547bc43fe80fd41360a0336cfdbe9aedad05bef6fd2
+ Result = VERIFY_ERROR
+ 
+ # parameter is not NULLt
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:sha1
+ Input = "0123456789ABCDEF1234"
+@@ -151,42 +158,49 @@ Output = 3ec3fc29eb6e122bd7aa361cd09fe1bcbe85311096a7b9e4799cedfb2351ce0ab7fe4e7
+ Result = VERIFY_ERROR
+ 
+ # embedded digest too long
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:sha1
+ Input = "0123456789ABCDEF1234"
+ Output = afec9a0d5330a08f54283bb4a9d4e7e7e70fc1342336c4c766fba713f66970151c6e27413c48c33864ea45a0238787004f338ed3e21b53b0fe9c1151c42c388cbc7cba5a06b706c407a5b48324fbe994dc7afc3a19fb3d2841e66222596c14cd72a0f0a7455a019d8eb554f59c0183f9552b75aa96fee8bf935945e079ca283d2bd3534a86f11351f6d6181fbf433e5b01a6d1422145c7a72214d3aacdd5d3af12b2d6bf6438f9f9a64010d8aeed801c87f0859412b236150b86a545f7239be022f4a7ad246b59df87514294cb4a4c7c5a997ee53c66054d9f38ca4e76c1f7af83c30f737ef70f83a45aebe18238ddb95e1998814ca4fc72388f1533147c169d
+ Result = VERIFY_ERROR
+ 
++Availablein = default
+ VerifyRecover = RSA-2048
+ Ctrl = digest:sha1
+ Input = afec9a0d5330a08f54283bb4a9d4e7e7e70fc1342336c4c766fba713f66970151c6e27413c48c33864ea45a0238787004f338ed3e21b53b0fe9c1151c42c388cbc7cba5a06b706c407a5b48324fbe994dc7afc3a19fb3d2841e66222596c14cd72a0f0a7455a019d8eb554f59c0183f9552b75aa96fee8bf935945e079ca283d2bd3534a86f11351f6d6181fbf433e5b01a6d1422145c7a72214d3aacdd5d3af12b2d6bf6438f9f9a64010d8aeed801c87f0859412b236150b86a545f7239be022f4a7ad246b59df87514294cb4a4c7c5a997ee53c66054d9f38ca4e76c1f7af83c30f737ef70f83a45aebe18238ddb95e1998814ca4fc72388f1533147c169d
+ Result = KEYOP_ERROR
+ 
+ # embedded digest too short
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:sha1
+ Input = "0123456789ABCDEF1234"
+ Output = afec9a0d5330a08f54283bb4a9d4e7e7e70fc1342336c4c766fba713f66970151c6e27413c48c33864ea45a0238787004f338ed3e21b53b0fe9c1151c42c388cbc7cba5a06b706c407a5b48324fbe994dc7afc3a19fb3d2841e66222596c14cd72a0f0a7455a019d8eb554f59c0183f9552b75aa96fee8bf935945e079ca283d2bd3534a86f11351f6d6181fbf433e5b01a6d1422145c7a72214d3aacdd5d3af12b2d6bf6438f9f9a64010d8aeed801c87f0859412b236150b86a545f7239be022f4a7ad246b59df87514294cb4a4c7c5a997ee53c66054d9f38ca4e76c1f7af83c30f737ef70f83a45aebe18238ddb95e1998814ca4fc72388f1533147c169d
+ Result = VERIFY_ERROR
+ 
++Availablein = default
+ VerifyRecover = RSA-2048
+ Ctrl = digest:sha1
+ Input = afec9a0d5330a08f54283bb4a9d4e7e7e70fc1342336c4c766fba713f66970151c6e27413c48c33864ea45a0238787004f338ed3e21b53b0fe9c1151c42c388cbc7cba5a06b706c407a5b48324fbe994dc7afc3a19fb3d2841e66222596c14cd72a0f0a7455a019d8eb554f59c0183f9552b75aa96fee8bf935945e079ca283d2bd3534a86f11351f6d6181fbf433e5b01a6d1422145c7a72214d3aacdd5d3af12b2d6bf6438f9f9a64010d8aeed801c87f0859412b236150b86a545f7239be022f4a7ad246b59df87514294cb4a4c7c5a997ee53c66054d9f38ca4e76c1f7af83c30f737ef70f83a45aebe18238ddb95e1998814ca4fc72388f1533147c169d
+ Result = KEYOP_ERROR
+ 
+ # Garbage after DigestInfo
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:sha1
+ Input = "0123456789ABCDEF1234"
+ Output = 9ee34872d4271a7d8808af0a4052a145a6d6a8437d00da3ed14428c7f087cd39f4d43334c41af63e7fa1ba363fee7bcef401d9d36a662abbab55ce89a696e1be0dfa19a5d09ca617dd488787b6048baaefeb29bc8688b2fe3882de2b77c905b5a8b56cf9616041e5ec934ba6de863efe93acc4eef783fe7f72a00fa65d6093ed32bf98ce527e62ccb1d56317f4be18b7e0f55d7c36617d2d0678a306e3350956b662ac15df45215dd8f6b314babb9788e6c272fa461e4c9b512a11a4b92bc77c3a4c95c903fccb238794eca5c750477bf56ea6ee6a167367d881b485ae3889e7c489af8fdf38e0c0f2aed780831182e34abedd43c39281b290774bf35cc25274
+ Result = VERIFY_ERROR
+ 
++Availablein = default
+ VerifyRecover = RSA-2048
+ Ctrl = digest:sha1
+ Input = 9ee34872d4271a7d8808af0a4052a145a6d6a8437d00da3ed14428c7f087cd39f4d43334c41af63e7fa1ba363fee7bcef401d9d36a662abbab55ce89a696e1be0dfa19a5d09ca617dd488787b6048baaefeb29bc8688b2fe3882de2b77c905b5a8b56cf9616041e5ec934ba6de863efe93acc4eef783fe7f72a00fa65d6093ed32bf98ce527e62ccb1d56317f4be18b7e0f55d7c36617d2d0678a306e3350956b662ac15df45215dd8f6b314babb9788e6c272fa461e4c9b512a11a4b92bc77c3a4c95c903fccb238794eca5c750477bf56ea6ee6a167367d881b485ae3889e7c489af8fdf38e0c0f2aed780831182e34abedd43c39281b290774bf35cc25274
+ Result = KEYOP_ERROR
+ 
+ # invalid tag for parameter
++Availablein = default
+ Verify = RSA-2048
+ Ctrl = digest:sha1
+ Input = "0123456789ABCDEF1234"
+@@ -195,6 +209,7 @@ Result = VERIFY_ERROR
+ 
+ # Verify using public key
+ 
++Availablein = default
+ Verify = RSA-2048-PUBLIC
+ Ctrl = digest:SHA1
+ Input = "0123456789ABCDEF1234"
+@@ -370,6 +385,8 @@ Input="0123456789ABCDEF0123456789ABCDEF"
+ Output=4DE433D5844043EF08D354DA03CB29068780D52706D7D1E4D50EFB7D58C9D547D83A747DDD0635A96B28F854E50145518482CB49E963054621B53C60C498D07C16E9C2789C893CF38D4D86900DE71BDE463BD2761D1271E358C7480A1AC0BAB930DDF39602AD1BC165B5D7436B516B7A7858E8EB7AB1C420EEB482F4D207F0E462B1724959320A084E13848D11D10FB593E66BF680BF6D3F345FC3E9C3DE60ABBAC37E1C6EC80A268C8D9FC49626C679097AA690BC1AA662B95EB8DB70390861AA0898229F9349B4B5FDD030D4928C47084708A933144BE23BD3C6E661B85B2C0EF9ED36D498D5B7320E8194D363D4AD478C059BAE804181965E0B81B663158A
+ 
+ # Verify using salt length auto detect
++# In the FIPS provider on RHEL-9, the default digest for PSS signatures is SHA-256
++Availablein = default
+ Verify = RSA-2048-PUBLIC
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_pss_saltlen:auto
+@@ -404,6 +421,10 @@ Output=4DE433D5844043EF08D354DA03CB29068780D52706D7D1E4D50EFB7D58C9D547D83A747DD
+ Result = VERIFY_ERROR
+ 
+ # Verify using default parameters, explicitly setting parameters
++# NOTE: RSA-PSS-DEFAULT contains a restriction to use SHA1 as digest, which
++# RHEL-9 does not support in FIPS mode; all these tests are thus marked
++# Availablein = default.
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_pss_saltlen:20
+@@ -412,6 +433,7 @@ Input="0123456789ABCDEF0123"
+ Output = 3EFE09D88509027D837BFA5F8471CF7B69E6DF395DD999BB9CA42021F15722D9AC76670507C6BCFB73F64FB2211B611B8F140E76EBDB064BD762FDBA89D019E304A0D6B274E1C2FE1DF50005598A0306AF805416094E2A5BA60BC72BDE38CE061E853ED40F14967A8B9CA4DC739B462F89558F12FDF2D8D19FBEF16AD66FE2DDDA8BEE983ECBD873064244849D8D94B5B33F45E076871A47ED653E73257A2BE2DB3C0878094B0D2B6B682C8007DFD989425FB39A1FEEC9EED5876414601A49176EC344F5E3EDEE81CA2DDD29B7364F4638112CB3A547E2BC170E28CB66BDABE863754BE8AD5BA230567B575266F4B6B4CF81F28310ABF05351CC9E2DB85D00BF
+ 
+ # Verify explicitly setting parameters "digest" salt length
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_pss_saltlen:digest
+@@ -420,18 +442,21 @@ Input="0123456789ABCDEF0123"
+ Output = 3EFE09D88509027D837BFA5F8471CF7B69E6DF395DD999BB9CA42021F15722D9AC76670507C6BCFB73F64FB2211B611B8F140E76EBDB064BD762FDBA89D019E304A0D6B274E1C2FE1DF50005598A0306AF805416094E2A5BA60BC72BDE38CE061E853ED40F14967A8B9CA4DC739B462F89558F12FDF2D8D19FBEF16AD66FE2DDDA8BEE983ECBD873064244849D8D94B5B33F45E076871A47ED653E73257A2BE2DB3C0878094B0D2B6B682C8007DFD989425FB39A1FEEC9EED5876414601A49176EC344F5E3EDEE81CA2DDD29B7364F4638112CB3A547E2BC170E28CB66BDABE863754BE8AD5BA230567B575266F4B6B4CF81F28310ABF05351CC9E2DB85D00BF
+ 
+ # Verify using salt length larger than minimum
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_pss_saltlen:30
+ Input="0123456789ABCDEF0123"
+ Output = 6BF7EDC63A0BA184EEEC7F3020FEC8F5EBF38C2B76481881F48BCCE5796E7AB294548BA9AE810457C7723CABD1BDE94CF59CF7C0FC7461B22760C8ED703DD98E97BFDD61FA8D1181C411F6DEE5FF159F4850746D78EDEE385A363DC28E2CB373D5CAD7953F3BD5E639BE345732C03A1BDEA268814DA036EB1891C82D4012F3B903D86636055F87B96FC98806AD1B217685A4D754046A5DE0B0D7870664BE07902153EC85BA457BE7D7F89D7FE0F626D02A9CBBB2BB479DDA1A5CAE75247FB7BF6BFB15C1D3FD9E6B1573CCDBC72011C3B97716058BB11C7EA2E4E56ADAFE1F5DE6A7FD405AC5890100F9C3408EFFB5C73BF73F48177FF743B4B819D0699D507B
+ 
+ # Verify using maximum salt length
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_pss_saltlen:max
+ Input="0123456789ABCDEF0123"
+ Output = 4470DCFE812DEE2E58E4301D4ED274AB348FE040B724B2CD1D8CD0914BFF375F0B86FCB32BFA8AEA9BD22BD7C4F1ADD4F3D215A5CFCC99055BAFECFC23800E9BECE19A08C66BEBC5802122D13A732E5958FC228DCC0B49B5B4B1154F032D8FA2F3564AA949C1310CC9266B0C47F86D449AC9D2E7678347E7266E2D7C888CCE1ADF44A109A293F8516AE2BD94CE220F26E137DB8E7A66BB9FCE052CDC1D0BE24D8CEBB20D10125F26B069F117044B9E1D16FDDAABCA5340AE1702F37D0E1C08A2E93801C0A41035C6C73DA02A0E32227EAFB0B85E79107B59650D0EE7DC32A6772CCCE90F06369B2880FE87ED76997BA61F5EA818091EE88F8B0D6F24D02A3FC6
+ 
+ # Attempt to change salt length below minimum
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_pss_saltlen:0
+ Result = PKEY_CTRL_ERROR
+@@ -439,21 +464,25 @@ Result = PKEY_CTRL_ERROR
+ # Attempt to change padding mode
+ # Note this used to return PKEY_CTRL_INVALID
+ # but it is limited because setparams only returns 0 or 1.
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = rsa_padding_mode:pkcs1
+ Result = PKEY_CTRL_ERROR
+ 
+ # Attempt to change digest
++Availablein = default
+ Verify = RSA-PSS-DEFAULT
+ Ctrl = digest:sha256
+ Result = PKEY_CTRL_ERROR
+ 
+ # Invalid key: rejected when we try to init
++Availablein = default
+ Verify = RSA-PSS-BAD
+ Result = KEYOP_INIT_ERROR
+ Reason = invalid salt length
+ 
+ # Invalid key: rejected when we try to init
++Availablein = default
+ Verify = RSA-PSS-BAD2
+ Result = KEYOP_INIT_ERROR
+ Reason = invalid salt length
+@@ -472,36 +501,42 @@ CAltWyuLbfXWce9jd8CSHLI8Jwpw4lmOb/idGfEFrMLT8Ms18pKA4Thrb2TE7yLh
+ 4fINDOjP+yJJvZohNwIDAQAB
+ -----END PUBLIC KEY-----
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=cd8b6538cb8e8de566b68bd067569dbf1ee2718e
+ Output=9074308fb598e9701b2294388e52f971faac2b60a5145af185df5287b5ed2887e57ce7fd44dc8634e407c8e0e4360bc226f3ec227f9d9e54638e8d31f5051215df6ebb9c2f9579aa77598a38f914b5b9c1bd83c4e2f9f382a0d0aa3542ffee65984a601bc69eb28deb27dca12c82c2d4c3f66cd500f1ff2b994d8a4e30cbb33c
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=e35befc17a1d160b9ce35fbd8eb16e7ee491d3fd
+ Output=3ef7f46e831bf92b32274142a585ffcefbdca7b32ae90d10fb0f0c729984f04ef29a9df0780775ce43739b97838390db0a5505e63de927028d9d29b219ca2c4517832558a55d694a6d25b9dab66003c4cccd907802193be5170d26147d37b93590241be51c25055f47ef62752cfbe21418fafe98c22c4d4d47724fdb5669e843
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=0652ec67bcee30f9d2699122b91c19abdba89f91
+ Output=666026fba71bd3e7cf13157cc2c51a8e4aa684af9778f91849f34335d141c00154c4197621f9624a675b5abc22ee7d5baaffaae1c9baca2cc373b3f33e78e6143c395a91aa7faca664eb733afd14d8827259d99a7550faca501ef2b04e33c23aa51f4b9e8282efdb728cc0ab09405a91607c6369961bc8270d2d4f39fce612b1
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=39c21c4cceda9c1adf839c744e1212a6437575ec
+ Output=4609793b23e9d09362dc21bb47da0b4f3a7622649a47d464019b9aeafe53359c178c91cd58ba6bcb78be0346a7bc637f4b873d4bab38ee661f199634c547a1ad8442e03da015b136e543f7ab07c0c13e4225b8de8cce25d4f6eb8400f81f7e1833b7ee6e334d370964ca79fdb872b4d75223b5eeb08101591fb532d155a6de87
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=36dae913b77bd17cae6e7b09453d24544cebb33c
+ Output=1d2aad221ca4d31ddf13509239019398e3d14b32dc34dc5af4aeaea3c095af73479cf0a45e5629635a53a018377615b16cb9b13b3e09d671eb71e387b8545c5960da5a64776e768e82b2c93583bf104c3fdb23512b7b4e89f633dd0063a530db4524b01c3f384c09310e315a79dcd3d684022a7f31c865a664e316978b759fad
+ 
++Availablein = default
+ Verify=RSA-PSS-1
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+@@ -517,36 +552,42 @@ swU7R97S7NSkyu/WFIM9yLtiLzF+0Ha4BX/o3j+ESArV6D5KYZBKTySPs5cCc1fh
+ 0w5GMTmBXG/U/VrFuBcqRSMOy2MYoE8UVdhOWosCAwEAAQ==
+ -----END PUBLIC KEY-----
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=2715a49b8b0012cd7aee84c116446e6dfe3faec0
+ Output=586107226c3ce013a7c8f04d1a6a2959bb4b8e205ba43a27b50f124111bc35ef589b039f5932187cb696d7d9a32c0c38300a5cdda4834b62d2eb240af33f79d13dfbf095bf599e0d9686948c1964747b67e89c9aba5cd85016236f566cc5802cb13ead51bc7ca6bef3b94dcbdbb1d570469771df0e00b1a8a06777472d2316279edae86474668d4e1efff95f1de61c6020da32ae92bbf16520fef3cf4d88f61121f24bbd9fe91b59caf1235b2a93ff81fc403addf4ebdea84934a9cdaf8e1a9e
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=2dac956d53964748ac364d06595827c6b4f143cd
+ Output=80b6d643255209f0a456763897ac9ed259d459b49c2887e5882ecb4434cfd66dd7e1699375381e51cd7f554f2c271704b399d42b4be2540a0eca61951f55267f7c2878c122842dadb28b01bd5f8c025f7e228418a673c03d6bc0c736d0a29546bd67f786d9d692ccea778d71d98c2063b7a71092187a4d35af108111d83e83eae46c46aa34277e06044589903788f1d5e7cee25fb485e92949118814d6f2c3ee361489016f327fb5bc517eb50470bffa1afa5f4ce9aa0ce5b8ee19bf5501b958
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=28d98c46cccafbd3bc04e72f967a54bd3ea12298
+ Output=484408f3898cd5f53483f80819efbf2708c34d27a8b2a6fae8b322f9240237f981817aca1846f1084daa6d7c0795f6e5bf1af59c38e1858437ce1f7ec419b98c8736adf6dd9a00b1806d2bd3ad0a73775e05f52dfef3a59ab4b08143f0df05cd1ad9d04bececa6daa4a2129803e200cbc77787caf4c1d0663a6c5987b605952019782caf2ec1426d68fb94ed1d4be816a7ed081b77e6ab330b3ffc073820fecde3727fcbe295ee61a050a343658637c3fd659cfb63736de32d9f90d3c2f63eca
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=0866d2ff5a79f25ef668cd6f31b42dee421e4c0e
+ Output=84ebeb481be59845b46468bafb471c0112e02b235d84b5d911cbd1926ee5074ae0424495cb20e82308b8ebb65f419a03fb40e72b78981d88aad143053685172c97b29c8b7bf0ae73b5b2263c403da0ed2f80ff7450af7828eb8b86f0028bd2a8b176a4d228cccea18394f238b09ff758cc00bc04301152355742f282b54e663a919e709d8da24ade5500a7b9aa50226e0ca52923e6c2d860ec50ff480fa57477e82b0565f4379f79c772d5c2da80af9fbf325ece6fc20b00961614bee89a183e
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=6a5b4be4cd36cc97dfde9995efbf8f097a4a991a
+ Output=82102df8cb91e7179919a04d26d335d64fbc2f872c44833943241de8454810274cdf3db5f42d423db152af7135f701420e39b494a67cbfd19f9119da233a23da5c6439b5ba0d2bc373eee3507001378d4a4073856b7fe2aba0b5ee93b27f4afec7d4d120921c83f606765b02c19e4d6a1a3b95fa4c422951be4f52131077ef17179729cddfbdb56950dbaceefe78cb16640a099ea56d24389eef10f8fecb31ba3ea3b227c0a86698bb89e3e9363905bf22777b2a3aa521b65b4cef76d83bde4c
+ 
++Availablein = default
+ Verify=RSA-PSS-9
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+@@ -564,36 +605,42 @@ F7jfF3jbOB3OCctK0FilEQAac4GY7ifPVaE7dUU5kGWC7IsXS9WNXR89dnxhNyGu
+ BQIDAQAB
+ -----END PUBLIC KEY-----
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=9596bb630cf6a8d4ea4600422b9eba8b13675dd4
+ Output=82c2b160093b8aa3c0f7522b19f87354066c77847abf2a9fce542d0e84e920c5afb49ffdfdace16560ee94a1369601148ebad7a0e151cf16331791a5727d05f21e74e7eb811440206935d744765a15e79f015cb66c532c87a6a05961c8bfad741a9a6657022894393e7223739796c02a77455d0f555b0ec01ddf259b6207fd0fd57614cef1a5573baaff4ec00069951659b85f24300a25160ca8522dc6e6727e57d019d7e63629b8fe5e89e25cc15beb3a647577559299280b9b28f79b0409000be25bbd96408ba3b43cc486184dd1c8e62553fa1af4040f60663de7f5e49c04388e257f1ce89c95dab48a315d9b66b1b7628233876ff2385230d070d07e1666
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=b503319399277fd6c1c8f1033cbf04199ea21716
+ Output=14ae35d9dd06ba92f7f3b897978aed7cd4bf5ff0b585a40bd46ce1b42cd2703053bb9044d64e813d8f96db2dd7007d10118f6f8f8496097ad75e1ff692341b2892ad55a633a1c55e7f0a0ad59a0e203a5b8278aec54dd8622e2831d87174f8caff43ee6c46445345d84a59659bfb92ecd4c818668695f34706f66828a89959637f2bf3e3251c24bdba4d4b7649da0022218b119c84e79a6527ec5b8a5f861c159952e23ec05e1e717346faefe8b1686825bd2b262fb2531066c0de09acde2e4231690728b5d85e115a2f6b92b79c25abc9bd9399ff8bcf825a52ea1f56ea76dd26f43baafa18bfa92a504cbd35699e26d1dcc5a2887385f3c63232f06f3244c3
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=50aaede8536b2c307208b275a67ae2df196c7628
+ Output=6e3e4d7b6b15d2fb46013b8900aa5bbb3939cf2c095717987042026ee62c74c54cffd5d7d57efbbf950a0f5c574fa09d3fc1c9f513b05b4ff50dd8df7edfa20102854c35e592180119a70ce5b085182aa02d9ea2aa90d1df03f2daae885ba2f5d05afdac97476f06b93b5bc94a1a80aa9116c4d615f333b098892b25fface266f5db5a5a3bcc10a824ed55aad35b727834fb8c07da28fcf416a5d9b2224f1f8b442b36f91e456fdea2d7cfe3367268de0307a4c74e924159ed33393d5e0655531c77327b89821bdedf880161c78cd4196b5419f7acc3f13e5ebf161b6e7c6724716ca33b85c2e25640192ac2859651d50bde7eb976e51cec828b98b6563b86bb
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=aa0b72b8b371ddd10c8ae474425ccccf8842a294
+ Output=34047ff96c4dc0dc90b2d4ff59a1a361a4754b255d2ee0af7d8bf87c9bc9e7ddeede33934c63ca1c0e3d262cb145ef932a1f2c0a997aa6a34f8eaee7477d82ccf09095a6b8acad38d4eec9fb7eab7ad02da1d11d8e54c1825e55bf58c2a23234b902be124f9e9038a8f68fa45dab72f66e0945bf1d8bacc9044c6f07098c9fcec58a3aab100c805178155f030a124c450e5acbda47d0e4f10b80a23f803e774d023b0015c20b9f9bbe7c91296338d5ecb471cafb032007b67a60be5f69504a9f01abb3cb467b260e2bce860be8d95bf92c0c8e1496ed1e528593a4abb6df462dde8a0968dffe4683116857a232f5ebf6c85be238745ad0f38f767a5fdbf486fb
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+ Input=fad3902c9750622a2bc672622c48270cc57d3ea8
+ Output=7e0935ea18f4d6c1d17ce82eb2b3836c55b384589ce19dfe743363ac9948d1f346b7bfddfe92efd78adb21faefc89ade42b10f374003fe122e67429a1cb8cbd1f8d9014564c44d120116f4990f1a6e38774c194bd1b8213286b077b0499d2e7b3f434ab12289c556684deed78131934bb3dd6537236f7c6f3dcb09d476be07721e37e1ceed9b2f7b406887bd53157305e1c8b4f84d733bc1e186fe06cc59b6edb8f4bd7ffefdf4f7ba9cfb9d570689b5a1a4109a746a690893db3799255a0cb9215d2d1cd490590e952e8c8786aa0011265252470c041dfbc3eec7c3cbf71c24869d115c0cb4a956f56d530b80ab589acfefc690751ddf36e8d383f83cedd2cc
+ 
++Availablein = default
+ Verify=RSA-PSS-10
+ Ctrl = rsa_padding_mode:pss
+ Ctrl = rsa_mgf1_md:sha1
+@@ -1329,11 +1376,13 @@ Title = RSA FIPS tests
+ 
+ # FIPS tests
+ 
+-# Verifying with SHA1 is permitted in fips mode for older applications
++# Verifying with SHA1 is not permitted on RHEL-9 in FIPS mode
++Availablein = fips
+ DigestVerify = SHA1
+ Key = RSA-2048
+ Input = "Hello "
+ Output = 87ea0e2226ef35e5a2aec9ca1222fcbe39ba723f05b3203564f671dd3601271806ead3240e61d424359ee3b17bd3e32f54b82df83998a8ac4148410710361de0400f9ddf98278618fbc87747a0531972543e6e5f18ab2fdfbfda02952f6ac69690e43864690af271bf43d4be9705b303d4ff994ab3abd4d5851562b73e59be3edc01cec41a4cc13b68206329bad1a46c6608d3609e951faa321d0fdbc765d54e9a7c59248d2f67913c9903e932b769c9c8a45520cabea06e8c0b231dd3bcc7f7ec55b46b0157ccb5fc5011fa57353cd3df32edcbadcb8d168133cbd0acfb64444cb040e1298f621508a38f79e14ae8c2c5c857f90aa9d24ef5fc07d34bf23859
++Result = DIGESTVERIFYINIT_ERROR
+ 
+ # Verifying with a 1024 bit key is permitted in fips mode for older applications
+ DigestVerify = SHA256
+diff --git a/test/recipes/80-test_cms.t b/test/recipes/80-test_cms.t
+index 48a92f735d..34afe91b88 100644
+--- a/test/recipes/80-test_cms.t
++++ b/test/recipes/80-test_cms.t
+@@ -162,7 +162,7 @@ my @smime_pkcs7_tests = (
+       [ "{cmd1}", @defaultprov, "-sign", "-in", $smcont, "-md", "sha1",
+         "-certfile", $smroot,
+         "-signer", $smrsa1, "-out", "{output}.cms" ],
+-      [ "{cmd2}", @prov, "-verify", "-in", "{output}.cms",
++      [ "{cmd2}", @defaultprov, "-verify", "-in", "{output}.cms",
+         "-CAfile", $smroot, "-out", "{output}.txt" ],
+       \&final_compare
+     ],
+@@ -170,7 +170,7 @@ my @smime_pkcs7_tests = (
+     [ "signed zero-length content S/MIME format, RSA key SHA1",
+       [ "{cmd1}", @defaultprov, "-sign", "-in", $smcont_zero, "-md", "sha1",
+         "-certfile", $smroot, "-signer", $smrsa1, "-out", "{output}.cms" ],
+-      [ "{cmd2}", @prov, "-verify", "-in", "{output}.cms",
++      [ "{cmd2}", @defaultprov, "-verify", "-in", "{output}.cms",
+         "-CAfile", $smroot, "-out", "{output}.txt" ],
+       \&zero_compare
+     ],
+diff --git a/test/recipes/80-test_ssl_old.t b/test/recipes/80-test_ssl_old.t
+index 8c52b637fc..ff75c5b6ec 100644
+--- a/test/recipes/80-test_ssl_old.t
++++ b/test/recipes/80-test_ssl_old.t
+@@ -394,6 +394,9 @@ sub testssl {
+                'test sslv2/sslv3 with 1024bit DHE via BIO pair');
+           }
+ 
++        SKIP: {
++          skip "SSLv3 is not supported by the FIPS provider", 4
++              if $provider eq "fips";
+           ok(run(test([@ssltest, "-bio_pair", "-server_auth", @CA])),
+              'test sslv2/sslv3 with server authentication');
+           ok(run(test([@ssltest, "-bio_pair", "-client_auth", @CA])),
+@@ -402,6 +405,7 @@ sub testssl {
+              'test sslv2/sslv3 with both client and server authentication via BIO pair');
+           ok(run(test([@ssltest, "-bio_pair", "-server_auth", "-client_auth", "-app_verify", @CA])),
+              'test sslv2/sslv3 with both client and server authentication via BIO pair and app verify');
++         }
+ 
+         SKIP: {
+             skip "No IPv4 available on this machine", 4
+diff -up openssl-3.0.5/test/smime-certs/smdh.pem.0061 openssl-3.0.5/test/smime-certs/smdh.pem
+--- openssl-3.0.5/test/smime-certs/smdh.pem.0061	2022-09-02 14:17:15.331436663 +0200
++++ openssl-3.0.5/test/smime-certs/smdh.pem	2022-09-02 14:17:15.347436804 +0200
+@@ -1,47 +1,47 @@
+ -----BEGIN PRIVATE KEY-----
+-MIICXAIBADCCAjUGByqGSM4+AgEwggIoAoIBAQCB6AUA/1eXRh+iLWHXe+lUl6e+
+-+460tAIIpsQ1jw1ZaTmlH9SlrWSBNVRVHwDuBW7vA+lKgBvDpCIjmhRbgrZIGwcZ
+-6ruCYy5KF/B3AW5MApC9QCDaVrG6Hb7NfpMgwuUIKvvvOMrrvn4r5Oxtsx9rORTE
+-bdS33MuZCOIbodjs5u+e/2hhssOwgUTMASDwXppJTyeMwAAZ+p78ByrSULP6yYdP
+-PTh8sK1begDG6YTSKE3VqYNg1yaE5tQvCQ0U2L4qZ8JqexAVHbR8LA8MNhtA1pma
+-Zj4q2WNAEevpprIIRXgJEZY278nPlvVeoKfOef9RBHgQ6ZTnZ1Et5iLMCwYHAoIB
+-AFVgJaHfnBVJYfaQh1NyoVZJ5xX6UvvL5xEKUwwEMgs8JSOzp2UI+KRDpy9KbNH7
+-93Kwa2d8Q7ynciDiCmd1ygF4CJKb4ZOwjWjpZ4DedHr0XokGhyBCyjaBxOi3i4tP
+-EFO8YHs5B/yOZHzcpTfs2VxJqIm3KF8q0Ify9PWDAsgo+d21/+eye60FHjF9o2/D
+-l3NRlOhUhHNGykfqFgKEEEof3/3c6r5BS0oRXdsu6dx/y2/v8j9aJoHfyGHkswxr
+-ULSBxJENOBB89C+GET6yhbxV1e4SFwzHnXgG8bWXwk7bea6ZqXbHq0pT3kUiQeKe
+-assXKqRBAG9NLbQ3mmx8RFkCHQDIVBWPf6VwBa2s1CAcsIziVJ8qr/KAKx9DZ3h5
+-BB4CHAF3VZBAC/TB85J4PzsLJ+VrOWr0c8kQlYUR9rw=
++MIICXQIBADCCAjUGByqGSM4+AgEwggIoAoIBAQCCyx9ZhD6HY5xgusGDrJZJ+FdT
++e9OxD/p9DQNKqoLyJ10TAUXuycozVqDAD4v1wsOAPH0TDOX9Ns87PXgTbd6DpSJt
++F1ZLW+1pklZs2m0cLl4raOe8CZGHkSgia0wC40LAg/u/JZ6NAG2YSiFEtjbkf81l
++pvL0946LiHfHklMtSOkK3H9PkGB/KrXMITRR2P1u78AzTvc2YL7iLlCu6mV2g6v4
++ieeWprywTaZ8gp3NBMjyuRJniGCQ52jPfOvT32w/sBTIfUO+95u/eEHrTP4K+vTk
++VS3wLo5ypgrveRdALKvqkHe0qfNr5VQRk2Pt6ReH35kjiUPLZCccgJr9h80hAoIB
++AE50cpgSJBYr9+5dj+fJJcXf/KX9rttlBXyveUP+vbSm/oW443/IksO3oLMy1Raq
++tHTDBhtNrH7rSK6CDStKrMkgHsjTYkZOU85vCdrVi3UZBz0GiYO/8kQ8aLeTe3LB
++7QB0kkkUgZ7etsnNxEkz9WQwohTvGBHBFNDKDqWadP9BpNrFoDCYojit7GOZPQgt
++eEiCO8D9xu0sEXT8ZdRqWcmkTfeMRojrzxt0LpT/vUKHGsBFmUN7kH4Hy9z2LJxB
++DrYYkV3LSAweuUQKBocNI7bbbOvPByUvHVMfJBrBmwIJI3vc3091njOH53zATNNv
++ta+9S7L4zNsvbg8RtJyH8i4CHQCY12PTXj6Ipxbqq4d1Q+AoUqnN/H9lAS46teXv
++BB8CHQCGE6pxpX5lWcH6+TGLDoLo3T5L2/5KTd0tRNdj
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-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
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smdsa1.pem.0061 openssl-3.0.5/test/smime-certs/smdsa1.pem
+--- openssl-3.0.5/test/smime-certs/smdsa1.pem.0061	2022-09-02 14:17:15.326436618 +0200
++++ openssl-3.0.5/test/smime-certs/smdsa1.pem	2022-09-02 14:17:15.346436795 +0200
+@@ -1,47 +1,47 @@
+ -----BEGIN PRIVATE KEY-----
+-MIICXQIBADCCAjYGByqGSM44BAEwggIpAoIBAQCg5xGADjdINCKODDX6yq3w8vQ1
+-i0SuHnFvPc5gHMLIxJhDp3cLJ5eJmcHZ07WflsMgSxD2Wd5lX5Q9uxtv78/erv5t
+-4INbA4D+QSkxb4SWNurRBQj5LuoGhFMpCubDYSxiKkTJ4pmOEbsjnlGLiN5R1jAa
+-kOxI+l/rPAQlIUMCHSF6xXgd62fUdEAnRYj46Lgw+FWKAKNhcH7rOLA7k4JnYCLg
+-c9HnYvwxlpoV+SHi+QXSrcrtMBNCmIgIONI5uNuBnZq6jjHE/Wg1+D4wGxOZl+/S
+-8EP8eXSDD+1Sni2Jk38etU+laS0pVV9lh6sV3zV28YXVZl01CHUfwH+3w/XJAh0A
+-mkjrU1XrCahV9d78Rklpd4fK3K53+X5MeTgNLQKCAQEAoA32HKvIhx6wvmT9huaw
+-V6wj7hT99kjzQjZqbvLENW9bbAgOdPzZzusqZmZMgGdDr94oYz1/MhmAKNY4lQv7
+-ioJmtded5hhS6GDg3Oj4IYiJ9trAQ/ATrDrSi3sQAZ3Pvip7j4oljvsQBmAj3KKR
+-CnZ2/FeRyjSS3cUey89GE2N2DQbHEmuG/F8aDmUhLNusZm6nXs2Y1W7+kQRwswBL
+-5H4Oo6NaSUc8dl7HWEeWoS8BE7G4JFCXBQwwgInOJINyQlknxMSpv7dwxp32SgdL
+-QldkaQkHAEg0QqYb2Hv/xHfVhn9vTpGJQyWvnT5RvbXSGdTk1CTlZTrUAGmbHOwX
+-ygQeAhwE9yuqObvNXzUTN+PY2rg00PzdyJw3XJAUrmlY
++MIICZQIBADCCAjkGByqGSM44BAEwggIsAoIBAQCQfLlNdehPnTrGIMhw4rk0uua6
++k1nCG3zcyfXli17BdB2k0HBPaTA3a3ZHfOt1Awy0Uu0wZ3gdPr9z0I64hnJXIGou
++zIanZ7nYRImHtX5JMFbXeyxo1Owd2Zs3oEk9nQUoUsMxvmYC/ghPL5Zx1pPxcHCO
++wzWxoG4yZMjimXOc1/W7zvK/4/g/Cz9fItD3zdcydfgM/hK0/CeYQ21xfhqf4mjK
++v9plnCcWgToGI+7H8VK80MFbkO2QKRz3vP1/TjK6PRm9sEeB5b10+SvGv2j2w+CC
++0fXL4s6n7PtBlm/bww8xL1/Az8kwejUcII1Dc8uNwwISwGbwaGBvl7IHpm21AiEA
++rodZi+nCKZdTL8IgCjX3n0DuhPRkVQPjz/B6VweLW9MCggEAfimkUNwnsGFp7mKM
++zJKhHoQkMB1qJzyIHjDzQ/J1xjfoF6i27afw1/WKboND5eseZhlhA2TO5ZJB6nGx
++DOE9lVQxYVml++cQj6foHh1TVJAgGl4mWuveW/Rz+NEhpK4zVeEsfMrbkBypPByy
++xzF1Z49t568xdIo+e8jLI8FjEdXOIUg4ehB3NY6SL8r4oJ49j/sJWfHcDoWH/LK9
++ZaBF8NpflJe3F40S8RDvM8j2HC+y2Q4QyKk1DXGiH+7yQLGWzr3M73kC3UBnnH0h
++Hxb7ISDCT7dCw/lH1nCbVFBOM0ASI26SSsFSXQrvD2kryRcTZ0KkyyhhoPODWpU+
++TQMsxQQjAiEAkolGvb/76X3vm5Ov09ezqyBYt9cdj/FLH7DyMkxO7X0=
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIIFmjCCBIKgAwIBAgIUUoOmJmXAY29/2rWY0wJphQ5/pzUwDQYJKoZIhvcNAQEL
++MIIFmzCCBIOgAwIBAgIUWGMqmBZZ1ykguVDk2Whn+2uKMA0wDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxNFoYDzIxMjIw
+-NTA5MTUzMzE0WjBFMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEeMBwGA1UEAwwVVGVzdCBTL01JTUUgRUUgRFNBICMxMIIDQzCCAjYGByqGSM44
+-BAEwggIpAoIBAQCg5xGADjdINCKODDX6yq3w8vQ1i0SuHnFvPc5gHMLIxJhDp3cL
+-J5eJmcHZ07WflsMgSxD2Wd5lX5Q9uxtv78/erv5t4INbA4D+QSkxb4SWNurRBQj5
+-LuoGhFMpCubDYSxiKkTJ4pmOEbsjnlGLiN5R1jAakOxI+l/rPAQlIUMCHSF6xXgd
+-62fUdEAnRYj46Lgw+FWKAKNhcH7rOLA7k4JnYCLgc9HnYvwxlpoV+SHi+QXSrcrt
+-MBNCmIgIONI5uNuBnZq6jjHE/Wg1+D4wGxOZl+/S8EP8eXSDD+1Sni2Jk38etU+l
+-aS0pVV9lh6sV3zV28YXVZl01CHUfwH+3w/XJAh0AmkjrU1XrCahV9d78Rklpd4fK
+-3K53+X5MeTgNLQKCAQEAoA32HKvIhx6wvmT9huawV6wj7hT99kjzQjZqbvLENW9b
+-bAgOdPzZzusqZmZMgGdDr94oYz1/MhmAKNY4lQv7ioJmtded5hhS6GDg3Oj4IYiJ
+-9trAQ/ATrDrSi3sQAZ3Pvip7j4oljvsQBmAj3KKRCnZ2/FeRyjSS3cUey89GE2N2
+-DQbHEmuG/F8aDmUhLNusZm6nXs2Y1W7+kQRwswBL5H4Oo6NaSUc8dl7HWEeWoS8B
+-E7G4JFCXBQwwgInOJINyQlknxMSpv7dwxp32SgdLQldkaQkHAEg0QqYb2Hv/xHfV
+-hn9vTpGJQyWvnT5RvbXSGdTk1CTlZTrUAGmbHOwXygOCAQUAAoIBACGS7hCpTL0g
+-lx9C1Bwz5xfVd0mwCqx9UGiH8Bf4lRsSagL0Irwvnjz++WH1vecZa2bWsYsPhQ+D
+-KDzaCo20CYln4IFEPgY0fSE+KTF1icFj/mD+MgxWgsgKoTI120ENPGHqHpKkv0Uv
+-OlwTImU4BxxkctZ5273XEv3VPQE8COGnXgqt7NBazU/O7vibFm0iaEsVjHFHYcoo
+-+sMcm3F2E/gvR9IJGaGPeCk0sMW8qloPzErWIugx/OGqM7fni2cIcZwGdju52O+l
+-cLV0tZdgC7eTbVDMLspyuiYME+zvEzRwCQF/GqcCDSn68zxJv/zSNZ9XxOgZaBfs
+-Na7e8YGATiujYDBeMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgXgMB0GA1Ud
+-DgQWBBSFVrWPZrHzhHUg0MMEAAKwQIfsazAfBgNVHSMEGDAWgBQVwRMha+JVX6dq
+-HVcg1s/zqXNkWTANBgkqhkiG9w0BAQsFAAOCAQEAbm49FB+eyeX7OBUC/akhnkFw
+-cDXqw7Fl2OibRK+g/08zp4CruwJdb72j5+pTmG+9SF7tGyQBfHFf1+epa3ZiIc+0
+-UzFf2xQBMyHjesL19cTe4i176dHz8pCxx9OEow0GlZVV85+Anev101NskKVNNVA7
+-YnB2xKQWgf8HORh66XVCk54xMcd99ng8xQ8vhZC6KckVbheQgdPp7gUAcDgxH2Yo
+-JF8jHQlsWNcCGURDldP6FQ49TGWHj24IGjnjGapWxMUjvCz+kV6sGW/OIYu+MM9w
+-FMIOyEdUUtKowWT6eXwrITup3T6pspPTicbK61ZCPuxMvP2JBFGZsqat+F5g+w==
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MjA0OFoXDTMyMDMz
++MTE0MjA0OFowRTELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HjAcBgNVBAMMFVRlc3QgUy9NSU1FIEVFIERTQSAjMTCCA0YwggI5BgcqhkjOOAQB
++MIICLAKCAQEAkHy5TXXoT506xiDIcOK5NLrmupNZwht83Mn15YtewXQdpNBwT2kw
++N2t2R3zrdQMMtFLtMGd4HT6/c9COuIZyVyBqLsyGp2e52ESJh7V+STBW13ssaNTs
++HdmbN6BJPZ0FKFLDMb5mAv4ITy+WcdaT8XBwjsM1saBuMmTI4plznNf1u87yv+P4
++Pws/XyLQ983XMnX4DP4StPwnmENtcX4an+Joyr/aZZwnFoE6BiPux/FSvNDBW5Dt
++kCkc97z9f04yuj0ZvbBHgeW9dPkrxr9o9sPggtH1y+LOp+z7QZZv28MPMS9fwM/J
++MHo1HCCNQ3PLjcMCEsBm8Ghgb5eyB6ZttQIhAK6HWYvpwimXUy/CIAo1959A7oT0
++ZFUD48/welcHi1vTAoIBAH4ppFDcJ7Bhae5ijMySoR6EJDAdaic8iB4w80PydcY3
++6Beotu2n8Nf1im6DQ+XrHmYZYQNkzuWSQepxsQzhPZVUMWFZpfvnEI+n6B4dU1SQ
++IBpeJlrr3lv0c/jRIaSuM1XhLHzK25AcqTwcsscxdWePbeevMXSKPnvIyyPBYxHV
++ziFIOHoQdzWOki/K+KCePY/7CVnx3A6Fh/yyvWWgRfDaX5SXtxeNEvEQ7zPI9hwv
++stkOEMipNQ1xoh/u8kCxls69zO95At1AZ5x9IR8W+yEgwk+3QsP5R9Zwm1RQTjNA
++EiNukkrBUl0K7w9pK8kXE2dCpMsoYaDzg1qVPk0DLMUDggEFAAKCAQAZdJAANu5E
++hkGOJDo2KTBmX7EQMR98gTRFZu/B/W19bHDhm9qc792PLPkV487QAgkMEItSOv0P
++faeSYgbUe7d1aBXzqSdCwzq4WIxLNj2eQkZk6UffDg0csTvymTvnFHWyDUwRmvjH
+++35r95r1jgBeSUQMJxoe2kwZ4DHdkCpIp5z7NA44DvclY/X+BgcZ1jJNClC3BFOy
++HQaLmY452mgnS+k7zfFhsUJn5lkpfVFY6Ml7Y5AFG3Dvf2rWdGBrVUwsBP8sVJCx
++ITcg6nyGJZuOeK3VITqrcgjZr9odkf/Hg7OzN+a1B+Z6u3Ld5BKrduBqN/EKxxyd
++GNJst42JrNFIo2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIF4DAdBgNV
++HQ4EFgQU0dBhM47Fpn83rw6nGqMcq5q3DqwwHwYDVR0jBBgwFoAUyZFTCmN7FluL
++vUTwdoipJObltmwwDQYJKoZIhvcNAQELBQADggEBAC3W5L4plRWiaX03PncMHnaL
++sp48+2jJen4avzNpRZF/bTQ621x/KLWelbMzBTMxU6jtU1LwCvsiOTSenUZ6W5vq
++TGy6nwkMUrBN0nHmymVz5v40VBLtc2/5xF9UBZ1GMnmYko+d7VHBD6qu4hpi6OD1
++3Z2kxCRaZ87y3IbVnl6zqdqxDxKCj4Ca+TT6AApm/MYVwpuvCVmuXrBBvJYTFFeZ
++2J90jHlQep2rAaZu41oiIlmQUEf9flV0iPYjj+Pqdzr9ovWVbqt7l1WKOBDYdzJW
++fQ8TvFSExkDQsDc0nkkLIfJBFUFuOpNmODvq+Ac8AGUBnl/Z3pAV4KVnnobIXHw=
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smdsa2.pem.0061 openssl-3.0.5/test/smime-certs/smdsa2.pem
+--- openssl-3.0.5/test/smime-certs/smdsa2.pem.0061	2022-09-02 14:17:15.332436671 +0200
++++ openssl-3.0.5/test/smime-certs/smdsa2.pem	2022-09-02 14:17:15.347436804 +0200
+@@ -1,47 +1,47 @@
+ -----BEGIN PRIVATE KEY-----
+-MIICXQIBADCCAjYGByqGSM44BAEwggIpAoIBAQCg5xGADjdINCKODDX6yq3w8vQ1
+-i0SuHnFvPc5gHMLIxJhDp3cLJ5eJmcHZ07WflsMgSxD2Wd5lX5Q9uxtv78/erv5t
+-4INbA4D+QSkxb4SWNurRBQj5LuoGhFMpCubDYSxiKkTJ4pmOEbsjnlGLiN5R1jAa
+-kOxI+l/rPAQlIUMCHSF6xXgd62fUdEAnRYj46Lgw+FWKAKNhcH7rOLA7k4JnYCLg
+-c9HnYvwxlpoV+SHi+QXSrcrtMBNCmIgIONI5uNuBnZq6jjHE/Wg1+D4wGxOZl+/S
+-8EP8eXSDD+1Sni2Jk38etU+laS0pVV9lh6sV3zV28YXVZl01CHUfwH+3w/XJAh0A
+-mkjrU1XrCahV9d78Rklpd4fK3K53+X5MeTgNLQKCAQEAoA32HKvIhx6wvmT9huaw
+-V6wj7hT99kjzQjZqbvLENW9bbAgOdPzZzusqZmZMgGdDr94oYz1/MhmAKNY4lQv7
+-ioJmtded5hhS6GDg3Oj4IYiJ9trAQ/ATrDrSi3sQAZ3Pvip7j4oljvsQBmAj3KKR
+-CnZ2/FeRyjSS3cUey89GE2N2DQbHEmuG/F8aDmUhLNusZm6nXs2Y1W7+kQRwswBL
+-5H4Oo6NaSUc8dl7HWEeWoS8BE7G4JFCXBQwwgInOJINyQlknxMSpv7dwxp32SgdL
+-QldkaQkHAEg0QqYb2Hv/xHfVhn9vTpGJQyWvnT5RvbXSGdTk1CTlZTrUAGmbHOwX
+-ygQeAhwmRauZi+nQ3kQ+GSKD7JCwv8XkD9NObMGlW018
++MIICZAIBADCCAjkGByqGSM44BAEwggIsAoIBAQCQfLlNdehPnTrGIMhw4rk0uua6
++k1nCG3zcyfXli17BdB2k0HBPaTA3a3ZHfOt1Awy0Uu0wZ3gdPr9z0I64hnJXIGou
++zIanZ7nYRImHtX5JMFbXeyxo1Owd2Zs3oEk9nQUoUsMxvmYC/ghPL5Zx1pPxcHCO
++wzWxoG4yZMjimXOc1/W7zvK/4/g/Cz9fItD3zdcydfgM/hK0/CeYQ21xfhqf4mjK
++v9plnCcWgToGI+7H8VK80MFbkO2QKRz3vP1/TjK6PRm9sEeB5b10+SvGv2j2w+CC
++0fXL4s6n7PtBlm/bww8xL1/Az8kwejUcII1Dc8uNwwISwGbwaGBvl7IHpm21AiEA
++rodZi+nCKZdTL8IgCjX3n0DuhPRkVQPjz/B6VweLW9MCggEAfimkUNwnsGFp7mKM
++zJKhHoQkMB1qJzyIHjDzQ/J1xjfoF6i27afw1/WKboND5eseZhlhA2TO5ZJB6nGx
++DOE9lVQxYVml++cQj6foHh1TVJAgGl4mWuveW/Rz+NEhpK4zVeEsfMrbkBypPByy
++xzF1Z49t568xdIo+e8jLI8FjEdXOIUg4ehB3NY6SL8r4oJ49j/sJWfHcDoWH/LK9
++ZaBF8NpflJe3F40S8RDvM8j2HC+y2Q4QyKk1DXGiH+7yQLGWzr3M73kC3UBnnH0h
++Hxb7ISDCT7dCw/lH1nCbVFBOM0ASI26SSsFSXQrvD2kryRcTZ0KkyyhhoPODWpU+
++TQMsxQQiAiAdCUJ5n2Q9hIynN8BMpnRcdfH696BKejGx+2Mr2kfnnA==
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-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
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smdsa3.pem.0061 openssl-3.0.5/test/smime-certs/smdsa3.pem
+--- openssl-3.0.5/test/smime-certs/smdsa3.pem.0061	2022-09-02 14:17:15.334436689 +0200
++++ openssl-3.0.5/test/smime-certs/smdsa3.pem	2022-09-02 14:17:15.348436813 +0200
+@@ -1,47 +1,47 @@
+ -----BEGIN PRIVATE KEY-----
+-MIICXgIBADCCAjYGByqGSM44BAEwggIpAoIBAQCg5xGADjdINCKODDX6yq3w8vQ1
+-i0SuHnFvPc5gHMLIxJhDp3cLJ5eJmcHZ07WflsMgSxD2Wd5lX5Q9uxtv78/erv5t
+-4INbA4D+QSkxb4SWNurRBQj5LuoGhFMpCubDYSxiKkTJ4pmOEbsjnlGLiN5R1jAa
+-kOxI+l/rPAQlIUMCHSF6xXgd62fUdEAnRYj46Lgw+FWKAKNhcH7rOLA7k4JnYCLg
+-c9HnYvwxlpoV+SHi+QXSrcrtMBNCmIgIONI5uNuBnZq6jjHE/Wg1+D4wGxOZl+/S
+-8EP8eXSDD+1Sni2Jk38etU+laS0pVV9lh6sV3zV28YXVZl01CHUfwH+3w/XJAh0A
+-mkjrU1XrCahV9d78Rklpd4fK3K53+X5MeTgNLQKCAQEAoA32HKvIhx6wvmT9huaw
+-V6wj7hT99kjzQjZqbvLENW9bbAgOdPzZzusqZmZMgGdDr94oYz1/MhmAKNY4lQv7
+-ioJmtded5hhS6GDg3Oj4IYiJ9trAQ/ATrDrSi3sQAZ3Pvip7j4oljvsQBmAj3KKR
+-CnZ2/FeRyjSS3cUey89GE2N2DQbHEmuG/F8aDmUhLNusZm6nXs2Y1W7+kQRwswBL
+-5H4Oo6NaSUc8dl7HWEeWoS8BE7G4JFCXBQwwgInOJINyQlknxMSpv7dwxp32SgdL
+-QldkaQkHAEg0QqYb2Hv/xHfVhn9vTpGJQyWvnT5RvbXSGdTk1CTlZTrUAGmbHOwX
+-ygQfAh0AkfI6533W5nBIVrDPcp2DCXC8u2SIwBob6OoK5A==
++MIICZQIBADCCAjkGByqGSM44BAEwggIsAoIBAQCQfLlNdehPnTrGIMhw4rk0uua6
++k1nCG3zcyfXli17BdB2k0HBPaTA3a3ZHfOt1Awy0Uu0wZ3gdPr9z0I64hnJXIGou
++zIanZ7nYRImHtX5JMFbXeyxo1Owd2Zs3oEk9nQUoUsMxvmYC/ghPL5Zx1pPxcHCO
++wzWxoG4yZMjimXOc1/W7zvK/4/g/Cz9fItD3zdcydfgM/hK0/CeYQ21xfhqf4mjK
++v9plnCcWgToGI+7H8VK80MFbkO2QKRz3vP1/TjK6PRm9sEeB5b10+SvGv2j2w+CC
++0fXL4s6n7PtBlm/bww8xL1/Az8kwejUcII1Dc8uNwwISwGbwaGBvl7IHpm21AiEA
++rodZi+nCKZdTL8IgCjX3n0DuhPRkVQPjz/B6VweLW9MCggEAfimkUNwnsGFp7mKM
++zJKhHoQkMB1qJzyIHjDzQ/J1xjfoF6i27afw1/WKboND5eseZhlhA2TO5ZJB6nGx
++DOE9lVQxYVml++cQj6foHh1TVJAgGl4mWuveW/Rz+NEhpK4zVeEsfMrbkBypPByy
++xzF1Z49t568xdIo+e8jLI8FjEdXOIUg4ehB3NY6SL8r4oJ49j/sJWfHcDoWH/LK9
++ZaBF8NpflJe3F40S8RDvM8j2HC+y2Q4QyKk1DXGiH+7yQLGWzr3M73kC3UBnnH0h
++Hxb7ISDCT7dCw/lH1nCbVFBOM0ASI26SSsFSXQrvD2kryRcTZ0KkyyhhoPODWpU+
++TQMsxQQjAiEArJr6p2zTbhRppQurHGTdmdYHqrDdZH4MCsD9tQCw1xY=
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIIFmjCCBIKgAwIBAgIUO2QHMd9V/S6KlrFDIPd7asRP4FAwDQYJKoZIhvcNAQEL
++MIIFmzCCBIOgAwIBAgIUMMzeluWS9FTgzFM2PCI6rSt0++QwDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxNFoYDzIxMjIw
+-NTA5MTUzMzE0WjBFMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEeMBwGA1UEAwwVVGVzdCBTL01JTUUgRUUgRFNBICMzMIIDQzCCAjYGByqGSM44
+-BAEwggIpAoIBAQCg5xGADjdINCKODDX6yq3w8vQ1i0SuHnFvPc5gHMLIxJhDp3cL
+-J5eJmcHZ07WflsMgSxD2Wd5lX5Q9uxtv78/erv5t4INbA4D+QSkxb4SWNurRBQj5
+-LuoGhFMpCubDYSxiKkTJ4pmOEbsjnlGLiN5R1jAakOxI+l/rPAQlIUMCHSF6xXgd
+-62fUdEAnRYj46Lgw+FWKAKNhcH7rOLA7k4JnYCLgc9HnYvwxlpoV+SHi+QXSrcrt
+-MBNCmIgIONI5uNuBnZq6jjHE/Wg1+D4wGxOZl+/S8EP8eXSDD+1Sni2Jk38etU+l
+-aS0pVV9lh6sV3zV28YXVZl01CHUfwH+3w/XJAh0AmkjrU1XrCahV9d78Rklpd4fK
+-3K53+X5MeTgNLQKCAQEAoA32HKvIhx6wvmT9huawV6wj7hT99kjzQjZqbvLENW9b
+-bAgOdPzZzusqZmZMgGdDr94oYz1/MhmAKNY4lQv7ioJmtded5hhS6GDg3Oj4IYiJ
+-9trAQ/ATrDrSi3sQAZ3Pvip7j4oljvsQBmAj3KKRCnZ2/FeRyjSS3cUey89GE2N2
+-DQbHEmuG/F8aDmUhLNusZm6nXs2Y1W7+kQRwswBL5H4Oo6NaSUc8dl7HWEeWoS8B
+-E7G4JFCXBQwwgInOJINyQlknxMSpv7dwxp32SgdLQldkaQkHAEg0QqYb2Hv/xHfV
+-hn9vTpGJQyWvnT5RvbXSGdTk1CTlZTrUAGmbHOwXygOCAQUAAoIBAEj25Os9f57G
+-TaxsP8NzdCRBThCLqZWqLADh6S/aFOQQFpRRk3vGkvrOK/5La8KGKIDyzCEQo7Kg
+-sPwI1o4N5GKx15Cer2ekDWLtP4hA2CChs4tWJzEa8VxIDTg4EUnASFCbfDUY/Yt0
+-5NM4nxtBhnr6PT7XmRehEFaTAgmsQFJ29jKx4tJkr+Gmj9J4i10CPd9DvIgIEnNt
+-rYMAlfbGovaZVCgKp5INVA4IkDfCcbzDeNiOGaACeV+4QuEbgIbUhMq9vbw3Vvqe
+-jwozPdrTYjd7oNxx/tY7gqxFRFxdDPXPno230afsAJsHmNF7lpj9Q4vBhy8w/EI1
+-jGzuiXjei9qjYDBeMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgXgMB0GA1Ud
+-DgQWBBTwbCT+wSR9cvTg70jA2yIWgQSDZjAfBgNVHSMEGDAWgBQVwRMha+JVX6dq
+-HVcg1s/zqXNkWTANBgkqhkiG9w0BAQsFAAOCAQEAe5t9oi8K76y+wnV6I21vKgEh
+-M6DEe3+XTq10kAgYbcbMm+a6n86beaID7FANGET+3bsShxFeAX9g4Qsdw+Z3PF3P
+-wvqiBD8MaXczj28zP6j9TxsjGzpAsV3xo1n7aQ+hHzpopJUxAyx4hLBqSSwdj/xe
+-azELeVKoXY/nlokXnONWC5AvtfR7m7mKFPOmUghbeGCJH7+FXnC58eiF7BEpSbQl
+-SniAdQFis+Dne6/kwZnQQaSDg55ELfaZOLhaLcRtqqgU+kv24mXGGEBhs9bBKMz5
+-ZNiKLafE3tCGRA5iMRwzdeSgrdnkQDHFiYXh3JHk5oKwGOdxusgt3DTHAFej1A==
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MjI0MloXDTMyMDMz
++MTE0MjI0MlowRTELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HjAcBgNVBAMMFVRlc3QgUy9NSU1FIEVFIERTQSAjMzCCA0YwggI5BgcqhkjOOAQB
++MIICLAKCAQEAkHy5TXXoT506xiDIcOK5NLrmupNZwht83Mn15YtewXQdpNBwT2kw
++N2t2R3zrdQMMtFLtMGd4HT6/c9COuIZyVyBqLsyGp2e52ESJh7V+STBW13ssaNTs
++HdmbN6BJPZ0FKFLDMb5mAv4ITy+WcdaT8XBwjsM1saBuMmTI4plznNf1u87yv+P4
++Pws/XyLQ983XMnX4DP4StPwnmENtcX4an+Joyr/aZZwnFoE6BiPux/FSvNDBW5Dt
++kCkc97z9f04yuj0ZvbBHgeW9dPkrxr9o9sPggtH1y+LOp+z7QZZv28MPMS9fwM/J
++MHo1HCCNQ3PLjcMCEsBm8Ghgb5eyB6ZttQIhAK6HWYvpwimXUy/CIAo1959A7oT0
++ZFUD48/welcHi1vTAoIBAH4ppFDcJ7Bhae5ijMySoR6EJDAdaic8iB4w80PydcY3
++6Beotu2n8Nf1im6DQ+XrHmYZYQNkzuWSQepxsQzhPZVUMWFZpfvnEI+n6B4dU1SQ
++IBpeJlrr3lv0c/jRIaSuM1XhLHzK25AcqTwcsscxdWePbeevMXSKPnvIyyPBYxHV
++ziFIOHoQdzWOki/K+KCePY/7CVnx3A6Fh/yyvWWgRfDaX5SXtxeNEvEQ7zPI9hwv
++stkOEMipNQ1xoh/u8kCxls69zO95At1AZ5x9IR8W+yEgwk+3QsP5R9Zwm1RQTjNA
++EiNukkrBUl0K7w9pK8kXE2dCpMsoYaDzg1qVPk0DLMUDggEFAAKCAQBxe+1+Il8h
++nTCAak3vZl4asn2axRc7GjDvDd8Ns/yvyd9WQE1t+FryvHR5jp9REVVnMg53wQcY
++rKlwfWBLp5k25x/OCwfWDmvlxFqExmaAZcEQGxauHYhoMbtVIq372CHPbsQqCMBA
++LPIdAvkUImBHanty/RXhJGqCIAZiUnX3WTZa0s6xV3yRf/+OPWXxNSATtOqm5ISl
++pLJDifMlE6llZmk3VHAWYJRFF7KQAFT83OKf/6tme9munxahdJcSrF4HiZKFFJof
++nvEWckKlHAonipLa6EBPMloofu+7reTcON+1tIFWH7fZhfC0dz4EaOzxLZoO0Jbc
++W0MDtnonwEjFo2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIF4DAdBgNV
++HQ4EFgQUwnFq0MQUIQUaXi6iJBDXTnQm71EwHwYDVR0jBBgwFoAUyZFTCmN7FluL
++vUTwdoipJObltmwwDQYJKoZIhvcNAQELBQADggEBAJNW/oEmpz6jZ7EjUkHhxDXR
++egsZVjBO+E2hPCciEoZaM6jIDYphrCVbdOOyy1RvLBv3SRblaECmInsRpCNwf5B5
++OaGN3hdsvx23IKnLJ7EKDauIOGhkzCMWjO8tez48UL0Wgta0+TpuiOT+UBoKb9fw
++f0f4ab9wD9pED7ghMKlwI6/oppS4PrhwYS2nwYwGXpmgu6QZDln/cgoU7cQV7r3J
++deMCpKGPyS429B9mUxlggZYvvJOm35ZiI7UAcGhJWIUrdXBxqx3DQ3CSf75vGP87
++2vn6ZoXRXSLfE48GpUtQzP6/gZti68vZrHdzKWTyZxMs4+PGoHrW5hbNDsghKDs=
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smec1.pem.0061 openssl-3.0.5/test/smime-certs/smec1.pem
+--- openssl-3.0.5/test/smime-certs/smec1.pem.0061	2022-09-02 14:17:15.325436610 +0200
++++ openssl-3.0.5/test/smime-certs/smec1.pem	2022-09-02 14:17:15.345436786 +0200
+@@ -1,22 +1,22 @@
+ -----BEGIN PRIVATE KEY-----
+-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdOomk0EB/oWMnTZB
+-Qm5XMjlKnZNF4PMpwgov0Tj3u8OhRANCAATbG6XprSqHiD9AxWJiXRFgS+y38DGZ
+-7hpSjs4bd95L+Lli+O91/lUy7Tb8aJ6VU2CoyWQjV4sQjbdVqeD+y4Ky
++MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXzBRX9Z5Ib4LAVAS
++DMlYvkj0SmLmYvWULe2LfyXRmpWhRANCAAS+SIj2FY2DouPRuNDp9WVpsqef58tV
++3gIwV0EOV/xyYTzZhufZi/aBcXugWR1x758x4nHus2uEuEFi3Mr3K3+x
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIICrTCCAZWgAwIBAgIUdLT4B443vbxt0B8Mzy0sR4+6AyowDQYJKoZIhvcNAQEL
++MIICqzCCAZOgAwIBAgIUZsuXIOmILju0nz1jVSgag5GrPyMwDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxNFoYDzIxMjIw
+-NTA5MTUzMzE0WjBEMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEdMBsGA1UEAwwUVGVzdCBTL01JTUUgRUUgRUMgIzEwWTATBgcqhkjOPQIBBggq
+-hkjOPQMBBwNCAATbG6XprSqHiD9AxWJiXRFgS+y38DGZ7hpSjs4bd95L+Lli+O91
+-/lUy7Tb8aJ6VU2CoyWQjV4sQjbdVqeD+y4Kyo2AwXjAMBgNVHRMBAf8EAjAAMA4G
+-A1UdDwEB/wQEAwIF4DAdBgNVHQ4EFgQUOia9H7l0qw3ftsDgEEeSBrHwQrwwHwYD
+-VR0jBBgwFoAUFcETIWviVV+nah1XINbP86lzZFkwDQYJKoZIhvcNAQELBQADggEB
+-AC7h/QkMocYANPqMQAO2okygG+OaE4qpKnlzHPUFMYedJGCvAWrwxu4hWL9T+hZo
+-qilM7Fwaxw/P4Zaaa15SOOhXkIdn9Fu2ROmBQtEiklmWGMjiZ6F+9NCZPk0cTAXK
+-2WQZOy41YNuvts+20osD4X/8x3fiARlokufj/TVyE73wG8pSSDh4KxWDfKv5Pi1F
+-PC5IJh8XVELnFkeY3xjtoux5AYT+1xIQHO4eBua02Y1oPiWG7l/sK3grVlxrupd9
+-pXowwFlezWZP9q12VlWkcqwNb9hF9PkZge9bpiOJipSYgyobtAnms/CRHu3e6izl
+-LJRua7p4Wt/8GQENDrVkHqU=
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MjUyNFoXDTMyMDMz
++MTE0MjUyNFowRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HTAbBgNVBAMMFFRlc3QgUy9NSU1FIEVFIEVDICMxMFkwEwYHKoZIzj0CAQYIKoZI
++zj0DAQcDQgAEvkiI9hWNg6Lj0bjQ6fVlabKnn+fLVd4CMFdBDlf8cmE82Ybn2Yv2
++gXF7oFkdce+fMeJx7rNrhLhBYtzK9yt/saNgMF4wDAYDVR0TAQH/BAIwADAOBgNV
++HQ8BAf8EBAMCBeAwHQYDVR0OBBYEFH/JvELYMj4nJ2HHUUyA9sxOYvNHMB8GA1Ud
++IwQYMBaAFMmRUwpjexZbi71E8HaIqSTm5bZsMA0GCSqGSIb3DQEBCwUAA4IBAQCp
++sSEupiqT7S6oPS/5qtRF6POyxmhkH/Eh+RJitOODutxneJh+NdDqAQAOCexqcsF9
++1BH9hB/H6b3mS4CbcRG6R/EwzqMPUgy8OYXTrqWI9jzMKGyrBo59QFfGrwP1h8hj
++weVOVQU1iOloWPOfvMHehjX1Wt79/6BMMBvw+2qXXLAw2xpLFa4lU6HSoTiwoS5R
++mimrHnZ9tQZb54bsvdrW84kV3u1FIQ5G7jAduu97Wfr3eZGaJhW1MZLeoL7Z4Usy
++hRd2TJ6bZanb+wUJBcHOeW5ETj9MPtPsGIp8vETmY5XDm4UlX6tp4gAe4oeoIXFQ
++V5ASvNRiGWIJK5XF+zRY
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smec2.pem.0061 openssl-3.0.5/test/smime-certs/smec2.pem
+--- openssl-3.0.5/test/smime-certs/smec2.pem.0061	2022-09-02 14:17:15.330436654 +0200
++++ openssl-3.0.5/test/smime-certs/smec2.pem	2022-09-02 14:17:15.347436804 +0200
+@@ -1,23 +1,23 @@
+ -----BEGIN PRIVATE KEY-----
+-MIGQAgEAMBAGByqGSM49AgEGBSuBBAAQBHkwdwIBAQQkAEkuzLBwx5bIw3Q2PMNQ
+-HzaY8yL3QLjzaJ8tCHrI/JTb9Q7VoUwDSgAEAu8b2HvLzKd0qhPtIw65Lh3OgF3X
+-IN5874qHwt9zPSvokijSAH3v9tcBJPdRLD3Lweh2ZPn5hMwVwVorHqSgASk5vnjp
+-HqER
++MIGPAgEAMBAGByqGSM49AgEGBSuBBAAQBHgwdgIBAQQjhHaq507MOBznelrLG/pl
++brnnJi/iEJUUp+Pm3PEiteXqckmhTANKAAQF2zs6vobmoT+M+P2+9LZ7asvFBNi7
++uCzLYF/8j1Scn/spczoC9vNzVhNw+Lg7dnjNL4EDIyYZLl7E0v69luzbvy+q44/8
++6bQ=
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIICsjCCAZqgAwIBAgIUFMjrNKt+D8tzvn7jtjZ5HrLcUlswDQYJKoZIhvcNAQEL
++MIICsDCCAZigAwIBAgIUWJSICrM9ZdmN6/jF/PoKng63XR0wDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxNFoYDzIxMjIw
+-NTA5MTUzMzE0WjBEMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEdMBsGA1UEAwwUVGVzdCBTL01JTUUgRUUgRUMgIzIwXjAQBgcqhkjOPQIBBgUr
+-gQQAEANKAAQC7xvYe8vMp3SqE+0jDrkuHc6AXdcg3nzviofC33M9K+iSKNIAfe/2
+-1wEk91EsPcvB6HZk+fmEzBXBWisepKABKTm+eOkeoRGjYDBeMAwGA1UdEwEB/wQC
+-MAAwDgYDVR0PAQH/BAQDAgXgMB0GA1UdDgQWBBSqWRYUy2syIUwfSR31e19LeNXK
+-9TAfBgNVHSMEGDAWgBQVwRMha+JVX6dqHVcg1s/zqXNkWTANBgkqhkiG9w0BAQsF
+-AAOCAQEASbh+sI03xUMMzPT8bRbWNF5gG3ab8IUzqm05rTa54NCPRSn+ZdMXcCFz
+-5fSU0T1dgEjeD+cCRVAZxskTZF7FWmRLc2weJMf7x+nPE5KaWyRAoD7FIKGP2m6m
+-IMCVOmiafuzmHASBYOz6RwjgWS0AWES48DJX6o0KpuT4bsknz+H7Xo+4+NYGCRao
+-enqIMZmWesGVXJ63pl32jUlXeAg59W6PpV2L9XRWLzDW1t1q2Uji7coCWtNjkojZ
+-rv0yRMc1czkT+mAJRAJ8D9MoTnRXm1dH4bOxte4BGUHNQ2P1HeV01vkd1RTL0g0R
+-lPyDAlBASvMn7RZ9nX8G3UOOL6gtVA==
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MjgxOVoXDTMyMDMz
++MTE0MjgxOVowRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HTAbBgNVBAMMFFRlc3QgUy9NSU1FIEVFIEVDICMyMF4wEAYHKoZIzj0CAQYFK4EE
++ABADSgAEBds7Or6G5qE/jPj9vvS2e2rLxQTYu7gsy2Bf/I9UnJ/7KXM6Avbzc1YT
++cPi4O3Z4zS+BAyMmGS5exNL+vZbs278vquOP/Om0o2AwXjAMBgNVHRMBAf8EAjAA
++MA4GA1UdDwEB/wQEAwIF4DAdBgNVHQ4EFgQUZ/5BJCWQ3bQ+w03vH6OZAgkENxcw
++HwYDVR0jBBgwFoAUyZFTCmN7FluLvUTwdoipJObltmwwDQYJKoZIhvcNAQELBQAD
++ggEBACMGL6tuV/1lfrnx7TN/CnWdLEp55AlmzJ3MT9dXSOO1/df/fO3uAiiBNMyQ
++Rcf4vOeBZEk/Xq6GIaAbuuT5ECg50uopEGjUDR9sRWC5yiw2CRQ5ZWTcqMapv+E5
++7/1/tpaVHy+ZkJpbTV6O9gogEPy6uoft+tsel6NFoAj9ulkjuX9TortkVGPTfedd
++oevI32G3z4L4Gv1PCZvFMwEIiAuFDZBbD86gw7rH4BNihRujJRhpnxeRu8zJYB60
++cNeR2N7humdUy5uZnj6YHy3g2j0EDKOITHydIvL1KkSlihQrxEX5kMRr9RWRyFXJ
++/UfNk+5Y3g5Mm642MLvjBEUqurw=
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smroot.pem.0061 openssl-3.0.5/test/smime-certs/smroot.pem
+--- openssl-3.0.5/test/smime-certs/smroot.pem.0061	2022-09-02 14:17:15.329436645 +0200
++++ openssl-3.0.5/test/smime-certs/smroot.pem	2022-09-02 14:17:15.346436795 +0200
+@@ -1,49 +1,49 @@
+ -----BEGIN PRIVATE KEY-----
+-MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDZLSl8LdU54OUA
+-T8ctFuKLShJul2IMzaEDkFLoL4agccajgvsRxW+8vbc2Re0y1mVMvfNz7Cg5a7Ke
+-iSuFJOrQtvDt+HkU5c706YDmw15mBpDSHapkXr80G/ABFbstWafOfagVW45wv65K
+-H4cnpcqwrLhagmC8QG0KfWbf+Z2efOxaGu/dTNA3Cnq/BQGTdlkQ28xbrvd+Ubzg
+-cY4Y/hJ7Fw1/IeEhgr/iVJhQIUAklp9B+xqDfWuxIt5mNwWWh/Lfk+UxqE99EhQR
+-0YZWyIKfKzbeJLBzDqY2hQzVL6kAvY9cR1WbBItTA0G2F5qZ9B/3EHEFWZMBvobt
+-+UTEkuBdAgMBAAECggEAF3Eagz7nPyIZVdlGpIVN2r8aEjng6YTglmPjrxBCNdtS
+-F6AxvY9UKklIF2Gg4tXlhU0TlDWvedM4Koif2/VKK1Ez3FvvpePQXPs/YKlB7T1U
+-MHnnRII9nUBOva88zv5YcJ97nyKM03q9M18H1a29nShnlc1w56EEpBc5HX/yFYMv
+-kMYydvB5j0DQkJlkQNFn4yRag0wIIPeyXwwh5l98SMlr40hO10OYTOQPrrgP/ham
+-AOZ//DvGo5gF8hGJYoqG4vcYbxRfTqbc2lQ4XRknOT182l9gRum52ahkBY6LKb4r
+-IZXPStS6fCAR5S0lcdBb3uN/ap9SUfb9w/Dhj5DZAQKBgQDr06DcsBpoGV2dK9ib
+-YL5MxC5JL7G79IBPi3ThRiOSttKXv3oDAFB0AlJvFKwYmVz8SxXqQ2JUA4BfvMGF
+-TNrbhukzo0ou5boExnQW/RjLN3fWVq1JM7iLbNU9YYpPCIG5LXrt4ZDOwITeGe8f
+-bmZK9zxWxc6BBJtc3mTFS5tm4QKBgQDrwRyEn6oZ9TPbR69fPgWvDqQwKs+6TtYn
+-0otMG9UejbSMcyU4sI+bZouoca2CzoNi2qZVIvI9aOygUHQAP7Dyq1KhsvYtzJub
+-KEua379WnzBMMjJ56Q/e4aKTq229QvOk+ZEYl6aklZX7xnYetYNZQrp4QzUyOQTG
+-gfxgxKi0/QKBgQCy1esAUJ/F366JOS3rLqNBjehX4c5T7ae8KtJ433qskO4E29TI
+-H93jC7u9txyHDw5f2QUGgRE5Cuq4L2lGEDFMFvQUD7l69QVrB6ATqt25hhffuB1z
+-DMDfIqpXAPgk1Rui9SVq7gqlb4OS9nHLESqLoQ/l8d2XI4o6FACxSZPQoQKBgQCR
+-8AvwSUoqIXDFaB22jpVEJYMb0hSfFxhYtGvIZF5MOJowa0L6UcnD//mp/xzSoXYR
+-pppaj3R28VGxd7wnP0YRIl7XfAoKleMpbAtJRwKR458pO9WlQ9GwPeq/ENqw0xYx
+-5M+d8pqUvYiHv/X00pYJllYKBkiS21sKawLJAFQTHQKBgQCJCwVHxvxkdQ8G0sU2
+-Vtv2W38hWOSg5+cxa+g1W6My2LhX34RkgKzuaUpYMlWGHzILpxIxhPrVLk1ZIjil
+-GIP969XJ1BjB/kFtLWdxXG8tH1If3JgzfSHUofPHF3CENoJYEZ1ugEfIPzWPZJDI
+-DL5zP8gmBL9ZAOO/J9YacxWYMQ==
++MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCyyQXED5HyVWwq
++nXyzmY317yMUJrIfsKvREG2C691dJNHgNg+oq5sjt/fzkyS84AvdOiicAsao4cYL
++DulthaLpbC7msEBhvwAil0FNb5g3ERupe1KuTdUV1UuD/i6S2VoaNXUBBn1rD9Wc
++BBc0lnx/4Wt92eQTI6925pt7ZHPQw2Olp7TQDElyi5qPxCem4uT0g3zbZsWqmmsI
++MXbu+K3dEprzqA1ucKXbxUmZNkMwVs2XCmlLxrRUj8C3/zENtH17HWCznhR/IVcV
++kgIuklkeiDsEhbWvUQumVXR7oPh/CPZAbjGqq5mVueHSHrp7brBVZKHZvoUka28Q
++LWitq1W5AgMBAAECggEASkRnOMKfBeOmQy2Yl6K57eeg0sYgSDnDpd0FINWJ5x9c
++b58FcjOXBodtYKlHIY6QXx3BsM0WaSEge4d+QBi7S+u8r+eXVwNYswXSArDQsk9R
++Bl5MQkvisGciL3pvLmFLpIeASyS/BLJXMbAhU58PqK+jT2wr6idwxBuXivJ3ichu
++ISdT1s2aMmnD86ulCD2DruZ4g0mmk5ffV+Cdj+WWkyvEaJW2GRYov2qdaqwSOxV4
++Yve9qStvEIWAf2cISQjbnw2Ww6Z5ebrqlOz9etkmwIly6DTbrIneBnoqJlFFWGlF
++ghuzc5RE2w1GbcKSOt0qXH44MTf/j0r86dlu7UIxgQKBgQDq0pEaiZuXHi9OQAOp
++PsDEIznCU1bcTDJewANHag5DPEnMKLltTNyLaBRulMypI+CrDbou0nDr29VOzfXx
++mNvi/c7RttOBOx7kXKvu0JUFKe2oIWRsg0KsyMX7UFMVaHFgrW+8DhQc7HK7URiw
++nitOnA7YwIHRF9BMmcWcLFEYBQKBgQDC6LPbXV8COKO0YCfGXPnE7EZGD/p0Q92Z
++8CoSefphEScSdO1IpxFXG7fOZ4x2GQb9q7D3IvaeKAqNjUjkuyxdB30lIWDBwSWw
++fFgsa2SZwD5P60G/ar50YJr6LiF333aUMDVmC9swFfZERAEmGUz2NTrPWQdIx/lu
++PyDtUR75JQKBgHaoCCJ8vl5SJl1IA5GV4Bo8IoeLTSzsY9d09zMy6BoZcMD1Ix2T
++5S2cXhayoegl9PT6bsYSGHVWFCdJ86ktMI826TcXRzDaCvYhzc9THroJQcnfdbtP
++aHWezkv7fsAmkoPjn75K7ubeo+r7Q5qbkg6a1PW58N8TRXIvkackzaVxAoGBALAq
++qh3U+AHG9dgbrPeyo6KkuCOtX39ks8/mbfCDRZYkbb9V5f5r2tVz3R93IlK/7jyr
++yWimtmde46Lrl33922w+T5OW5qBZllo9GWkUrDn3s5qClcuQjJIdmxYTSfbSCJiK
++NkmE39lHkG5FVRB9f71tgTlWS6ox7TYDYxx83NTtAoGAUJPAkGt4yGAN4Pdebv53
++bSEpAAULBHntiqDEOu3lVColHuZIucml/gbTpQDruE4ww4wE7dOhY8Q4wEBVYbRI
++vHkSiWpJUvZCuKG8Foh5pm9hU0qb+rbQV7NhLJ02qn1AMGO3F/WKrHPPY8/b9YhQ
++KfvPCYimQwBjVrEnSntLPR0=
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-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
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smrsa1.pem.0061 openssl-3.0.5/test/smime-certs/smrsa1.pem
+--- openssl-3.0.5/test/smime-certs/smrsa1.pem.0061	2022-09-02 14:17:15.328436636 +0200
++++ openssl-3.0.5/test/smime-certs/smrsa1.pem	2022-09-02 14:17:15.346436795 +0200
+@@ -1,49 +1,49 @@
+ -----BEGIN PRIVATE KEY-----
+-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDax3T7alefZcbm
+-CcdN0kEoBLwV8H25vre43RYjuPo64TBjeKUy27ayC1TXydF1eYm3HPrFYfkS0fZ6
+-YK0xvwyxiQnesvcfnVe2fpXFPsl5RQvu1JKM7rJAuLC+YTRLez07IHhQnHQ25ZkR
+-+B4SL5mIhuOSJ9yyFJYJQ3Kdw/aX/jtnWVR8p3FyghJptWIm90ufW4xWFY0yNSW1
+-KmkZuOWF7VPh5RC1C7woB/RHhyD2gOP7tF+eDJ/QbX4iki4gPRFHuNrSV8ZpvDkI
+-qqyF5BW8tyJneDkoWW8IuEpmNIzfbOCHvI6y7roeAmRrwH4/o5WxaEIsnQ/3pNvj
+-n6+vA+nfAgMBAAECggEAFR5MHQQYCYjDXoDoI7YdgwA+AFIoGLjKYZu5yjX4tZv3
+-gJ/si7sTaMlY5cGTU1HUPirxIVeCjv4Eha31BJ3KsGJ9jj6Gm0nOuzd/O+ctKeRv
+-2/HaDvpFlk4dsCrlkjmxteuS9u5l9hygniWYutcBwjY0cRnMScZcm0VO+DVVMDj0
+-9yNrFzhlmqV+ckawjK/J91r0uvnCVIsGA6akhlc5K0gwvFb/CC1WuceEeGx/38k3
+-4OuiHtLyJfIlgyGD8C3QfJlMOBHeQ/DCo6GMqrOAad/chtcO7JklcJ+k2qylP2gu
+-e25NJCQVh+L32b9WrH3quH6fbLIg8a8MmUWl6te3FQKBgQDddu0Dp8R8fe2WnAE5
+-oXdASAf2BpthRNqUdYpkkO7gOV0MXCKIEiGZ+WuWEYmNlsXZCJRABprqLw9O/5Td
+-2q+rCbdG9mSW2x82t/Ia4zd3r0RSHZyKbtOLtgmWfQkwVHy+rED8Juie5bNzHbjS
+-1mYtFP2KDQ5yZA95yFg8ZtXOawKBgQD85VOPnfXGOJ783JHepAn4J2x1Edi+ZDQ+
+-Ml9g2LwetI46dQ0bF6V8RtcyWp0+6+ydX5U4JKhERFDivolD7Z1KFmlNLPs0cqSX
+-5g5kzTD+R+zpr9FRragYKyLdHsLP0ur75Rh5FQkUl2DmeKCMvMKAkio0cduVpVXT
+-SvWUBtkHXQKBgBy4VoZZ1GZcolocwx/pK6DfdoDWXIIhvsLv91GRZhkX91QqAqRo
+-zYi9StF8Vr1Q5zl9HlSrRp3GGpMhG/olaRCiQu1l+KeDpSmgczo/aysPRKntgyaE
+-ttRweA/XCUEGQ+MqTYcluJcarMnp+dUFztxb04F6rfvxs/wUGjVDFMkfAoGBAK+F
+-wx9UtPZk6gP6Wsu58qlnQ2Flh5dtGM1qTMR86OQu0OBFyVjaaqL8z/NE7Qp02H7J
+-jlmvJ5JqD/Gv6Llau+Zl86P66kcWoqJCrA7OU4jJBueSfadA7gAIQGRUK0Xuz+UQ
+-tpGjRfAiuMB9TIEhqaVuzRglRhBw9kZ2KkgZEJyJAoGBANrEpEwOhCv8Vt1Yiw6o
+-co96wYj+0LARJXw6rIfEuLkthBRRoHqQMKqwIGMrwjHlHXPnQmajONzIJd+u+OS4
+-psCGetAIGegd3xNVpK2uZv9QBWBpQbuofOh/c2Ctmm2phL2sVwCZ0qwIeXuBwJEc
+-NOlOojKDO+dELErpShJgFIaU
++MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDXr9uzB/20QXKC
++xhkfNnJvl2xl1hzdOcrQmAqo+AAAcA/D49ImuJDVQRaK2bcj54XB26i1kXuOrxID
++3/etUb8yudfx8OAVwh8G0xVA4zhr8uXW85W2tBr4v0Lt+W6lSd6Hmfrk4GmE9LTU
++/vzl9HUPW6SZShN1G0nY6oeUXvLi0vasEUKv3a51T6JFYg4c7qt5RCk/w8kwrQ0D
++orQwCdkOPEIiC4b+nPStF12SVm5bx8rbYzioxuY/PdSebvt0APeqgRxSpCxqYnHs
++CoNeHzSrGXcP0COzFeUOz2tdrhmH09JLbGZs4nbojPxMkjpJSv3/ekDG2CHYxXSH
++XxpJstxZAgMBAAECggEASY4xsJaTEPwY3zxLqPdag2/yibBBW7ivz/9p80HQTlXp
++KnbxXj8nNXLjCytAZ8A3P2t316PrrTdLP4ML5lGwkM4MNPhek00GY79syhozTa0i
++cPHVJt+5Kwee/aVI9JmCiGAczh0yHyOM3+6ttIZvvXMVaSl4BUHvJ0ikQBc5YdzL
++s6VM2gCOR6K6n+39QHDI/T7WwO9FFSNnpWFOCHwAWtyBMlleVj+xeZX8OZ/aT+35
++27yjsGNBftWKku29VDineiQC+o+fZGJs6w4JZHoBSP8TfxP8fRCFVNA281G78Xak
++cEnKXwZ54bpoSa3ThKl+56J6NHkkfRGb8Rgt/ipJYQKBgQD5DKb82mLw85iReqsT
++8bkp408nPOBGz7KYnQsZqAVNGfehM02+dcN5z+w0jOj6GMPLPg5whlEo/O+rt9ze
++j6c2+8/+B4Bt5oqCKoOCIndH68jl65+oUxFkcHYxa3zYKGC9Uvb+x2BtBmYgvDRG
++ew6I2Q3Zyd2ThZhJygUZpsjsbQKBgQDdtNiGTkgWOm+WuqBI1LT5cQfoPfgI7/da
++ZA+37NBUQRe0cM7ddEcNqx7E3uUa1JJOoOYv65VyGI33Ul+evI8h5WE5bupcCEFk
++LolzbMc4YQUlsySY9eUXM8jQtfVtaWhuQaABt97l+9oADkrhA+YNdEu2yiz3T6W+
++msI5AnvkHQKBgDEjuPMdF/aY6dqSjJzjzfgg3KZOUaZHJuML4XvPdjRPUlfhKo7Q
++55/qUZ3Qy8tFBaTderXjGrJurc+A+LiFOaYUq2ZhDosguOWUA9yydjyfnkUXZ6or
++sbvSoM+BeOGhnezdKNT+e90nLRF6cQoTD7war6vwM6L+8hxlGvqDuRNFAoGAD4K8
++d0D4yB1Uez4ZQp8m/iCLRhM3zCBFtNw1QU/fD1Xye5w8zL96zRkAsRNLAgKHLdsR
++355iuTXAkOIBcJCOjveGQsdgvAmT0Zdz5FBi663V91o+IDlryqDD1t40CnCKbtRG
++hng/ruVczg4x7OYh7SUKuwIP/UlkNh6LogNreX0CgYBQF9troLex6X94VTi1V5hu
++iCwzDT6AJj63cS3VRO2ait3ZiLdpKdSNNW2WrlZs8FZr/mVutGEcWho8BugGMWST
++1iZkYwly9Xfjnpd0I00ZIlr2/B3+ZsK8w5cOW5Lpb7frol6+BkDnBjbNZI5kQndn
++zQpuMJliRlrq/5JkIbH6SA==
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIIDeTCCAmGgAwIBAgIUM6U1Peo3wzfAJIrzINejJJfmRzkwDQYJKoZIhvcNAQEL
++MIIDdzCCAl+gAwIBAgIUNrEw2I4NEV0Nbo7AVOF9z4mPBiYwDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxM1oYDzIxMjIw
+-NTA5MTUzMzEzWjBFMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEeMBwGA1UEAwwVVGVzdCBTL01JTUUgRUUgUlNBICMxMIIBIjANBgkqhkiG9w0B
+-AQEFAAOCAQ8AMIIBCgKCAQEA2sd0+2pXn2XG5gnHTdJBKAS8FfB9ub63uN0WI7j6
+-OuEwY3ilMtu2sgtU18nRdXmJtxz6xWH5EtH2emCtMb8MsYkJ3rL3H51Xtn6VxT7J
+-eUUL7tSSjO6yQLiwvmE0S3s9OyB4UJx0NuWZEfgeEi+ZiIbjkifcshSWCUNyncP2
+-l/47Z1lUfKdxcoISabViJvdLn1uMVhWNMjUltSppGbjlhe1T4eUQtQu8KAf0R4cg
+-9oDj+7Rfngyf0G1+IpIuID0RR7ja0lfGabw5CKqsheQVvLciZ3g5KFlvCLhKZjSM
+-32zgh7yOsu66HgJka8B+P6OVsWhCLJ0P96Tb45+vrwPp3wIDAQABo2AwXjAMBgNV
+-HRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIF4DAdBgNVHQ4EFgQUHw4Us7FXwgLtZ1JB
+-MOAHSkNYfEkwHwYDVR0jBBgwFoAUFcETIWviVV+nah1XINbP86lzZFkwDQYJKoZI
+-hvcNAQELBQADggEBAAMAXEjTNo7evn6BvfEaG2q21q9xfFear/M0zxc5xcTj+WP+
+-BKrlxXg5RlVFyvmzGhwZBERsDMJYa54aw8scDJsy/0zPdWST39dNev7xH13pP8nF
+-QF4MGPKIqBzX8iDCqhz70p1w2ndLjz1dvsAqn6z9/Sh3T2kj6DfZY3jA49pMEim1
+-vYd4lWa5AezU3+cLtBbo2c2iyG2W7SFpnNTjLX823f9rbVPnUb93ZI/tDXDIf5hL
+-0hocZs+MWdC7Ly1Ru4PXa6+DeOM0z673me/Q27e24OBbG2eq5g7eW5euxJinGkpI
+-XGGKTKrBCPxSdTtwSNHU9HsggT8a0wXL2QocZ3w=
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MDczN1oXDTMyMDMz
++MTE0MDczN1owRTELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HjAcBgNVBAMMFVRlc3QgUy9NSU1FIEVFIFJTQSAjMTCCASIwDQYJKoZIhvcNAQEB
++BQADggEPADCCAQoCggEBANev27MH/bRBcoLGGR82cm+XbGXWHN05ytCYCqj4AABw
++D8Pj0ia4kNVBForZtyPnhcHbqLWRe46vEgPf961RvzK51/Hw4BXCHwbTFUDjOGvy
++5dbzlba0Gvi/Qu35bqVJ3oeZ+uTgaYT0tNT+/OX0dQ9bpJlKE3UbSdjqh5Re8uLS
++9qwRQq/drnVPokViDhzuq3lEKT/DyTCtDQOitDAJ2Q48QiILhv6c9K0XXZJWblvH
++yttjOKjG5j891J5u+3QA96qBHFKkLGpicewKg14fNKsZdw/QI7MV5Q7Pa12uGYfT
++0ktsZmziduiM/EySOklK/f96QMbYIdjFdIdfGkmy3FkCAwEAAaNgMF4wDAYDVR0T
++AQH/BAIwADAOBgNVHQ8BAf8EBAMCBeAwHQYDVR0OBBYEFOaNz6WtNC5jH9UE4EaM
++y+59qO+EMB8GA1UdIwQYMBaAFMmRUwpjexZbi71E8HaIqSTm5bZsMA0GCSqGSIb3
++DQEBCwUAA4IBAQBMz3Ef3U0blTGhfP9HIBq09fWCgUN3aDDLZ/B6biFfWM87wlAm
++CdIuy2jhiEt8Ld8U9y8dbO7c2gzHBGc9FhScBkfQInrbhSctXL/r/wOc0divK9rq
++oXL2cL/CFfzcYPWNN3w6JAJyOhkhWnqF+/0T8+NdiRLE3a9NfX3a83GpfBVccYKQ
++kKKeVIw2K1dYbtlSo1HwOckxqUzN00IPs3xC8U9KNXKy7o0kdetKhk70DzXQ64j0
++EcmXxqPaCkgo3fl9z9nzKlWhg/qIi/1Bd1bpMP8IXAPEURDqhi0KI0w9GPCQRjfY
++7NwXrLEayBoL8TNxcJ3FwdI20+bmhhILBZgO
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smrsa2.pem.0061 openssl-3.0.5/test/smime-certs/smrsa2.pem
+--- openssl-3.0.5/test/smime-certs/smrsa2.pem.0061	2022-09-02 14:17:15.333436680 +0200
++++ openssl-3.0.5/test/smime-certs/smrsa2.pem	2022-09-02 14:17:15.347436804 +0200
+@@ -1,49 +1,49 @@
+ -----BEGIN PRIVATE KEY-----
+-MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDkoMi4sqj2mN8j
+-SaFAibXEfeYYrzBHIdCm/uaXWit81fXOSFVw1rbeAppxz7bOcSEN50lpdP2UX3/b
+-FYFD3exHXjvch9NPNgQaNkCqTNTuYa2L9wrpltXnon7tH3W/zZfF+/qpUSu1f6rk
+-GyxjVXxLwjIawCX0rbLcdFCVVy+EyvQkvSxXjafrDMzshWzPDbtjUv3SH6avqrPn
+-4NX0fv3BdBwTfDLAw/m8nN+9B9Mg0V7UNM1IJY/Vo5pLhv+MrEf8SnAS+1Wt43rT
+-3PY9iMZMMWUswdgmPY0yCN95ggwNrSMGV60yvEDxINWuJoR8s0lybDdFa+AB5v4T
+-hqKpspFNAgMBAAECggEAZmWu0K5QJ7Y7Rlo9ayLicsFyk36vUESQZ6MF0ybzEEPi
+-BkR2ZAX+vDuNQckm1pprlAcRZbactl35bT3Z+fQE1cgaZoC8/x6xwq2m0796pNPB
+-v0zjqdBBOLAaSgjLm56wyd88GqZ8vZsTBnw3KrxIYcP13e5OcaJ0V/GOf/yfD0lg
+-Tq9i7V5Iq++Fpo2KvJA8FMgqcfhvhdo40rRykoBfzEZpBk4Ia/Yijsbx5sE15pFZ
+-DfmsMbD+vViuM8IavHo61mBNyYeydwlgIMqUgP/6xbYUov/XSUojrLG+IQuvDx9D
+-xzTHGM+IBJxQZMza/mDVcjUAcDEjWt/Mve8ibTQCbwKBgQDyaiGsURtlf/8xmmvT
+-RQQFFFsJ8SXHNYmnceNULIjfDxpLk1yC4kBNUD+liAJscoVlOcByHmXQRtnY1PHq
+-AwyrwplGd82773mtriDVFSjhD+GB7I0Hv2j+uiFZury0jR/6/AsWKCtTqd0opyuB
+-8rGZjguiwZIjeyxd8mL1dncUHwKBgQDxcNxHUvIeDBvAmtK65xWUuLcqtK9BblBH
+-YVA7p93RqX4E+w3J0OCvQRQ3r1GCMMzFEO0oOvNfMucU4rbQmx1pbzF8aQU+8iEW
+-kYpaWUbPUQ2hmBblhjGYHsigt/BrzaW0QveVIWcGiyVVX9wiCzJH5moJlCRK2oHR
+-B36hdlmNEwKBgQCSlWSpOx4y4RQiHXtn9Eq6+5UVTPGIJTKIwxAwnQFiyFIhMwl0
+-x3UUixsBcF3uz80j6akaGJF+QOmH+TQTSibGUdS3TMhmBSfxwuJtlu7yMNUu6Chb
+-b/4AUfLKvGVRVCjrbq8Rhda1L3jhFTz0xhlofgFBOIWy2M96O5BlV24oBwKBgQDs
+-cf93ZfawkGEZVUXsPeQ3mlHe48YCCPtbfCSr13B3JErCq+5L52AyoUQgaHQlUI8o
+-qrPmQx0V7O662G/6iP3bxEYtNVgq1cqrpGpeorGi1BjKWPyLWMj21abbJmev21xc
+-1XxLMsQHd3tfSZp2SIq8OR09NjP4jla1k2Ziz1lRuwKBgQCUJXjhW4dPoOzC7DJK
+-u4PsxcKkJDwwtfNudVDaHcbvvaHELTAkE2639vawH0TRwP6TDwmlbTQJP4EW+/0q
+-13VcNXVAZSruA9dvxlh4vNUH3PzTDdFIJzGVbYbV9p5t++EQ7gRLuLZqs99BOzM9
+-k6W9F60mEFz1Owh+lQv7WfSIVA==
++MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDcYC4tS2Uvn1Z2
++iDgtfkJA5tAqgbN6X4yK02RtVH5xekV9+6+eTt/9S+iFAzAnwqR/UB1R67ETrsWq
++V8u9xLg5fHIwIkmu9/6P31UU9cghO7J1lcrhHvooHaFpcXepPWQacpuBq2VvcKRD
++lDfVmdM5z6eS3dSZPTOMMP/xk4nhZB8mcw27qiccPieS0PZ9EZB63T1gmwaK1Rd5
++U94Pl0+zpDqhViuXmBfiIDWjjz0BzHnHSz5Rg4S3oXF1NcojhptIWyI0r7dgn5J3
++NxC4kgKdjzysxo6iWd0nLgz7h0jUdj79EOis4fg9G4f0EFWyQf7iDxGaA93Y9ePB
++Jv5iFZVZAgMBAAECggEBAILIPX856EHb0KclbhlpfY4grFcdg9LS04grrcTISQW1
++J3p9nBpZ+snKe6I8Yx6lf5PiipPsSLlCliHiWpIzJZVQCkAQiSPiHttpEYgP2IYI
++dH8dtznkdVbLRthZs0bnnPmpHCpW+iqpcYJ9eqkz0cvUNUGOjjWmwWmoRqwp/8CW
++3S1qbkQiCh0Mk2fQeGar76R06kXQ9MKDEj14zyS3rJX+cokjEoMSlH8Sbmdh2mJz
++XlNZcvqmeGJZwQWgbVVHOMUuZaKJiFa+lqvOdppbqSx0AsCRq6vjmjEYQEoOefYK
++3IJM9IvqW5UNx0Cy4kQdjhZFFwMO/ALD3QyF21iP4gECgYEA+isQiaWdaY4UYxwK
++Dg+pnSCKD7UGZUaCUIv9ds3CbntMOONFe0FxPsgcc4jRYQYj1rpQiFB8F11+qXGa
++P/IHcnjr2+mTrNY4I9Bt1Lg+pHSS8QCgzeueFybYMLaSsXUo7tGwpvw6UUb6/YWI
++LNCzZbrCLg1KZjGODhhxtvN45ZkCgYEA4YNSe+GMZlxgsvxbLs86WOm6DzJUPvxN
++bWmni0+Oe0cbevgGEUjDVc895uMFnpvlgO49/C0AYJ+VVbStjIMgAeMnWj6OZoSX
++q49rI8KmKUxKgORZiiaMqGWQ7Rxv68+4S8WANsjFxoUrE6dNV3uYDIUsiSLbZeI8
++38KVTcLohcECgYEAiOdyWHGq0G4xl/9rPUCzCMsa4velNV09yYiiwBZgVgfhsawm
++hQpOSBZJA60XMGqkyEkT81VgY4UF4QLLcD0qeCnWoXWVHFvrQyY4RNZDacpl87/t
++QGO2E2NtolL3umesa+2TJ/8Whw46Iu2llSjtVDm9NGiPk5eA7xPPf1iEi9kCgYAb
++0EmVE91wJoaarLtGS7LDkpgrFacEWbPnAbfzW62UENIX2Y1OBm5pH/Vfi7J+vHWS
++8E9e0eIRCL2vY2hgQy/oa67H151SkZnvQ/IP6Ar8Xvd1bDSK8HQ6tMQqKm63Y9g0
++KDjHCP4znOsSMnk8h/bZ3HcAtvbeWwftBR/LBnYNQQKBgA1leIXLLHRoX0VtS/7e
++y7Xmn7gepj+gDbSuCs5wGtgw0RB/1z/S3QoS2TCbZzKPBo20+ivoRP7gcuFhduFR
++hT8V87esr/QzLVpjLedQDW8Xb7GiO3BsU/gVC9VcngenbL7JObl3NgvdreIYo6+n
++yrLyf+8hjm6H6zkjqiOkHAl+
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIIDeTCCAmGgAwIBAgIUTMQXiTcI/rpzqO91NyFWpjLE3KkwDQYJKoZIhvcNAQEL
++MIIDdzCCAl+gAwIBAgIUdWyHziJTdWjooy8SanPMwLxNsPEwDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxM1oYDzIxMjIw
+-NTA5MTUzMzEzWjBFMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEeMBwGA1UEAwwVVGVzdCBTL01JTUUgRUUgUlNBICMyMIIBIjANBgkqhkiG9w0B
+-AQEFAAOCAQ8AMIIBCgKCAQEA5KDIuLKo9pjfI0mhQIm1xH3mGK8wRyHQpv7ml1or
+-fNX1zkhVcNa23gKacc+2znEhDedJaXT9lF9/2xWBQ93sR1473IfTTzYEGjZAqkzU
+-7mGti/cK6ZbV56J+7R91v82Xxfv6qVErtX+q5BssY1V8S8IyGsAl9K2y3HRQlVcv
+-hMr0JL0sV42n6wzM7IVszw27Y1L90h+mr6qz5+DV9H79wXQcE3wywMP5vJzfvQfT
+-INFe1DTNSCWP1aOaS4b/jKxH/EpwEvtVreN609z2PYjGTDFlLMHYJj2NMgjfeYIM
+-Da0jBletMrxA8SDVriaEfLNJcmw3RWvgAeb+E4aiqbKRTQIDAQABo2AwXjAMBgNV
+-HRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIF4DAdBgNVHQ4EFgQUSJ0v3SKahe6eKssR
+-rBvYLBprFTgwHwYDVR0jBBgwFoAUFcETIWviVV+nah1XINbP86lzZFkwDQYJKoZI
+-hvcNAQELBQADggEBAKoyszyZ3DfCOIVzeJrnScXuMvRkVqO5aGmgZxtY9r6gPk8v
+-gXaEFXDKqRbGqEnuwEjpew+SVZO8nrVpdIP7fydpufy7Cu91Ev4YL1ui5Vc66+IK
+-7dXV7eZYcH/dDJBPZddHx9vGhcr0w8B1W9nldM3aQE/RQjOmMRDc7/Hnk0f0RzJp
+-LA0adW3ry27z2s4qeCwkV9DNSh1KoGfcLwydBiXmJ1XINMFH/scD4pk9UeJpUL+5
+-zvTaDzUmzLsI1gH3j/rlzJuNJ7EMfggKlfQdit9Qn6+6Gjk6T5jkZfzcq3LszuEA
+-EFtkxWyBmmEgh4EmvZGAyrUvne1hIIksKe3iJ+E=
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MDkyNVoXDTMyMDMz
++MTE0MDkyNVowRTELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HjAcBgNVBAMMFVRlc3QgUy9NSU1FIEVFIFJTQSAjMjCCASIwDQYJKoZIhvcNAQEB
++BQADggEPADCCAQoCggEBANxgLi1LZS+fVnaIOC1+QkDm0CqBs3pfjIrTZG1UfnF6
++RX37r55O3/1L6IUDMCfCpH9QHVHrsROuxapXy73EuDl8cjAiSa73/o/fVRT1yCE7
++snWVyuEe+igdoWlxd6k9ZBpym4GrZW9wpEOUN9WZ0znPp5Ld1Jk9M4ww//GTieFk
++HyZzDbuqJxw+J5LQ9n0RkHrdPWCbBorVF3lT3g+XT7OkOqFWK5eYF+IgNaOPPQHM
++ecdLPlGDhLehcXU1yiOGm0hbIjSvt2Cfknc3ELiSAp2PPKzGjqJZ3ScuDPuHSNR2
++Pv0Q6Kzh+D0bh/QQVbJB/uIPEZoD3dj148Em/mIVlVkCAwEAAaNgMF4wDAYDVR0T
++AQH/BAIwADAOBgNVHQ8BAf8EBAMCBeAwHQYDVR0OBBYEFPRqunJgwdcM9Uvsy/MT
++6XHvUvuyMB8GA1UdIwQYMBaAFMmRUwpjexZbi71E8HaIqSTm5bZsMA0GCSqGSIb3
++DQEBCwUAA4IBAQBz02v4hd+EjW5NaMubkqPbgUTDRKdRq1RZM+C6m1MTMKy+8zTD
++QSKRCFf0UmSPMsdTArry9x15fmHIJW21F3bw4ISeVXRyzBhOnrGKXUt2Lg9c2MLa
++9C394ex0vw4ZGSNkrIARbM3084Chegs4PLMWLFam1H5J6wpvH8iXXYvhESW98luv
++i3HVQzqLXw7/9XHxf8RnrRcy/WhAA+KegAQMGHTo5KPLliXtypYdCxBHNcmOwJlR
++pSOp6fxhiRKN5DzcBPHOE/brZc4aNGgBHZgGg1g1Wb2lAylopgJrbyNkhEEwHVNM
++1uLCnXKV1nX+EiMKkhSV761ozdhMGljYb+GE
+ -----END CERTIFICATE-----
+diff -up openssl-3.0.5/test/smime-certs/smrsa3.pem.0061 openssl-3.0.5/test/smime-certs/smrsa3.pem
+--- openssl-3.0.5/test/smime-certs/smrsa3.pem.0061	2022-09-02 14:17:15.327436627 +0200
++++ openssl-3.0.5/test/smime-certs/smrsa3.pem	2022-09-02 14:17:15.346436795 +0200
+@@ -1,49 +1,49 @@
+ -----BEGIN PRIVATE KEY-----
+-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQD5A/t3norj/167
+-toKG1Ygtg3G+pZ4Nwl5a9flnm8JdSMW5TEEP1TSvDVIEuAVi7xqoAn6heypoaMkB
+-GJ+AoSo9R7umdhhq2vnmWFNsdH6oDzynVXixyURo81YrN3sn9Xd55ivTiSpZXldi
+-ECr2T0BYvOw0h497bPs6gY9LqgrBHNYVF3lFhdOmYWv+2qSdti+1gV3t24pv1CrK
+-2AdX5Epdd5jR+eNnt+suZqoPC0hTcNjszJLcfDYFXHva9BcE0DfrgcYSmoSBU53M
+-jt63TClK6ZoVcPJ7vXjFRHncvs1/d+nc9BdL9FsGI1ezspSwcJHqex2wgo76yDrq
+-DE4s23rPAgMBAAECggEAEDi+VWD5VUpjD5zWOoPQiRDGBJBhtMAKkl6okxEmXvWb
+-Xz3STFnjHgA1JFHW3bRU9BHI9k8vSHmnlnkfKb3V/ZX5IHNcKCHb/x9NBak+QLVQ
+-0zLtfE9vxiTC0B/oac+MPaiD4hYFQ81pFwK6VS0Poi8ZCBJtOkRqfUvsyV8zZrgh
+-/6cs4mwOVyZPFRgF9eWXYv7PJz8pNRizhII0iv9H/r2I3DzsZLPCg7c29mP+I/SG
+-A7Pl82UXjtOc0KurGY2M5VheZjxJT/k/FLMkWY2GS5n6dfcyzsVSKb25HoeuvQsI
+-vs1mKs+Onbobdc17hCcKVJzbi3DwXs5XDhrEzfHccQKBgQD88uBxVCRV31PsCN6I
+-pKxQDGgz+1BqPqe7KMRiZI7HgDUK0eCM3/oG089/jsBtJcSxnScLSVNBjQ+xGiFi
+-YCD4icQoJSzpqJyR6gDq5lTHASAe+9LWRW771MrtyACQWNXowYEyu8AjekrZkCUS
+-wIKVpw57oWykzIoS7ixZsJ8gxwKBgQD8BPWqJEsLiQvOlS5E/g88eV1KTpxm9Xs+
+-BbwsDXZ7m4Iw5lYaUu5CwBB/2jkGGRl8Q/EfAdUT7gXv3t6x5b1qMXaIczmRGYto
+-NuI3AH2MPxAa7lg5TgBgie1r7PKwyPMfG3CtDx6n8W5sexgJpbIy5u7E+U6d8s1o
+-c7EcsefduQKBgCkHJAx9v18GWFBip+W2ABUDzisQSlzRSNd8p03mTZpiWzgkDq4K
+-7j0JQhDIkMGjbKH6gYi9Hfn17WOmf1+7g92MSvrP/NbxeGPadsejEIEu14zu/6Wt
+-oXDLdRbYZ+8B2cBlEpWuCl42yck8Lic6fnPTou++oSah3otvglYR5d2lAoGACd8L
+-3FE1m0sP6lSPjmZBJIZAcDOqDqJY5HIHD9arKGZL8CxlfPx4lqa9PrTGfQWoqORk
+-YmmI9hHhq6aYJHGyPKGZWfjhbVyJyFg1/h+Hy2GA+P0S+ZOjkiR050BNtTz5wOMr
+-Q6wO8FcVkywzIdWaqEHBYne9a5RiFVBKxKv3QAkCgYBxmCBKajFkMVb4Uc55WqJs
+-Add0mctGgmZ1l5vq81eWe3wjM8wgfJgaD3Q3gwx2ABUX/R+OsVWSh4o5ZR86sYoz
+-TviknBHF8GeDLjpT49+04fEaz336J2JOptF9zIpz7ZK1nrOEjzaZGtumReVjUP7X
+-fNcb5iDYqZRzD8ixBbLxUw==
++MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCyK+BTAOJKJjji
++OhY60NeZjzGGZxEBfCm62n0mwkzusW/V/e63uwj6uOVCFoVBz5doMf3M6QIS2jL3
++Aw6Qs5+vcuLA0gHrqIwjYQz1UZ5ETLKLKbQw6YOIVfsFSTxytUVpfcByrubWiLKX
++63theG1/IVokDK/9/k52Kyt+wcCjuRb7AJQFj2OLDRuWm/gavozkK103gQ+dUq4H
++XamZMtTq1EhQOfc0IUeCOEL6xz4jzlHHfzLdkvb7Enhav2sXDfOmZp/DYf9IqS7l
++vFkkINPVbYFBTexaPZlFwmpGRjkmoyH/w+Jlcpzs+w6p1diWRpaSn62bbkRN49j6
++L2dVb+DfAgMBAAECggEAciwDl6zdVT6g/PbT/+SMA+7qgYHSN+1koEQaJpgjzGEP
++lUUfj8TewCtzXaIoyj9IepBuXryBg6snNXpT/w3bqgYon/7zFBvxkUpDj4A5tvKf
++BuY2fZFlpBvUu1Ju1eKrFCptBBBoA9mc+BUB/ze4ktrAdJFcxZoMlVScjqGB3GdR
++OHw2x9BdWGCJBhiu9VHhAAb/LVWi6xgDumYSWZwN2yovg+7J91t5bsENeBRHycK+
++i5dNFh1umIK9N0SH6bpHPnLHrCRchrQ6ZRRxL4ZBKA9jFRDeI7OOsJuCvhGyJ1se
++snsLjr/Ahg00aiHCcC1SPQ6pmXAVBCG7hf4AX82V4QKBgQDaFDE+Fcpv84mFo4s9
++wn4CZ8ymoNIaf5zPl/gpH7MGots4NT5+Ns+6zzJQ6TEpDjTPx+vDaabP7QGXwVZn
++8NAHYvCQK37b+u9HrOt256YYRDOmnJFSbsJdmqzMEzpTNmQ8GuI37cZCS9CmSMv+
++ab/plcwuv0cJRSC83NN2AFyu1QKBgQDRJzKIBQlpprF9rA0D5ZjLVW4OH18A0Mmm
++oanw7qVutBaM4taFN4M851WnNIROyYIlkk2fNgW57Y4M8LER4zLrjU5HY4lB0BMX
++LQWDbyz4Y7L4lVnnEKfQxWFt9avNZwiCxCxEKy/n/icmVCzc91j9uwKcupdzrN6E
++yzPd1s5y4wKBgQCkJvzmAdsOp9/Fg1RFWcgmIWHvrzBXl+U+ceLveZf1j9K5nYJ7
++2OBGer4iH1XM1I+2M4No5XcWHg3L4FEdDixY0wXHT6Y/CcThS+015Kqmq3fBmyrc
++RNjzQoF9X5/QkSmkAIx1kvpgXtcgw70htRIrToGSUpKzDKDW6NYXhbA+PQKBgDJK
++KH5IJ8E9kYPUMLT1Kc4KVpISvPcnPLVSPdhuqVx69MkfadFSTb4BKbkwiXegQCjk
++isFzbeEM25EE9q6EYKP+sAm+RyyJ6W0zKBY4TynSXyAiWSGUAaXTL+AOqCaVVZiL
++rtEdSUGQ/LzclIT0/HLV2oTw4KWxtTdc3LXEhpNdAoGBAM3LckiHENqtoeK2gVNw
++IPeEuruEqoN4n+XltbEEv6Ymhxrs6T6HSKsEsLhqsUiIvIzH43KMm45SNYTn5eZh
++yzYMXLmervN7c1jJe2Y2MYv6hE+Ypj1xGW4w7s8WNKmVzLv97beisD9AZrS7sXfF
++RvOAi5wVkYylDxV4238MAZIq
+ -----END PRIVATE KEY-----
+ -----BEGIN CERTIFICATE-----
+-MIIDeTCCAmGgAwIBAgIUIDyc//j/LoNDesZTGbPBoVarv4EwDQYJKoZIhvcNAQEL
++MIIDdzCCAl+gAwIBAgIUAKvI4FWjFLx8iBGifOW3mG/xkT0wDQYJKoZIhvcNAQEL
+ BQAwRDELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAxHTAbBgNV
+-BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MCAXDTIyMDYwMjE1MzMxM1oYDzIxMjIw
+-NTA5MTUzMzEzWjBFMQswCQYDVQQGEwJVSzEWMBQGA1UECgwNT3BlblNTTCBHcm91
+-cDEeMBwGA1UEAwwVVGVzdCBTL01JTUUgRUUgUlNBICMzMIIBIjANBgkqhkiG9w0B
+-AQEFAAOCAQ8AMIIBCgKCAQEA+QP7d56K4/9eu7aChtWILYNxvqWeDcJeWvX5Z5vC
+-XUjFuUxBD9U0rw1SBLgFYu8aqAJ+oXsqaGjJARifgKEqPUe7pnYYatr55lhTbHR+
+-qA88p1V4sclEaPNWKzd7J/V3eeYr04kqWV5XYhAq9k9AWLzsNIePe2z7OoGPS6oK
+-wRzWFRd5RYXTpmFr/tqknbYvtYFd7duKb9QqytgHV+RKXXeY0fnjZ7frLmaqDwtI
+-U3DY7MyS3Hw2BVx72vQXBNA364HGEpqEgVOdzI7et0wpSumaFXDye714xUR53L7N
+-f3fp3PQXS/RbBiNXs7KUsHCR6nsdsIKO+sg66gxOLNt6zwIDAQABo2AwXjAMBgNV
+-HRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIF4DAdBgNVHQ4EFgQUN9pGq/UFS3o50rTi
+-V+AYgAk+3R4wHwYDVR0jBBgwFoAUFcETIWviVV+nah1XINbP86lzZFkwDQYJKoZI
+-hvcNAQELBQADggEBAGcOh380/6aJqMpYBssuf2CB3DX/hGKdvEF7fF8iNSfl5HHq
+-112kHl3MhbL9Th/safJq9sLDJqjXRNdVCUJJbU4YI2P2gsi04paC0qxWxMLtzQLd
+-CE7ki2xH94Fuu/dThbpzZBABROO1RrdI24GDGt9t4Gf0WVkobmT/zNlwGppKTIB2
+-iV/Ug30iKr/C49UzwUIa+XXXujkjPTmGSnrKwVQNxQh81rb+iTL7GEnNuqDsatHW
+-ZyLS2SaVdG5tMqDkITPMDGjehUzJcAbVc8Bv4m8Ukuov3uDj2Doc6MxlvrVkV0AE
+-BcSCb/bWQJJ/X4LQZlx9cMk4NINxV9UeFPZOefg=
++BAMMFFRlc3QgUy9NSU1FIFJTQSBSb290MB4XDTIyMDUyMzE0MTEwNloXDTMyMDMz
++MTE0MTEwNlowRTELMAkGA1UEBhMCVUsxFjAUBgNVBAoMDU9wZW5TU0wgR3JvdXAx
++HjAcBgNVBAMMFVRlc3QgUy9NSU1FIEVFIFJTQSAjMzCCASIwDQYJKoZIhvcNAQEB
++BQADggEPADCCAQoCggEBALIr4FMA4komOOI6FjrQ15mPMYZnEQF8KbrafSbCTO6x
++b9X97re7CPq45UIWhUHPl2gx/czpAhLaMvcDDpCzn69y4sDSAeuojCNhDPVRnkRM
++sosptDDpg4hV+wVJPHK1RWl9wHKu5taIspfre2F4bX8hWiQMr/3+TnYrK37BwKO5
++FvsAlAWPY4sNG5ab+Bq+jOQrXTeBD51SrgddqZky1OrUSFA59zQhR4I4QvrHPiPO
++Ucd/Mt2S9vsSeFq/axcN86Zmn8Nh/0ipLuW8WSQg09VtgUFN7Fo9mUXCakZGOSaj
++If/D4mVynOz7DqnV2JZGlpKfrZtuRE3j2PovZ1Vv4N8CAwEAAaNgMF4wDAYDVR0T
++AQH/BAIwADAOBgNVHQ8BAf8EBAMCBeAwHQYDVR0OBBYEFDoKRbmxroesGxa+4868
++yPIvkCewMB8GA1UdIwQYMBaAFMmRUwpjexZbi71E8HaIqSTm5bZsMA0GCSqGSIb3
++DQEBCwUAA4IBAQBfCCzWyZzIvq/ci6E74ovJ8mMel5Z9MU9EcvY0k7pJSUbpCg3c
++P48CiAzt8r8Em4AymADfK1pYvvpTNVpU/USbdKR1hyxZjqWrYdsY7tlVuvZ92oFs
++s3komuKHCx2SQAe5b+LWjC1Bf8JUFx+XTjYb/BBg7nQRwi3TkYVVmW7hXLYvf4Jn
++Uyu0x02pDzUu+62jeYbNIVJnYwSU0gLHEo81QmNs06RLjnAhbneUZ6P6YuJOdDo7
++xMw/ywijZM0FxsWxRSsCBwavhabg1Kb1lO//pbgcSa9T0D7ax1XoMni3RJnHj6gu
++r0Mi3QjgZaxghR3TPh83dQLilECYDuD0uTzf
+ -----END CERTIFICATE-----

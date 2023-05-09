@@ -1,0 +1,119 @@
+From c4b086fc4de06128695e1fe428f56d776d25e748 Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Thu, 11 Aug 2022 09:27:12 +0200
+Subject: [PATCH] Add FIPS indicator parameter to HKDF
+
+NIST considers HKDF only acceptable when used as in TLS 1.3, and
+otherwise unapproved. Add an explicit indicator attached to the
+EVP_KDF_CTX that can be queried using EVP_KDF_CTX_get_params() to
+determine whether the KDF operation was approved after performing it.
+
+Related: rhbz#2114772
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+---
+ include/openssl/core_names.h          |  1 +
+ include/openssl/kdf.h                 |  4 ++
+ providers/implementations/kdfs/hkdf.c | 53 +++++++++++++++++++++++++++
+ 3 files changed, 58 insertions(+)
+
+diff --git a/include/openssl/core_names.h b/include/openssl/core_names.h
+index 21c94d0488..87786680d7 100644
+--- a/include/openssl/core_names.h
++++ b/include/openssl/core_names.h
+@@ -223,6 +223,7 @@ extern "C" {
+ #define OSSL_KDF_PARAM_X942_SUPP_PUBINFO    "supp-pubinfo"
+ #define OSSL_KDF_PARAM_X942_SUPP_PRIVINFO   "supp-privinfo"
+ #define OSSL_KDF_PARAM_X942_USE_KEYBITS     "use-keybits"
++#define OSSL_KDF_PARAM_HKDF_REDHAT_FIPS_INDICATOR "hkdf-fips-indicator"
+ 
+ /* Known KDF names */
+ #define OSSL_KDF_NAME_HKDF           "HKDF"
+diff --git a/include/openssl/kdf.h b/include/openssl/kdf.h
+index 0983230a48..869f23d8fb 100644
+--- a/include/openssl/kdf.h
++++ b/include/openssl/kdf.h
+@@ -63,6 +63,10 @@ int EVP_KDF_names_do_all(const EVP_KDF *kdf,
+ # define EVP_KDF_HKDF_MODE_EXTRACT_ONLY        1
+ # define EVP_KDF_HKDF_MODE_EXPAND_ONLY         2
+ 
++# define EVP_KDF_HKDF_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_KDF_HKDF_FIPS_INDICATOR_APPROVED     1
++# define EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED 2
++
+ #define EVP_KDF_SSHKDF_TYPE_INITIAL_IV_CLI_TO_SRV     65
+ #define EVP_KDF_SSHKDF_TYPE_INITIAL_IV_SRV_TO_CLI     66
+ #define EVP_KDF_SSHKDF_TYPE_ENCRYPTION_KEY_CLI_TO_SRV 67
+diff --git a/providers/implementations/kdfs/hkdf.c b/providers/implementations/kdfs/hkdf.c
+index afdb7138e1..9d28d292d8 100644
+--- a/providers/implementations/kdfs/hkdf.c
++++ b/providers/implementations/kdfs/hkdf.c
+@@ -298,6 +298,56 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+             return 0;
+         return OSSL_PARAM_set_size_t(p, sz);
+     }
++
++#ifdef FIPS_MODULE
++    if ((p = OSSL_PARAM_locate(params,
++                OSSL_KDF_PARAM_HKDF_REDHAT_FIPS_INDICATOR)) != NULL) {
++        int fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_UNDETERMINED;
++        switch (ctx->mode) {
++        case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
++            /* TLS 1.3 never uses extract-and-expand */
++            fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
++            break;
++        case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
++            {
++                /* When TLS 1.3 uses extract, the following holds:
++                 * 1. The salt length matches the hash length, and either
++                 * 2.1. the key is all zeroes and matches the hash length, or
++                 * 2.2. the key originates from a PSK (resumption_master_secret
++                 *   or some externally esablished key), or an ECDH or DH key
++                 *   derivation. See
++                 *   https://www.rfc-editor.org/rfc/rfc8446#section-7.1.
++                 * Unfortunately at this point, we cannot verify where the key
++                 * comes from, so all we can do is check the salt length.
++                 */
++                const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
++                if (md != NULL && ctx->salt_len == EVP_MD_get_size(md))
++                    fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_APPROVED;
++                else
++                    fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
++            }
++            break;
++        case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
++            /* When TLS 1.3 uses expand, it always provides a label that
++             * contains an uint16 for the length, followed by between 7 and 255
++             * bytes for a label string that starts with "tls13 " or "dtls13".
++             * For compatibility with future versions, we only check for "tls"
++             * or "dtls". See
++             * https://www.rfc-editor.org/rfc/rfc8446#section-7.1 and
++             * https://www.rfc-editor.org/rfc/rfc9147#section-5.9. */
++            if (ctx->label != NULL
++                    && ctx->label_len >= 2 /* length */ + 4 /* "dtls" */
++                    && (strncmp("tls", (const char *)ctx->label + 2, 3) == 0 ||
++                        strncmp("dtls", (const char *)ctx->label + 2, 4) == 0))
++                fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_APPROVED;
++            else
++                fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
++            break;
++        }
++        return OSSL_PARAM_set_int(p, fips_indicator);
++    }
++#endif /* defined(FIPS_MODULE) */
++
+     return -2;
+ }
+ 
+@@ -306,6 +356,9 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
+ {
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
++#ifdef FIPS_MODULE
++        OSSL_PARAM_int(OSSL_KDF_PARAM_HKDF_REDHAT_FIPS_INDICATOR, NULL),
++#endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+     return known_gettable_ctx_params;
+-- 
+2.37.1
+
