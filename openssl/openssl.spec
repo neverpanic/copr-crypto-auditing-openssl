@@ -156,6 +156,57 @@ Patch100: 0100-RSA-PKCS15-implicit-rejection.patch
 # Add crypto-auditing probe point for TLS
 Patch9999: 9999-Add-crypto-auditing-probe-for-TLS.patch
 
+# Tito doesn't deal well with patchfiles and does not copy them into its
+# _specdir, so as a workaround, mention all patchfiles as source. See
+# https://github.com/rpm-software-management/tito/issues/446. The list is
+# generated using:
+#   grep -P '^Patch\d+:' openssl.spec | awk '{print $2}' | (i=500; while read file; do echo "Source${i}: $file"; let i++; done)
+Source500: 0001-Aarch64-and-ppc64le-use-lib64.patch
+Source501: 0002-Use-more-general-default-values-in-openssl.cnf.patch
+Source502: 0003-Do-not-install-html-docs.patch
+Source503: 0004-Override-default-paths-for-the-CA-directory-tree.patch
+Source504: 0005-apps-ca-fix-md-option-help-text.patch
+Source505: 0006-Disable-signature-verification-with-totally-unsafe-h.patch
+Source506: 0007-Add-support-for-PROFILE-SYSTEM-system-default-cipher.patch
+Source507: 0008-Add-FIPS_mode-compatibility-macro.patch
+Source508: 0009-Add-Kernel-FIPS-mode-flag-support.patch
+Source509: 0010-Add-changes-to-ectest-and-eccurve.patch
+Source510: 0011-Remove-EC-curves.patch
+Source511: 0012-Disable-explicit-ec.patch
+Source512: 0013-skipped-tests-EC-curves.patch
+Source513: 0024-load-legacy-prov.patch
+Source514: 0031-tmp-Fix-test-names.patch
+Source515: 0032-Force-fips.patch
+Source516: 0033-FIPS-embed-hmac.patch
+Source517: 0034.fipsinstall_disable.patch
+Source518: 0035-speed-skip-unavailable-dgst.patch
+Source519: 0044-FIPS-140-3-keychecks.patch
+Source520: 0045-FIPS-services-minimize.patch
+Source521: 0047-FIPS-early-KATS.patch
+Source522: 0049-Selectively-disallow-SHA1-signatures.patch
+Source523: 0049-Allow-disabling-of-SHA1-signatures.patch
+Source524: 0051-Support-different-R_BITS-lengths-for-KBKDF.patch
+Source525: 0052-Allow-SHA1-in-seclevel-2-if-rh-allow-sha1-signatures.patch
+Source526: 0052-Allow-SHA1-in-seclevel-1-if-rh-allow-sha1-signatures.patch
+Source527: 0053-Add-SHA1-probes.patch
+Source528: 0056-strcasecmp.patch
+Source529: 0058-FIPS-limit-rsa-encrypt.patch
+Source530: 0060-FIPS-KAT-signature-tests.patch
+Source531: 0061-Deny-SHA-1-signature-verification-in-FIPS-provider.patch
+Source532: 0062-fips-Expose-a-FIPS-indicator.patch
+Source533: 0071-AES-GCM-performance-optimization.patch
+Source534: 0072-ChaCha20-performance-optimizations-for-ppc64le.patch
+Source535: 0073-FIPS-Use-OAEP-in-KATs-support-fixed-OAEP-seed.patch
+Source536: 0074-FIPS-Use-digest_sign-digest_verify-in-self-test-eln.patch
+Source537: 0074-FIPS-Use-digest_sign-digest_verify-in-self-test.patch
+Source538: 0075-FIPS-Use-FFDHE2048-in-self-test.patch
+Source539: 0076-FIPS-140-3-DRBG.patch
+Source540: 0077-FIPS-140-3-zeroization.patch
+Source541: 0078-Add-FIPS-indicator-parameter-to-HKDF.patch
+Source542: 0079-Fix-AES-GCM-on-Power-8-CPUs.patch
+Source543: 0100-RSA-PKCS15-implicit-rejection.patch
+Source544: 9999-Add-crypto-auditing-probe-for-TLS.patch
+
 License: ASL 2.0
 URL: http://www.openssl.org/
 BuildRequires: gcc g++
