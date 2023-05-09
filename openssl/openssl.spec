@@ -153,6 +153,9 @@ Patch79: 0079-Fix-AES-GCM-on-Power-8-CPUs.patch
 # https://github.com/openssl/openssl/pull/13817
 Patch100: 0100-RSA-PKCS15-implicit-rejection.patch
 
+# Add crypto-auditing probe point for TLS
+Patch9999: 9999-Add-crypto-auditing-probe-for-TLS.patch
+
 License: ASL 2.0
 URL: http://www.openssl.org/
 BuildRequires: gcc g++

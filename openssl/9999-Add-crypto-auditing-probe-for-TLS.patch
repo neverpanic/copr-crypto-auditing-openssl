@@ -1,0 +1,125 @@
+From a0c99a79b0f3dfc3ed05795e7e5c7add88cd7f26 Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Thu, 24 Nov 2022 12:28:05 +0100
+Subject: [PATCH] Add crypto auditing probe for TLS
+
+Allow tracing which TLS version and cipher suite was used for SSLv3,
+TLSv1, TLSv1.1, TLSv1.2, and TLSv1.3 handshakes.
+---
+ include/internal/audit.h | 29 +++++++++++++++++++++++++++++
+ ssl/s3_enc.c             |  6 ++++++
+ ssl/t1_enc.c             |  6 ++++++
+ ssl/tls13_enc.c          |  6 ++++++
+ 4 files changed, 47 insertions(+)
+ create mode 100644 include/internal/audit.h
+
+diff --git a/include/internal/audit.h b/include/internal/audit.h
+new file mode 100644
+index 0000000000..cd8a248aaf
+--- /dev/null
++++ b/include/internal/audit.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
++ *
++ * Licensed under the Apache License 2.0 (the "License").  You may not use
++ * this file except in compliance with the License.  You can obtain a copy
++ * in the file LICENSE in the source distribution or at
++ * https://www.openssl.org/source/license.html
++ */
++
++#ifndef OSSL_INTERNAL_AUDIT_H
++# define OSSL_INTERNAL_AUDIT_H
++# pragma once
++
++# define AUDIT_CONTEXT_SIZE (8)
++
++# include <sys/sdt.h>
++
++# define AUDIT_PUSH_CONTEXT(context_ptr, parent_ptr) \
++	DTRACE_PROBE3(audit, push_context, context_ptr, parent_ptr, AUDIT_CONTEXT_SIZE)
++# define AUDIT_POP_CONTEXT(context_ptr) \
++	DTRACE_PROBE2(audit, pop_context, context_ptr, AUDIT_CONTEXT_SIZE)
++# define AUDIT_WORD_DATA(context_ptr, key_ptr, value_ptr) \
++	DTRACE_PROBE3(audit, word_data, context_ptr, key_ptr, value_ptr)
++# define AUDIT_STRING_DATA(context_ptr, key_ptr, value_ptr) \
++	DTRACE_PROBE3(audit, string_data, context_ptr, key_ptr, value_ptr)
++# define AUDIT_BLOB_DATA(key_ptr, context_ptr, value_ptr, value_size) \
++	DTRACE_PROBE4(audit, blob_data, context_ptr, key_ptr, value_ptr, value_size)
++
++#endif /* !defined(OSSL_INTERNAL_AUDIT_H) */
+diff --git a/ssl/s3_enc.c b/ssl/s3_enc.c
+index d13a28697e..86672890a9 100644
+--- a/ssl/s3_enc.c
++++ b/ssl/s3_enc.c
+@@ -13,6 +13,7 @@
+ #include <openssl/evp.h>
+ #include <openssl/md5.h>
+ #include <openssl/core_names.h>
++#include "internal/audit.h"
+ #include "internal/cryptlib.h"
+ 
+ static int ssl3_generate_key_block(SSL *s, unsigned char *km, int num)
+@@ -256,6 +257,11 @@ int ssl3_setup_key_block(SSL *s)
+         return 0;
+     }
+ 
++    /* Log the TLS version and cipher suite identifier into BPF */
++    AUDIT_WORD_DATA(&s->session, "tls::protocol_version", s->version);
++    AUDIT_WORD_DATA(&s->session, "tls::ciphersuite",
++                    SSL_CIPHER_get_protocol_id(s->session->cipher));
++
+     ssl_evp_cipher_free(s->s3.tmp.new_sym_enc);
+     s->s3.tmp.new_sym_enc = c;
+     ssl_evp_md_free(s->s3.tmp.new_hash);
+diff --git a/ssl/t1_enc.c b/ssl/t1_enc.c
+index 712a784a0d..e89d6f1269 100644
+--- a/ssl/t1_enc.c
++++ b/ssl/t1_enc.c
+@@ -13,6 +13,7 @@
+ #include "record/record_local.h"
+ #include "internal/ktls.h"
+ #include "internal/cryptlib.h"
++#include "internal/audit.h"
+ #include <openssl/comp.h>
+ #include <openssl/evp.h>
+ #include <openssl/kdf.h>
+@@ -540,6 +541,11 @@ int tls1_setup_key_block(SSL *s)
+         return 0;
+     }
+ 
++    /* Log the TLS version and cipher suite identifier into BPF */
++    AUDIT_WORD_DATA(&s->session, "tls::protocol_version", s->version);
++    AUDIT_WORD_DATA(&s->session, "tls::ciphersuite",
++                    SSL_CIPHER_get_protocol_id(s->session->cipher));
++
+     ssl_evp_cipher_free(s->s3.tmp.new_sym_enc);
+     s->s3.tmp.new_sym_enc = c;
+     ssl_evp_md_free(s->s3.tmp.new_hash);
+diff --git a/ssl/tls13_enc.c b/ssl/tls13_enc.c
+index 78efc65813..d6bce23266 100644
+--- a/ssl/tls13_enc.c
++++ b/ssl/tls13_enc.c
+@@ -12,6 +12,7 @@
+ #include "internal/ktls.h"
+ #include "record/record_local.h"
+ #include "internal/cryptlib.h"
++#include "internal/audit.h"
+ #include <openssl/evp.h>
+ #include <openssl/kdf.h>
+ #include <openssl/core_names.h>
+@@ -322,6 +323,11 @@ int tls13_setup_key_block(SSL *s)
+         return 0;
+     }
+ 
++    /* Log the TLS version and cipher suite identifier into BPF */
++    AUDIT_WORD_DATA(&s->session, "tls::protocol_version", s->version);
++    AUDIT_WORD_DATA(&s->session, "tls::ciphersuite",
++                    SSL_CIPHER_get_protocol_id(s->session->cipher));
++
+     ssl_evp_cipher_free(s->s3.tmp.new_sym_enc);
+     s->s3.tmp.new_sym_enc = c;
+     ssl_evp_md_free(s->s3.tmp.new_hash);
+-- 
+2.40.0
+
